@@ -89,5 +89,12 @@ A brand-new idragra executable should be created!
 
 #### Step 6bis: alternative, run in debug mode ####
 
-Go to the launch.json file under .vscode folder and set the path to  
+Go to the launch.json file under .vscode folder and replace the path with that to your idragra dataset (where idragra_parameters.txt exists):
+```json
+...
+"cwd": "YOUR-PATH-TO-IDRAGRA-DATASET",
+...
+make
+```
+
 On the side bar (left), select Run and Debug. Then, click on the green triangle on the top. If necessary, select the debugger (gdb) Launch
