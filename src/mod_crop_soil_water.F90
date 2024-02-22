@@ -163,12 +163,12 @@ module mod_crop_soil_water
             ! TODO: check order and update h_soil_mean
             call evaporation(h_soil_mean, h_rew, h_wp, kc_max, few, k_e, k_cb,h_et0,h_eva_act,h_eva_pot,k_r)!
             
-            h_perc1 = percolation(adj_perc_par,h_soil_mean, h_r, h_sat, k_sat, fatt_n)!
+            h_perc1 = percolation(adj_perc_par, h_soil_mean, h_r, h_sat, k_sat, fatt_n)!
 
             call transpiration(h_soil_mean, k_cb, p_day, h_wp, h_fc, rf_e, h_transp_act, h_transp_pot, hks, h_et0)!
             
             ! water balance equation (TODO: h_soil_mean)
-            h_soil_new = h_soil0 + (h_inf+h_net_irr+h_pond_i) - h_eva_act - h_perc1 - h_transp_act!
+            h_soil_new = h_soil0 + (h_inf + h_net_irr + h_pond_i) - h_eva_act - h_perc1 - h_transp_act!
             !
             h_pond = 0
             ! surplus check: compare the WB solution with the maximum capacity of the soil layer
@@ -285,8 +285,10 @@ module mod_crop_soil_water
             ! %AB%: calculate capillary rise if required (only during growing season and not rice paddy)
             ! TODO: %CG%: add transpiration from the 1st layer
             if ((caprise_flag .eqv. .true.) .and. (k_cb/=0.) .and. (cn_group/=7)) then
-                h_caprise = cap_rise(sr,depth_under_rz,h_soil_mean/(zr*1000),h_fc/(zr*1000),h_wp/(zr*1000),h_transp_pot,h_eva_pot,&!
-                    & a3,a4,b1,b2,b3,b4)!
+                h_caprise = cap_rise(sr, depth_under_rz, &
+                    & h_soil_mean/(zr*1000), h_fc/(zr*1000), h_wp/(zr*1000), &
+                    & k_cb * h_et0, h_eva_pot, &   ! replace with total transpiration & h_transp_pot, h_eva_pot,&!
+                    & a3, a4, b1, b2, b3, b4)!
             end if
 
             ! calculate percolation if no capillary rise
