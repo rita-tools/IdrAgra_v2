@@ -71,14 +71,14 @@ module cli_watsources
         end do
         read(mn_src_tbl%unit, *, iostat=ios) mn_src_tbl%q_nom ! read the potential discharge
         
-        ! Read the fisrt and the last days, separated by " -> " : eg. "01/01/1993 -> 31/12/2014"
+        ! Read the first and the last days, separated by " -> " : eg. "01/01/1993 -> 31/12/2014"
         read(mn_src_tbl%unit, '(a300)', iostat = ios) date_string
         call split_date(date_string, date_start, date_end)
         call split_date(date_start, mn_src_tbl%start)
         call split_date(date_end, mn_src_tbl%finish)
         mn_src_tbl%start%doy = calc_doy(mn_src_tbl%start%day, mn_src_tbl%start%month, mn_src_tbl%start%year)
         mn_src_tbl%finish%doy = calc_doy(mn_src_tbl%finish%day, mn_src_tbl%finish%month, mn_src_tbl%finish%year)
-        ! Check if the length of the time series matchs the dates limits
+        ! Check if the length of the time series matches the dates limits
         if (n_rows /= mn_src_tbl%finish%doy - mn_src_tbl%start%doy + 1) then
             stop "Diversion time series have incoherent lengths with respect to declared dates. Execution will be aborted..."
         end if
@@ -97,7 +97,7 @@ module cli_watsources
         ! EndList =
         implicit none!
         character(len=*), intent(in):: file_name
-        type(unmon_coll_sources_table),intent(inout)::unm_coll_src_tbl!
+        type(unmonitored_sources_table),intent(inout)::unm_coll_src_tbl!
         type(parameters),intent(inout)::pars!
         integer, intent(out):: error_flag
         integer, intent(out):: n_unm_coll_src
@@ -177,7 +177,7 @@ module cli_watsources
         character(len=*), intent(in) :: file_name!
         integer,intent(in)::k!
         type(parameters),intent(inout)::pars!
-        type(unmon_coll_sources_table),intent(out)::unm_col_sour_tbl!
+        type(unmonitored_sources_table),intent(out)::unm_col_sour_tbl!
         integer, intent(out) :: error_flag
         
         integer :: i
@@ -394,34 +394,34 @@ module cli_watsources
         
         call read_water_sources_table(trim(pars%sim%watsour_path)//trim(pars%sim%watsources_fn), wat_src_tbl, error_flag)!
         
-        nullify(src_info%ms_tbl1%q_daily)
-        nullify(src_info%ms_tbl2%q_daily)
+        nullify(src_info%mn_src_tbl1%q_daily)
+        nullify(src_info%mn_src_tbl2%q_daily)
         nullify(src_info%int_reuse_tbl%q_daily)
         
         if(pars%ms_i%f_exists .eqv. .true.)then!
-            call open_daily_discharges_file(trim(pars%sim%watsour_path)//trim(pars%sim%mon_sources_i_div_fn),src_info%ms_tbl1, &
+            call open_daily_discharges_file(trim(pars%sim%watsour_path)//trim(pars%sim%mon_sources_i_div_fn),src_info%mn_src_tbl1, &
                 & pars%ms_i%n_withdrawals,error_flag)!
             ! Check dates match weather data
-            if (src_info%ms_tbl1%start%doy /= weather_info(1)%start%doy) then
+            if (src_info%mn_src_tbl1%start%doy /= weather_info(1)%start%doy) then
                 stop 'Meteorological and monitored sources (i) time series start in different days'
-            else if (src_info%ms_tbl1%finish%doy /= weather_info(1)%finish%doy) then
+            else if (src_info%mn_src_tbl1%finish%doy /= weather_info(1)%finish%doy) then
                 stop 'Meteorological and monitored sources (i) time series end in different days'
             end if
         end if!
         
         if(pars%ms_ii%f_exists .eqv. .true.)then!
-            call open_daily_discharges_file(trim(pars%sim%watsour_path)//trim(pars%sim%mon_sources_ii_div_fn),src_info%ms_tbl2, &
+            call open_daily_discharges_file(trim(pars%sim%watsour_path)//trim(pars%sim%mon_sources_ii_div_fn),src_info%mn_src_tbl2, &
                 & pars%ms_ii%n_withdrawals,error_flag)
             if (pars%ms_i%f_exists .eqv. .true.) then ! check dates match between different monitored water sources
-                if (src_info%ms_tbl1%start%doy /= src_info%ms_tbl2%start%doy) then
+                if (src_info%mn_src_tbl1%start%doy /= src_info%mn_src_tbl2%start%doy) then
                     stop 'monitored sources (i) and monitored sources (ii) time series start in different days'
-                else if (src_info%ms_tbl1%finish%doy /= src_info%ms_tbl2%finish%doy) then
+                else if (src_info%mn_src_tbl1%finish%doy /= src_info%mn_src_tbl2%finish%doy) then
                     stop 'monitored sources (i) and monitored sources (ii) series end in different days'
                 end if
             else  ! Check dates match weather data
-                if (src_info%ms_tbl2%start%doy /= weather_info(1)%start%doy) then
+                if (src_info%mn_src_tbl2%start%doy /= weather_info(1)%start%doy) then
                     stop 'Meteorological and monitored sources (ii) time series start in different days'
-                else if (src_info%ms_tbl2%finish%doy /= weather_info(1)%finish%doy) then
+                else if (src_info%mn_src_tbl2%finish%doy /= weather_info(1)%finish%doy) then
                     stop 'Meteorological and monitored sources (ii) time series end in different days'
                 end if
             end if
@@ -430,15 +430,15 @@ module cli_watsources
         if(pars%intreu%f_exists .eqv. .true.)then
             call open_daily_discharges_file(trim(pars%sim%watsour_path)//trim(pars%sim%int_reuse_div_fn),src_info%int_reuse_tbl,pars%intreu%n_withdrawals,error_flag)!
             if (pars%ms_ii%f_exists .eqv. .true.) then ! Check dates match monitored water sources 2
-                if (src_info%ms_tbl2%start%doy /= src_info%int_reuse_tbl%start%doy) then
+                if (src_info%mn_src_tbl2%start%doy /= src_info%int_reuse_tbl%start%doy) then
                     stop 'monitored sources (ii) and internal reuse time series start in different days'
-                else if (src_info%ms_tbl2%finish%doy /= src_info%int_reuse_tbl%finish%doy) then
+                else if (src_info%mn_src_tbl2%finish%doy /= src_info%int_reuse_tbl%finish%doy) then
                     stop 'monitored sources (ii) and internal reuse time series end in different days'
                 end if
             else if (pars%ms_i%f_exists .eqv. .true.) then ! Check dates match monitored water sources 1
-                if (src_info%ms_tbl1%start%doy /= src_info%int_reuse_tbl%start%doy) then
+                if (src_info%mn_src_tbl1%start%doy /= src_info%int_reuse_tbl%start%doy) then
                     stop 'monitored sources (i) and internal reuse time series start in different days'
-                else if (src_info%ms_tbl1%finish%doy /= src_info%int_reuse_tbl%finish%doy) then
+                else if (src_info%mn_src_tbl1%finish%doy /= src_info%int_reuse_tbl%finish%doy) then
                     stop 'monitored sources (i) and internal reuse time series end in different days'
                 end if
             else ! Check dates match weather data
@@ -451,7 +451,7 @@ module cli_watsources
         end if!
 
         if(pars%cr%f_exists .eqv. .true.)then!
-            call read_unm_coll_sources_list(trim(pars%sim%watsour_path)//trim(pars%sim%cr_sources_list_fn), src_info%un_col_tbl, &
+            call read_unm_coll_sources_list(trim(pars%sim%watsour_path)//trim(pars%sim%cr_sources_list_fn), src_info%unm_src_tbl, &
                 & error_flag, pars%cr%n_withdrawals, pars)
         end if!
         
@@ -459,13 +459,13 @@ module cli_watsources
         do i=1,size(wat_src_tbl)!
             select case(wat_src_tbl(i)%type_id)!
                 case(1)
-                    wat_src_tbl(i)%wat_src_idx = get_value_index(src_info%ms_tbl1%wat_src_id,wat_src_tbl(i)%id_wat_src)!
+                    wat_src_tbl(i)%wat_src_idx = get_value_index(src_info%mn_src_tbl1%wat_src_id,wat_src_tbl(i)%id_wat_src)!
                 case(2)
-                    wat_src_tbl(i)%wat_src_idx = get_value_index(src_info%ms_tbl2%wat_src_id,wat_src_tbl(i)%id_wat_src)!
+                    wat_src_tbl(i)%wat_src_idx = get_value_index(src_info%mn_src_tbl2%wat_src_id,wat_src_tbl(i)%id_wat_src)!
                 case(3)
                     wat_src_tbl(i)%wat_src_idx = get_value_index(src_info%int_reuse_tbl%wat_src_id,wat_src_tbl(i)%id_wat_src)!
                 case(4)
-                    wat_src_tbl(i)%wat_src_idx = get_value_index(src_info%un_col_tbl%wat_src_id,wat_src_tbl(i)%id_wat_src)!
+                    wat_src_tbl(i)%wat_src_idx = get_value_index(src_info%unm_src_tbl%wat_src_id,wat_src_tbl(i)%id_wat_src)!
                 case default!
                     stop "Code not identified in watsour%type column. Execution will be aborted..."!
             end select!
@@ -480,18 +480,18 @@ module cli_watsources
         integer::ios =0
         
         if(pars%ms_i%f_exists .eqv. .true.)then!
-            close(src_info%ms_tbl1%unit,iostat=ios)!
+            close(src_info%mn_src_tbl1%unit,iostat=ios)!
             if(ios/=0)then!
-                print *, "Error closing file ", trim(pars%sim%mon_sources_i_div_fn), " connected to unit =", src_info%ms_tbl1%unit, &
+                print *, "Error closing file ", trim(pars%sim%mon_sources_i_div_fn), " connected to unit =", src_info%mn_src_tbl1%unit, &
                     & " iostat=", ios, ". Execution will be aborted..."
                 stop
             end if!
         end if!
         
         if(pars%ms_ii%f_exists .eqv. .true.)then!
-            close(src_info%ms_tbl2%unit,iostat=ios)!
+            close(src_info%mn_src_tbl2%unit,iostat=ios)!
             if(ios/=0)then!
-                print *, "Error closing file ", trim(pars%sim%mon_sources_ii_div_fn), " connected to unit =", src_info%ms_tbl2%unit, &
+                print *, "Error closing file ", trim(pars%sim%mon_sources_ii_div_fn), " connected to unit =", src_info%mn_src_tbl2%unit, &
                     & " iostat=", ios, ". Execution will be aborted..."
                 stop
             end if!
@@ -534,13 +534,13 @@ module cli_watsources
             k = wat_src_tbl(i)%wat_src_idx
             select case(wat_src_tbl(i)%type_id)
                 case(1)                 ! 1st water sources
-                    irr_units(j)%q_pot_fld(1) = wat_src_tbl(i)%duty_frc*src_info%ms_tbl1%q_nom(k)*irr_units(j)%int_distr_eff + irr_units(j)%q_pot_fld(1)
+                    irr_units(j)%q_pot_fld(1) = wat_src_tbl(i)%duty_frc*src_info%mn_src_tbl1%q_nom(k)*irr_units(j)%int_distr_eff + irr_units(j)%q_pot_fld(1)
                 case(2)                 ! 2nd water sources
-                    irr_units(j)%q_pot_fld(2) = wat_src_tbl(i)%duty_frc*src_info%ms_tbl2%q_nom(k)*irr_units(j)%int_distr_eff + irr_units(j)%q_pot_fld(2)!
+                    irr_units(j)%q_pot_fld(2) = wat_src_tbl(i)%duty_frc*src_info%mn_src_tbl2%q_nom(k)*irr_units(j)%int_distr_eff + irr_units(j)%q_pot_fld(2)!
                 case(3)                 ! water reuse
                     irr_units(j)%q_pot_fld(3) = wat_src_tbl(i)%duty_frc*src_info%int_reuse_tbl%q_nom(k)*irr_units(j)%int_distr_eff + irr_units(j)%q_pot_fld(3)!
                 case(4)                 ! unmonitored collective water sources
-                    irr_units(j)%q_pot_fld(4) = wat_src_tbl(i)%duty_frc*src_info%un_col_tbl%q_nom(k)*irr_units(j)%int_distr_eff + irr_units(j)%q_pot_fld(4)!
+                    irr_units(j)%q_pot_fld(4) = wat_src_tbl(i)%duty_frc*src_info%unm_src_tbl%q_nom(k)*irr_units(j)%int_distr_eff + irr_units(j)%q_pot_fld(4)!
                 case default
                     print *,"File", trim(watsources_fn), " lists a source type that is not codified: ", wat_src_tbl(i)%type_id
             end select!
@@ -575,9 +575,9 @@ module cli_watsources
         type(parameters),intent(in)::pars
         
         if(pars%ms_i%f_exists .eqv. .true.) &
-            & call read_daily_discharge_table(year_length,src_info%ms_tbl1,pars%ms_i)        ! monitored sources (i)
+            & call read_daily_discharge_table(year_length,src_info%mn_src_tbl1,pars%ms_i)        ! monitored sources (i)
         if(pars%ms_ii%f_exists .eqv. .true.) &
-            & call read_daily_discharge_table(year_length,src_info%ms_tbl2,pars%ms_ii)      ! monitored sources (ii)
+            & call read_daily_discharge_table(year_length,src_info%mn_src_tbl2,pars%ms_ii)      ! monitored sources (ii)
         if(pars%intreu%f_exists .eqv. .true.) &
             & call read_daily_discharge_table(year_length,src_info%int_reuse_tbl,pars%intreu)    ! internal reuse
 
@@ -604,8 +604,8 @@ module cli_watsources
         
         type(source_info),intent(inout)::src_info
         !!
-        if(associated(src_info%ms_tbl1%q_daily)) deallocate(src_info%ms_tbl1%q_daily)!
-        if(associated(src_info%ms_tbl2%q_daily)) deallocate(src_info%ms_tbl2%q_daily)!
+        if(associated(src_info%mn_src_tbl1%q_daily)) deallocate(src_info%mn_src_tbl1%q_daily)!
+        if(associated(src_info%mn_src_tbl2%q_daily)) deallocate(src_info%mn_src_tbl2%q_daily)!
         if(associated(src_info%int_reuse_tbl%q_daily)) deallocate(src_info%int_reuse_tbl%q_daily)!
         !!
     end subroutine destroy_water_sources_duty!

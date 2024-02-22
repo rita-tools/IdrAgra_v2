@@ -6,7 +6,7 @@ module mod_parameters!
     type simulation!
         character(len=200) :: path                      ! path of output!
         character(len=200) :: meteo_path                ! path of meteo tables
-        character(len=200) :: ws_list_fn                ! filename (with complete path) of weater stations list
+        character(len=200) :: ws_list_fn                ! filename (with complete path) of weather stations list
         character(len=200) :: pheno_path                ! path where phenophases files are stored
         character(len=200) :: pheno_root                ! a common string to use to get folder
         character(len=200) :: irr_met_path              ! path to irrigation methods folder
@@ -82,8 +82,8 @@ module mod_parameters!
         integer :: n_voronoi                        ! number of voronoi polygons
         integer :: n_lus                            ! total number of land uses
         integer :: n_crops                          ! max number of crops per year
-        integer,dimension(:),pointer :: lu_list     ! list of ids if the simulated landuses
-        integer,dimension(:),pointer :: no_lu_list  ! list of ids if the NOT simulated landuses
+        integer,dimension(:),pointer :: lu_list     ! list of ids if the simulated land uses
+        integer,dimension(:),pointer :: no_lu_list  ! list of ids if the NOT simulated land uses
         logical :: f_cap_rise                       ! if true, capillary rise is calculated
         logical :: f_shapearea                      ! if true, use shapes area (for vectorialization)
         integer :: n_ws                             ! maximum number of weather station
@@ -130,17 +130,17 @@ module mod_parameters!
     end type par_method!
 
     type par_irr_event
-        real(dp) :: f_w                                 ! wetted fractio                             
+        real(dp) :: f_w                                 ! wetted fraction                             
         type(par_method),dimension(:),pointer::met      ! irrigation method parameter
         real(dp) :: h_irr                               ! water application depth [mm]!
-        real(dp) :: alpha_raw                           ! fraction of RAW at which the irrigation accours
+        real(dp) :: alpha_raw                           ! fraction of RAW at which the irrigation occurs
         ! for USE mode only
-        real(dp) :: alpha_raw_uc                        ! fraction of RAW at which the irrigation accours for unmonitored collective water sources
+        real(dp) :: alpha_raw_uc                        ! fraction of RAW at which the irrigation occurs for unmonitored collective water sources
         real(dp) :: expl_fact                           ! exploration factor: multiply the number of cells potentially irrigable
     end type par_irr_event!
 
     type water_source!
-        integer :: n_withdrawals                    ! number of withdrawals for each water sorurces
+        integer :: n_withdrawals                    ! number of withdrawals for each water sources
         logical :: f_exists                         ! if true, allocate the variable
         logical :: f_allocate_timeserie             ! if true, allocate the array
     end type water_source!
@@ -181,7 +181,7 @@ module mod_parameters!
         integer :: type_id                  ! type of the water source, (1) monitored sources i, (2) monitored sources ii, (3) internal reuse, (4) collective unmonitored sources
         real :: duty_frc                    ! Rate of the water duty
         integer :: irr_unit_idx             ! column index in the irrigation units variable
-        integer :: wat_src_idx              ! column index in the dicharge file
+        integer :: wat_src_idx              ! column index in the discharge file
     end type water_sources_table
 
     type monitored_sources_table
@@ -194,28 +194,28 @@ module mod_parameters!
         type(date)::finish                                  ! end date of the time serie
     end type monitored_sources_table!
 
-    type unmon_coll_sources_table
+    type unmonitored_sources_table
         ! store unmonitored collective sources parameters    
         real(dp),dimension(:),pointer::q_max                ! list of maximum discharge value [m3/s]!
         real(dp),dimension(:),pointer::q_nom                ! list of nominal discharge value [m3/s]!
         character(len=10),dimension(:),pointer::wat_src_id  ! list of water sources id (name of max 10 characters)
         integer,dimension(:),pointer::unit                  ! unit associated to the input file
-    end type unmon_coll_sources_table!
+    end type unmonitored_sources_table!
 
     type source_info!
     ! collect all the different water sources
-        type(monitored_sources_table)::ms_tbl1           ! monitored sources (i)
-        type(monitored_sources_table)::ms_tbl2          ! monitored sources (ii)
-        type(monitored_sources_table)::int_reuse_tbl      ! internal reuse
-        type(unmon_coll_sources_table)::un_col_tbl            ! unmonitored collective water sources
+        type(monitored_sources_table)::mn_src_tbl1              ! monitored sources (i)
+        type(monitored_sources_table)::mn_src_tbl2              ! monitored sources (ii)
+        type(monitored_sources_table)::int_reuse_tbl            ! internal reuse
+        type(unmonitored_sources_table)::unm_src_tbl            ! unmonitored water sources
     end type source_info!
 
     type irr_units_table!
         ! store all the data referred to th irrigation units
         integer::id                             ! irrigation unit id
         integer::n_cells                        ! number of cells belonging to the irrigation units
-!        integer::n_irr                         ! number of irrigable cells, depoending on phenology
-        !integer::conta                         ! NOT USED contatore celle con un determinato id!
+!        integer::n_irr                         ! number of irrigable cells, depending on phenology
+        !integer::conta                         ! NOT USED cell counter with specific id
         integer::last_cell_id                   ! id of the latest irrigated cell
         real(dp)::int_distr_eff                 ! internal water distribution efficiency
         real(dp)::h_irr_mean                    ! average irrigation height in the irrigation unit
@@ -231,7 +231,7 @@ module mod_parameters!
         real(dp)::n_irrigable_cells             ! number of cell potentially irrigable calculated as v_nom/SUM(v_irr_cells)
         !real(dp)::a_raw                        ! NOT USED: activation threshold for monitored water sources
         !real(dp)::a_raw_priv                   ! NOT USED: activation threshold for private water sources
-        real(dp)::f_explore                     ! moltiplicative factor to set the number of cells potentially irrigable in a day
+        real(dp)::f_explore                     ! multiplicative factor to set the number of cells potentially irrigable in a day
         !!! %AB% <------- new variable for the rotation
         real::wat_shift                     ! rotation length (in days or fraction of day)
         integer::n_day                      ! number of cells irrigable in a day (related to the rotation)!

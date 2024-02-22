@@ -77,7 +77,7 @@ module mod_evapotranspiration
             k_stress=0
         end if
 
-        h_transp_act = k_stress*h_transp_pot
+        h_transp_act = k_stress * h_transp_pot
         
     end subroutine transpiration
 

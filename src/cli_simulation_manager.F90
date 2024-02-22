@@ -555,7 +555,7 @@ module cli_simulation_manager!
             if (pars%sim%mode == 1) then
                 call init_cell_output_by_year(out_tbl_list, pars%sim%path, s_years, info_meteo%filename, &
                     & pars%sim%mode, pars%sim%f_out_cells, debug, &
-                    & irr_units%id, pars%cr%n_withdrawals, info_sources%un_col_tbl%wat_src_id)!
+                    & irr_units%id, pars%cr%n_withdrawals, info_sources%unm_src_tbl%wat_src_id)!
             else 
                 call init_cell_output_by_year(out_tbl_list,pars%sim%path,s_years,info_meteo%filename, &
                     & pars%sim%mode, pars%sim%f_out_cells, debug)!

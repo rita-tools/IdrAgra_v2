@@ -651,9 +651,9 @@ module mod_irrigation
             k=wat_sources(i)%wat_src_idx!
             select case(wat_sources(i)%type_id)!
                 case(1)!
-                    irr_units(j)%q_act_fld(1) = wat_sources(i)%duty_frc * sources_info%ms_tbl1%q_daily(cur_doy,k) * irr_units(j)%int_distr_eff + irr_units(j)%q_act_fld(1)
+                    irr_units(j)%q_act_fld(1) = wat_sources(i)%duty_frc * sources_info%mn_src_tbl1%q_daily(cur_doy,k) * irr_units(j)%int_distr_eff + irr_units(j)%q_act_fld(1)
                 case(2)!
-                    irr_units(j)%q_act_fld(2) = wat_sources(i)%duty_frc * sources_info%ms_tbl2%q_daily(cur_doy,k) * irr_units(j)%int_distr_eff + irr_units(j)%q_act_fld(2)
+                    irr_units(j)%q_act_fld(2) = wat_sources(i)%duty_frc * sources_info%mn_src_tbl2%q_daily(cur_doy,k) * irr_units(j)%int_distr_eff + irr_units(j)%q_act_fld(2)
                 case(3)!
                     irr_units(j)%q_act_fld(3) = wat_sources(i)%duty_frc * sources_info%int_reuse_tbl%q_daily(cur_doy,k) * irr_units(j)%int_distr_eff + irr_units(j)%q_act_fld(3)
                 case(4)!
@@ -663,10 +663,10 @@ module mod_irrigation
                     n_cells_irr = count(cells_un_coll==k)
                     if(n_cells_irr==0) cycle
                     irr_units(j)%q_act_fld(4)= &
-                        & frac_rel_un_coll*wat_sources(i)%duty_frc * sources_info%un_col_tbl%q_max(k) * irr_units(j)%int_distr_eff * (real(n_cells_irr_un_coll)/real(n_cells_irr)) + &
+                        & frac_rel_un_coll*wat_sources(i)%duty_frc * sources_info%unm_src_tbl%q_max(k) * irr_units(j)%int_distr_eff * (real(n_cells_irr_un_coll)/real(n_cells_irr)) + &
                         & irr_units(j)%q_act_fld(4)!
                     
-                    q_un_coll(k) = frac_rel_un_coll*wat_sources(i)%duty_frc * sources_info%un_col_tbl%q_max(k)*(real(n_cells_irr_un_coll)/real(n_cells_irr))+&
+                    q_un_coll(k) = frac_rel_un_coll*wat_sources(i)%duty_frc * sources_info%unm_src_tbl%q_max(k)*(real(n_cells_irr_un_coll)/real(n_cells_irr))+&
                         & q_un_coll(k)   ! only for printing %AB% gross used water
                 case default!
             end select!
