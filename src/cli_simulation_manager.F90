@@ -864,7 +864,8 @@ module cli_simulation_manager!
                 ! calculate the CN value
                 call CN_table(tab_CN2, tab_CN3,info_spat%drainage,pheno%cn_class,pheno%cn_day, &!
                     & out_cn_day,info_spat%domain,info_spat%hydr_gr, &!
-                    & info_spat%slope%mat, out_cn,info_spat%theta,wat_bal1%t_soil,wat_bal2%t_soil)
+                    & info_spat%slope%mat, out_cn,info_spat%theta, &
+                    & wat_bal1%t_soil,wat_bal2%t_soil)
 
                 ! init water balance variables
                 call init_water_balance_variables(wat_bal1,wat_bal2)

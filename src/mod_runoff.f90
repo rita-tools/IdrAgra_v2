@@ -55,49 +55,50 @@ module mod_runoff
     end subroutine CN_runoff!
 
     
-    subroutine CN_table(tab_CN2, tab_CN3,dren,cn,cn_day,outCNday,domain,hydr_gr, &!
-        & slope, out_cn,teta,tvol1,tvol2)!
+    subroutine CN_table(tab_CN2, tab_CN3,hydr_cond,cn,cn_day,cn_day_out,domain,hydr_grp, &!
+        & slope, cn_out,theta,t_soil1,t_soil2)!
         ! CN model
         implicit none!
         ! Input
         real(dp),dimension(:,:,:),intent(in)::tab_CN2, tab_CN3
         type(grid_i),intent(in)::domain                                    ! simulation domain
-        type(grid_i),intent(in)::hydr_gr                                   ! hydrological group [-] [integer, 1-4 - corresponds to A-D classes]
-        type(grid_i),intent(in)::dren                                      ! hydrological condition [-] [integer, 1-3]
-        real(dp), dimension(:,:),intent(in)::slope                         ! slope [%]
+        type(grid_i),intent(in)::hydr_grp                                  ! hydrological group [-] [integer, 1-4 - corresponds to A-D classes]
+        type(grid_i),intent(in)::hydr_cond                                 ! hydrological condition [-] [integer, 1-3]
+        real(dp), dimension(:,:),intent(in)::slope                         ! slope [100*m/m]
         integer,dimension(:,:),intent(in)::cn!
         integer,dimension(:,:),intent(in)::cn_day!
-        type(moisture),dimension(:),intent(in)::teta!
-        real(dp),dimension(:,:),intent(in)::tvol1,tvol2                    ! hydrological content [m3/m3]
+        type(moisture),dimension(:),intent(in)::theta!
+        ! TODO: pass only the total soil moisture
+        real(dp),dimension(:,:),intent(in)::t_soil1,t_soil2                 ! soil water content from balance [m3/m3]
         ! Output
-        real(dp),dimension(:,:),intent(out)::outCNday!
-        type(output_cn),dimension(:,:),intent(out)::out_cn!
+        real(dp),dimension(:,:),intent(out)::cn_day_out!
+        type(output_cn),dimension(:,:),intent(out)::cn_out!
         ! Internal
-        real(dp),dimension(size(tab_cn2,1),size(tab_cn2,2),size(tab_cn2,3))::tab_CN2_slope!
+        real(dp),dimension(size(tab_cn2,1),size(tab_cn2,2),size(tab_cn2,3))::tab_cn2_slope!
         real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::cn2!
-        real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::cn1day!
-        real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::cn2day!
-        real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::cn3day!
+        real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::cn1_day!
+        real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::cn2_day!
+        real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::cn3_day!
         integer::i,j,k,ii,jj!
-        real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::swp            ! moisture content at wilting point
-        real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::sfc            ! moisture content at field capacity
-        real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::ssat           ! moisture content at saturation
-        real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::sfcwp          ! moisture content at AMCII
-        real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::st             ! actual moisture content
+        real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::t_wp            ! moisture content at wilting point
+        real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::t_fc            ! moisture content at field capacity
+        real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::t_sat           ! moisture content at saturation
+        real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::t_amc2          ! moisture content at AMCII
+        real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::t_act           ! actual moisture content
         ! Setting moisture contents
-        swp=0.;sfc=0.;ssat=0.;sfcwp=0.;!
+        t_wp=0.;t_fc=0.;t_sat=0.;t_amc2=0.;!
         where(domain%mat/=domain%header%nan)!
-            swp=teta(1)%wp%mat+teta(2)%wp%mat!
-            sfc=teta(1)%fc%mat+teta(2)%fc%mat!
-            ssat=teta(1)%sat%mat+teta(2)%sat%mat!
-            sfcwp=swp+(2.0/3.0)*(sfc-swp)!
-            st=tvol1+tvol2!
+            t_wp=theta(1)%wp%mat+theta(2)%wp%mat!
+            t_fc=theta(1)%fc%mat+theta(2)%fc%mat!
+            t_sat=theta(1)%sat%mat+theta(2)%sat%mat!
+            t_amc2=t_wp+(2.0/3.0)*(t_fc-t_wp)!
+            t_act=t_soil1+t_soil2!
         end where!
         ! CN Table
-        tab_CN2_slope=0.!
-        outCNday=0.!
+        tab_cn2_slope=0.!
+        cn_day_out=0.!
         cn2    =0.!
-        cn1day =0.;     cn2day =0.;     cn3day =0.!
+        cn1_day =0.;     cn2_day =0.;     cn3_day =0.!
 
         ! Get CN values
         do j=1,size(domain%mat,2)!
@@ -111,44 +112,44 @@ module mod_runoff
 
                     ! Hydrological condition - jj-index:
                     ! 1 - good; 2 - fair; 3 - poor
-                    jj = dren%mat(i,j)
+                    jj = hydr_cond%mat(i,j)
 
                     ! Hydrological group - ii-index
-                    ii=hydr_gr%mat(i,j)!
+                    ii=hydr_grp%mat(i,j)!
 
                     ! Slope adjustment - not calculated for rice
-                    call adjust_cn_by_slope(tab_CN2,tab_CN3,slope(i,j),tab_CN2_slope)!
+                    call adjust_cn_by_slope(tab_CN2,tab_CN3,slope(i,j),tab_cn2_slope)!
                     ! Crop Residue Cover (k==1), Meadow (k==5) and Fallow (k==8): hydrological condition is not taken into account (jj=1)
                     ! Rice (k==7): CN method is not taken into account when on field
                     if (k==1 .or. k==5 .or. k==8) then      ! Crop Residue Cover (k==1), Meadow (k==5) and Fallow (k==8): hydrological condition is always 1
-                        cn2(i,j)=tab_CN2_slope(k,1,ii)
+                        cn2(i,j)=tab_cn2_slope(k,1,ii)
                     else
-                        cn2(i,j)=tab_CN2_slope(k,jj,ii)
+                        cn2(i,j)=tab_cn2_slope(k,jj,ii)
                     end if
 
                     ! Phenological adjustment - not calculated for rice
                     ! Rice (k==7): CN method is not taken into account when on field
-                    call adjust_cn_by_pheno(cn_day(i,j),tab_CN2_slope(1,1,ii),cn2(i,j),cn2day(i,j),k)     ! %AB% tab_CN2_slope(1,1,ii)=Crop Residue Cover CN2
+                    call adjust_cn_by_pheno(cn_day(i,j),tab_cn2_slope(1,1,ii),cn2(i,j),cn2_day(i,j),k)     ! %AB% tab_CN2_slope(1,1,ii)=Crop Residue Cover CN2
 
                     ! Soil moisture content adjustment
                     ! CN1 & CN3
-                    cn1day(i,j)=cn2day(i,j)-((20.*(100.-cn2day(i,j)))/(100.-cn2day(i,j)+exp(2.533-0.0636*(100.-cn2day(i,j)))))!
-                    cn3day(i,j)=cn2day(i,j)*exp(0.00673*(100.-cn2day(i,j)))!
+                    cn1_day(i,j)=cn2_day(i,j)-((20.*(100.-cn2_day(i,j)))/(100.-cn2_day(i,j)+exp(2.533-0.0636*(100.-cn2_day(i,j)))))!
+                    cn3_day(i,j)=cn2_day(i,j)*exp(0.00673*(100.-cn2_day(i,j)))!
                     ! Soil moisture content CN
-                    call adjust_cn_by_moisture(outCNday(i,j),cn1day(i,j),cn2day(i,j),cn3day(i,j), &!
-                        & swp(i,j),sfc(i,j),ssat(i,j),sfcwp(i,j),st(i,j))!
+                    call adjust_cn_by_moisture(cn_day_out(i,j),cn1_day(i,j),cn2_day(i,j),cn3_day(i,j), &!
+                        & t_wp(i,j),t_fc(i,j),t_sat(i,j),t_amc2(i,j),t_act(i,j))!
                     ! Output
-                    out_cn(i,j)%tab_cn2=tab_cn2(k,jj,ii)!
-                    out_cn(i,j)%tab_cn3=tab_cn3(k,jj,ii)!
-                    out_cn(i,j)%tab_cn2_baresoil=tab_cn2_slope(1,1,ii)!
-                    out_cn(i,j)%k=k!
-                    out_cn(i,j)%jj=jj!
-                    out_cn(i,j)%jj=ii!
-                    out_cn(i,j)%tab_cn2_slope=cn2(i,j)
-                    out_cn(i,j)%cn1_day=cn1day(i,j)!
-                    out_cn(i,j)%cn2_day=cn2day(i,j)!
-                    out_cn(i,j)%cn3_day=cn3day(i,j)!
-                    out_cn(i,j)%cn_day=outCNday(i,j)!
+                    cn_out(i,j)%tab_cn2=tab_cn2(k,jj,ii)!
+                    cn_out(i,j)%tab_cn3=tab_cn3(k,jj,ii)!
+                    cn_out(i,j)%tab_cn2_baresoil=tab_cn2_slope(1,1,ii)!
+                    cn_out(i,j)%k=k!
+                    cn_out(i,j)%jj=jj!
+                    cn_out(i,j)%jj=ii!
+                    cn_out(i,j)%tab_cn2_slope=cn2(i,j)
+                    cn_out(i,j)%cn1_day=cn1_day(i,j)!
+                    cn_out(i,j)%cn2_day=cn2_day(i,j)!
+                    cn_out(i,j)%cn3_day=cn3_day(i,j)!
+                    cn_out(i,j)%cn_day=cn_day_out(i,j)!
                     !!
                 end if!
             end do!
