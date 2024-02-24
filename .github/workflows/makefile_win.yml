@@ -1,11 +1,11 @@
 name: Makefile CI
 
-#on:
-#  push:
-#    tags:
-#      - "v*"
+on:
+  push:
+    tags:
+      - "v*"
 
-on: workflow_dispatch
+# on: workflow_dispatch
 
 jobs:
   build:
@@ -42,7 +42,7 @@ jobs:
       #     prerelease: false
       #     automatic_release_tag: latest
 
-      - uses: ncipollo/release-action@v1
-        with:
-          artifacts: "release.tar.gz,foo/*.txt"
-          bodyFile: "body.md"  
+      # - uses: ncipollo/release-action@v1
+      #   with:
+      #     artifacts: "release.tar.gz,foo/*.txt"
+      #     bodyFile: "body.md"  
