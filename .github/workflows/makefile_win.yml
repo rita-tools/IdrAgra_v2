@@ -2,9 +2,8 @@ name: Makefile CI
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    tags:
+      - "v*"
 
 jobs:
   build:
@@ -12,12 +11,13 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Install dependencies
-      run: make
+      - name: Install dependencies
+        run: make
     
-    - uses: actions/upload-artifact@v4
-      with:
-        name: idragra
-        path: release/idragra.exe
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
+          
