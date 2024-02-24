@@ -18,10 +18,23 @@ jobs:
       - name: Install dependencies
         run: make
 
-      - uses: actions/upload-artifact@v4
+      - name: Commit files
+        run: |
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git commit -a -m "latest"
+      
+      - name: Push changes
+        uses: ad-m/github-push-action@master
         with:
-          name: idragra
-          path: release/idragra.exe
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
+
+      # - uses: actions/upload-artifact@v4
+      #   with:
+      #     name: idragra
+      #     path: release/idragra.exe
+      #     retention-days: 1
     
       # - uses: "marvinpinto/action-automatic-releases@latest"
       #   with:
@@ -29,3 +42,7 @@ jobs:
       #     prerelease: false
       #     automatic_release_tag: latest
 
+      - uses: ncipollo/release-action@v1
+        with:
+          artifacts: "release.tar.gz,foo/*.txt"
+          bodyFile: "body.md"  
