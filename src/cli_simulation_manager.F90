@@ -108,8 +108,8 @@ module cli_simulation_manager!
         integer::i,j,k,y,current_year,doy,hour,z,w                           ! for cycles
         integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::irandom
         integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::dir_phenofases
-        integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weigth_ws))::dir_meteo
-        real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weigth_ws))::meteo_weight
+        integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::dir_meteo
+        real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::meteo_weight
         character(len=255),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::code_pmeteo
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,pars%sim%n_irr_meth)::h_irr ! z depends on number of irrigation methods 
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::priv_irr!
@@ -166,7 +166,7 @@ module cli_simulation_manager!
         !!
         ! dir_phenofases: for each cell the appropriate meteorological station is selected
         ! (by linking to its progressive number in meteorological stations list)
-        dir_phenofases(:,:) = int(info_spat%weigth_ws(1)%mat(:,:))
+        dir_phenofases(:,:) = int(info_spat%weight_ws(1)%mat(:,:))
         do j=1,size(info_spat%domain%mat,2)
             do i=1,size(info_spat%domain%mat,1)
                 if(info_spat%domain%mat(i,j)/=info_spat%domain%header%nan) then
@@ -179,19 +179,19 @@ module cli_simulation_manager!
         ! dir_meteo: for each cell, the appropriate meteorological stations are selected
         ! (by changing meteorological station ID to its progressive number in meteorological stations list)
         do k=1,size(dir_meteo,3)
-            dir_meteo(:,:,k) = int(info_spat%weigth_ws(k)%mat(:,:))
+            dir_meteo(:,:,k) = int(info_spat%weight_ws(k)%mat(:,:))
             do j=1,size(info_spat%domain%mat,2)
                 do i=1,size(info_spat%domain%mat,1)
                     if(info_spat%domain%mat(i,j)/=info_spat%domain%header%nan) then
                         code_pmeteo(i,j) = make_numbered_name(dir_meteo(i,j,k),".dat")
                         dir_meteo(i,j,k) = get_value_index(info_meteo%filename,code_pmeteo(i,j))
                         if (dir_meteo(i,j,k)==0) then
-                            print*,"The weather station", int(info_spat%weigth_ws(k)%mat(i,j)), &
+                            print*,"The weather station", int(info_spat%weight_ws(k)%mat(i,j)), &
                                 & "cannot be found in the &
                                 & meteorological stations list. Execution will be aborted..."
                             stop
                         end if
-                        meteo_weight(i,j,k) = info_spat%weigth_ws(k)%mat(i,j) - int(info_spat%weigth_ws(k)%mat(i,j))!
+                        meteo_weight(i,j,k) = info_spat%weight_ws(k)%mat(i,j) - int(info_spat%weight_ws(k)%mat(i,j))!
                     end if
                 end do
             end do

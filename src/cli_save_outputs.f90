@@ -603,8 +603,8 @@ module cli_save_outputs!
                 case default
             end select
             !
-            do k=1,size(info_spat%weigth_ws)!
-                write(cell_info(i)%file%unit,*) 'Meteorological Station nr', k ,'; ',info_spat%weigth_ws(k)%mat(x,y)
+            do k=1,size(info_spat%weight_ws)!
+                write(cell_info(i)%file%unit,*) 'Meteorological Station nr', k ,'; ',info_spat%weight_ws(k)%mat(x,y)
             end do
         end do!
     end subroutine write_cell_info!

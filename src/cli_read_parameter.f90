@@ -705,11 +705,11 @@ module cli_read_parameter!
         end if!
         !
         ! read weather station weights
-        allocate(info_spat%weigth_ws(sim%n_ws))!
-        do k=1,size(info_spat%weigth_ws)!
+        allocate(info_spat%weight_ws(sim%n_ws))!
+        do k=1,size(info_spat%weight_ws)!
             write(k_str,*) k!
             call read_grid(trim(dir)//trim(sim%meteoweight_fn)//'_'//trim(adjustl(k_str))//'.asc',&
-                & info_spat%weigth_ws(k),sim, extent)!
+                & info_spat%weight_ws(k),sim, extent)!
         end do!
         
         ! read shape area, if the file exists
@@ -848,9 +848,9 @@ module cli_read_parameter!
         end if!
         !
         ! weather station weights maps 
-        do k=1,size(info_spat%weigth_ws)!
+        do k=1,size(info_spat%weight_ws)!
             write(k_str,*) k!
-            call overlay_domain(info_spat%weigth_ws(k),info_spat%domain)
+            call overlay_domain(info_spat%weight_ws(k),info_spat%domain)
         end do!
         !
         info_spat%backup_domain = info_spat%domain
@@ -1040,10 +1040,10 @@ module cli_read_parameter!
         end select
 
         !meteo weigths
-        do k=1,size(info_spat%weigth_ws)!
+        do k=1,size(info_spat%weight_ws)!
             write(meteo_stringa,*) k!
             call write_grid(trim(path)//trim(adjustl('out_meteo_'//trim(adjustl(meteo_stringa))//'.asc')), &!
-                & info_spat%weigth_ws(k),errorflag)!
+                & info_spat%weight_ws(k),errorflag)!
         end do!
         !!
     end subroutine write_init_grids!

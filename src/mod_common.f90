@@ -50,7 +50,7 @@ module mod_common
         real(dp),dimension(:,:),pointer::h_raw_priv     ! difference between water content at field capacity and threshold water content for irrigation application from private water sources - USE mode [mm]
         real(dp),dimension(:,:),pointer::k_s            ! water stress coefficient [-]
         real(dp),dimension(:,:),pointer::depth_under_rz ! depth of water table from root zone [m]!
-        real(dp),dimension(:,:),pointer::h_caprise     ! capillary rise [mm]
+        real(dp),dimension(:,:),pointer::h_caprise      ! capillary rise [mm]
         real(dp),dimension(:,:),pointer::h_rise         ! rise from 2nd to 1st layer [mm]
     end type balance2_matrices!
 
@@ -63,13 +63,13 @@ module mod_common
         REAL(dp),DIMENSION(:,:),pointer::k_r                 ! reduction coefficient of evaporation
         real(dp),dimension(:,:),pointer::h_inf               ! infiltration [mm] - hourly
         real(dp),dimension(:,:),pointer::h_perc1             ! percolation from 1st to 2nd layer [mm] - hourly
-        real(dp),dimension(:,:),pointer::h_perc2             ! percolazione dal II strato alla falda [mm] - hourly
+        real(dp),dimension(:,:),pointer::h_perc2             ! percolation from the 2nd layer to the water table [mm] - hourly
         real(dp),dimension(:,:),pointer::h_pond              ! ponding [mm] - hourly, final
         real(dp),dimension(:,:),pointer::h_transp_act1       ! hourly actual transpiration of 1st layer [mm]
         real(dp),dimension(:,:),pointer::h_transp_pot1       ! hourly potential transpiration of 1st layer [mm]
         real(dp),dimension(:,:),pointer::h_transp_act2       ! hourly actual transpiration of 2nd layer [mm]
         real(dp),dimension(:,:),pointer::h_transp_pot2       ! hourly potential transpiration of 2nd layer [mm]
-        real(dp),dimension(:,:),pointer::h_caprise           ! capillary rise capillare [mm] - hourly
+        real(dp),dimension(:,:),pointer::h_caprise           ! capillary rise  [mm] - hourly
         real(dp),dimension(:,:),pointer::h_rise              ! rise from 2nd to 1st layer [mm] - hourly
         real(dp),dimension(:,:),pointer::h_eff_rain          ! effective rainfall [mm] - hourly
         real(dp),dimension(:,:),pointer::h_net_av_water      ! net available water = effective rainfall + sprinkle irrigation (over which runoff is calculated) - hourly
@@ -130,7 +130,7 @@ module mod_common
         type(grid_r)::b2                            ! capillary rise model parameter
         type(grid_r)::b3                            ! capillary rise model parameter
         type(grid_r)::b4                            ! capillary rise model parameter
-        type(grid_r),dimension(:),pointer::weigth_ws! weights of weather stations
+        type(grid_r),dimension(:),pointer::weight_ws! weights of weather stations
         type(grid_r),dimension(2)::a_perc           ! calibration parameter a for the percolation booster parameter
         type(grid_r),dimension(2)::b_perc           ! calibration parameter b for the percolation booster parameter
         type(grid_r)::h_meth                        ! irrigation volume [mm] 
@@ -152,7 +152,7 @@ module mod_common
         type(vol_mm),dimension(2)::layer
         type(vol_mm),dimension(1)::theta2_rice
         real(dp),dimension(:,:),pointer::wat1_rew   ! soil water content at REW TODO: units?
-        real(dp),dimension(:,:),pointer::few        ! fracion of soil exposed to evaporation
+        real(dp),dimension(:,:),pointer::few        ! fraction of soil exposed to evaporation
         real(dp),dimension(:,:),pointer::kc_max     ! maximum value of Kcb
     end type wat_matrix!
 
