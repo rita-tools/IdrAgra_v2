@@ -321,6 +321,8 @@ module cli_read_parameter!
                             read(buffer, *, iostat=ios)xml_dtx%temp%delay
                         case ('dtxmincard') ! Number of values to obtain meaningfull statistics
                             read(buffer, *, iostat=ios)xml_dtx%n
+                        case ('forecast_day') ! Number days to consider for cumulative precipitation
+                            read(buffer, *, iostat=ios)xml_dtx%forecast_day
                         case default ! all other cases ... !
                             print *, 'Skipping invalid or obsolete label <',trim(label),'> at line', line, &
                                 & ' of file: ', trim(file_xml)

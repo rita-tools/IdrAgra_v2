@@ -378,6 +378,7 @@ subroutine print_parameters(xml,xml_dtx)
     print *,'SoilUseVarFlag = ', xml%sim%f_soiluse
     print *,'MeteoStatWeightNum = ', xml%sim%n_ws
     print *,'MeteoStatTotNum = ', xml%sim%n_voronoi
+    print *,'forecast_day = ', xml%sim%forecast_day
     print *,'zEvap = ', xml%depth%ze_fix
     print *,'zRoot = ', xml%depth%zr_fix
     print *,'LambdaCN = ', xml%sim%lambda_cn

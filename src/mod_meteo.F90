@@ -17,6 +17,7 @@ module mod_meteo!
         real(dp)::T_max                 ! maximum daily temperature [°C]!
         real(dp)::T_min                 ! minimum daily temperature [°C]!
         real(dp)::P                     ! daily precipitation [mm]!
+        real(dp)::P_cum                 ! daily cumulative precipitation [mm]!
         real(dp)::RH_max                ! maximum volumetric air moisture [%]!
         real(dp)::RH_min                ! minimum volumetric air moisture [%]!
         real(dp)::wind_vel              ! wind velocity at 2 m height [m/s]!
@@ -31,6 +32,7 @@ module mod_meteo!
         real(dp),dimension(:,:),pointer::T_max      ! maximum daily temperature [°C]
         real(dp),dimension(:,:),pointer::T_min      ! minimum daily temperature [°C]
         real(dp),dimension(:,:),pointer::P          ! precipitation [mm]
+        real(dp),dimension(:,:),pointer::P_cum      ! cumulate precipitation [mm]
         real(dp),dimension(:,:),pointer::RH_max     ! maximum daily air moisture [%]
         real(dp),dimension(:,:),pointer::RH_min     ! minimum daily air moisture [%]
         real(dp),dimension(:,:),pointer::Wind_vel   ! wind velocity at 2 m height [m/s]
@@ -293,19 +295,32 @@ module mod_meteo!
         deallocate(info_meteo)!
     end subroutine close_meteo_file!
     !
-    subroutine read_meteo_data(info_meteo,current_doy,res_surf)
+    subroutine read_meteo_data(info_meteo,current_doy,res_surf, forecast_day)
         ! read meteo data and update ET0
         implicit none!
         integer,intent(in)::current_doy!
+        integer,intent(in)::forecast_day!
         type(meteo_info),dimension(:),intent(inout)::info_meteo!
         real(dp),intent(in)::res_surf ! surface resistance
+        real(dp) :: dummy(3) = 0.0D0
         !!
-        integer::i
+        integer::i, ii
         integer::IOstatus
         !!
         do i=1,size(info_meteo)!
             read(info_meteo(i)%unit,*,iostat=IOstatus) info_meteo(i)%T_max,info_meteo(i)%T_min,info_meteo(i)%P,info_meteo(i)%RH_max, &!
                 & info_meteo(i)%RH_min,info_meteo(i)%wind_vel,info_meteo(i)%sol_rad!
+            ! init and populate cumulate precipitation
+            info_meteo(i)%P_cum = info_meteo(i)%P 
+            do ii=1,forecast_day
+                read(info_meteo(i)%unit,*,iostat=IOstatus) dummy
+                info_meteo(i)%P_cum = info_meteo(i)%P_cum + dummy(3)
+            end do
+            ! go back
+            do ii=1,forecast_day
+                backspace(info_meteo(i)%unit,iostat=IOstatus)
+            end do
+            
         end do!
 
         ! calculate ET0!

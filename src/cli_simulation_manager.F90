@@ -752,7 +752,7 @@ module cli_simulation_manager!
                 end where
                 !!
                 ! read weather daily data and calculate ET0 for each weather stations 
-                call read_meteo_data(info_meteo,doy,pars%sim%res_canopy(y))!
+                call read_meteo_data(info_meteo,doy,pars%sim%res_canopy(y), pars%sim%forecast_day)!
                 
                 ! spread weather data to the entire domain
                 if (y==pars%sim%start_simulation%year - info_meteo(1)%start%year + 1 &
@@ -1761,6 +1761,7 @@ module cli_simulation_manager!
                 meteo%T_max(i,j)    = info_meteo(dir_meteo(i,j,k))%T_max*meteo_weight(i,j,k) + meteo%T_max(i,j)!
                 meteo%T_min(i,j)    = info_meteo(dir_meteo(i,j,k))%T_min*meteo_weight(i,j,k) + meteo%T_min(i,j)!
                 meteo%P(i,j)        = info_meteo(dir_meteo(i,j,k))%P*meteo_weight(i,j,k) + meteo%P(i,j)!
+                meteo%P_cum(i,j)    = info_meteo(dir_meteo(i,j,k))%P_cum*meteo_weight(i,j,k) + meteo%P_cum(i,j)!
                 meteo%RH_max(i,j)   = info_meteo(dir_meteo(i,j,k))%RH_max*meteo_weight(i,j,k) + meteo%RH_max(i,j)!
                 meteo%RH_min(i,j)   = info_meteo(dir_meteo(i,j,k))%RH_min*meteo_weight(i,j,k) + meteo%RH_min(i,j)!
                 meteo%Wind_vel(i,j) = info_meteo(dir_meteo(i,j,k))%wind_vel*meteo_weight(i,j,k) + meteo%Wind_vel(i,j)!
@@ -2147,6 +2148,7 @@ module cli_simulation_manager!
             allocate(meteo%T_max    (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage!
             allocate(meteo%T_min    (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage!
             allocate(meteo%P       (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage!
+            allocate(meteo%P_cum    (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage!
             allocate(meteo%RH_max    (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage!
             allocate(meteo%RH_min    (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage!
             allocate(meteo%Wind_vel(imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage!
@@ -2159,6 +2161,7 @@ module cli_simulation_manager!
             deallocate(meteo%T_max    )!
             deallocate(meteo%T_min    )!
             deallocate(meteo%P       )!
+            deallocate(meteo%P_cum   )!
             deallocate(meteo%RH_max    )!
             deallocate(meteo%RH_min    )!
             deallocate(meteo%Wind_vel)!
