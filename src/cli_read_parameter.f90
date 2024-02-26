@@ -285,6 +285,8 @@ module cli_read_parameter!
                             end select
                         case ('randsowdayswind') ! range of sowinf!
                             read(buffer, *, iostat=ios) xml%sim%sowing_range
+                        case ('forecast_day') ! Number days to consider for cumulative precipitation
+                            read(buffer, *, iostat=ios)xml%sim%forecast_day
                         ! parameter for percolation booster
                         case ('01q_eva')  ! 10° percentile of the first layer
                             read(buffer, *, iostat=ios)xml%sim%quantiles(1,1)
@@ -321,8 +323,6 @@ module cli_read_parameter!
                             read(buffer, *, iostat=ios)xml_dtx%temp%delay
                         case ('dtxmincard') ! Number of values to obtain meaningfull statistics
                             read(buffer, *, iostat=ios)xml_dtx%n
-                        case ('forecast_day') ! Number days to consider for cumulative precipitation
-                            read(buffer, *, iostat=ios)xml_dtx%forecast_day
                         case default ! all other cases ... !
                             print *, 'Skipping invalid or obsolete label <',trim(label),'> at line', line, &
                                 & ' of file: ', trim(file_xml)

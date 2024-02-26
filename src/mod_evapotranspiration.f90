@@ -9,6 +9,36 @@ module mod_evapotranspiration
     
     contains
 
+    subroutine calculate_water_stresses(h_soil,h_fc,h_wp,h_sat,p_day,k_stress_dry,k_stress_sat)
+        ! calculate stresses
+        real(dp), intent(in)::h_soil              ! actual soil content [mm]
+        real(dp), intent(in)::h_wp                ! water content at wilting point [mm]
+        real(dp), intent(in)::h_fc                ! water content at field capacity [mm]
+        real(dp), intent(in)::h_sat               ! water content at saturation [mm]
+        real(dp), intent(in)::p_day               ! deplection fraction adjusted for meteorological conditions [-]
+        
+        real(dp), intent(out)::k_stress_dry       ! water scarcity stress coefficient[-]
+        real(dp), intent(out)::k_stress_sat       ! water saturation stress coefficient[-]
+        real(dp) :: raw                           ! readily available water [mm]
+        real(dp) :: h_raw                         ! soil water content st readily available water is transpired [mm]
+
+            ! TODO: raw can be computed as bil2%RAW outside hourly cycle
+        raw = p_day*(h_fc-h_wp)                  ! FAO56 eq. 83
+        h_raw = h_fc - raw
+        ! evaluate water stress condition k_stress = 1 -> no stress, k_stress = 0 -> total stress
+        ! TODO: consider transpiration reduction while approaching saturation
+        if(h_soil>=h_raw) then
+            k_stress_dry = 1.0
+        else if(h_soil>h_wp)then
+            k_stress_dry = (h_soil-h_wp)/(h_raw-h_wp)       ! FAO56 eq. 84
+        else ! h_soil <= h_wp
+            k_stress_dry = 0.0
+        end if
+
+        k_stress_sat = 1.0 ! not implemented
+
+    end subroutine
+
     subroutine evaporation(h_soil, h_rew, h_wp, k_c_max, few, k_e_act, k_cb,h_et0,h_eva,h_eva_pot,k_r)
         ! evaporation (daily calculation)
     
@@ -43,40 +73,22 @@ module mod_evapotranspiration
         h_eva_pot = k_e_pot * h_et0 ! it considers bare soil if there is no crop (FAO56 pag. 146)
     end subroutine evaporation
 
-    subroutine transpiration(h_soil,k_cb, p_day, h_wp, h_fc, Ra, h_transp_act, h_transp_pot, k_stress, h_et0)
+    subroutine transpiration(k_cb, Ra, h_transp_act, h_transp_pot, k_stress, h_et0)
         ! transpiration calculation
         ! it doesn't consider transpiration reduction caused by soil anoxy (i.e. if soil is nearly saturated)
-        real(dp), intent(in)::h_soil              ! actual soil content [mm]
         real(dp), intent(in)::k_cb                ! basal crop coefficient [-]
-        real(dp), intent(in)::p_day               ! deplection fraction adjusted for meteorological conditions [-]
-        real(dp), intent(in)::h_fc                ! water content at field capacity [mm]
-        real(dp), intent(in)::h_wp                ! water content at wilting point [mm]
         real(dp), intent(in)::Ra                  ! root ratio of considered layer [mm]
         real(dp), intent(in)::h_et0               ! reference evapotranspiration [mm]
+        real(dp), intent(in)::k_stress            ! water stress coefficient [-]  
         real(dp), intent(out)::h_transp_act       ! hourly actual transpiration [mm]
         real(dp), intent(out)::h_transp_pot       ! hourly potential transpiration [mm]
-        real(dp), intent(out)::k_stress           ! water stress coefficient (Ks) [-]
-        real(dp) :: raw                           ! readily available water [mm]
-        real(dp) :: h_raw                         ! soil water content st readily available water is transpired [mm]
+
 
         h_transp_pot = k_cb * h_et0
         ! hourly potential transpiration for considered layer [mm]
         ! a = considered layer / b = other layer
         h_transp_pot = h_transp_pot * Ra
         
-        ! TODO: raw can be computed as bil2%RAW outside hourly cycle
-        raw = p_day*(h_fc-h_wp)                  ! FAO56 eq. 83
-        h_raw = h_fc - raw
-        ! evaluate water stress condition k_stress = 1 -> no stress, k_stress = 0 -> total stress
-        ! TODO: consider transpiration reduction while approaching saturation
-        if(h_soil>=h_raw) then
-            k_stress=1
-        else if(h_soil>h_wp)then
-            k_stress=(h_soil-h_wp)/(h_raw-h_wp)       ! FAO56 eq. 84
-        else ! h_soil <= h_wp
-            k_stress=0
-        end if
-
         h_transp_act = k_stress * h_transp_pot
         
     end subroutine transpiration

@@ -107,7 +107,7 @@ module mod_crop_soil_water
 
     recursive subroutine water_balance_evap_lay(h_net_irr, h_soil1, & !
         & h_inf, h_eva_act, h_eva_pot, h_perc1, h_pond0, h_pond, h_transp_act, h_transp_pot, k_cb, p_day, h_et0, &
-        & k_e, k_r, hks, kc_max, few, rf_e, h_rew, h_sat, h_fc, h_wp, h_r, & !RR: add kr
+        & k_e, k_r, k_stress_dry, k_stress_sat, hks, kc_max, few, rf_e, h_rew, h_sat, h_fc, h_wp, h_r, & !RR: add kr
         & k_sat, fatt_n, n_iter1, adj_perc_par, mmax)
         ! water balance of the evapotranspirative layer
         ! recursive: time is divided by 2 in case solution not found
@@ -135,6 +135,8 @@ module mod_crop_soil_water
         !
         real(dp), intent(out)::k_e         ! actual soil evaporation coefficient [-]
         real(dp), intent(out)::k_r         ! reduction coefficient of evaporation [-]
+        real(dp), intent(out):: k_stress_dry! water scarcity stress coefficient [-]
+        real(dp), intent(out):: k_stress_sat! water saturation stress coefficient [-]
         real(dp), intent(out)::hks         ! water stress coefficient [-]
         real(dp), intent(out)::h_eva_act   ! effective evaporation [mm] - (sub)hourly
         real(dp), intent(out)::h_eva_pot   ! potential evaporation [mm] - (sub)hourly
@@ -150,7 +152,7 @@ module mod_crop_soil_water
         !
         real(dp)::h_soil0,h_soil_old,h_soil_mean,h_soil_new,h_delta !
         integer::n,m,k
-        real(dp)::h_eva_act_m, h_eva_pot_m, h_perc1_m, hks_m, h_transp_act_m, h_transp_pot_m 
+        real(dp)::h_eva_act_m, h_eva_pot_m, h_perc1_m,k_s_dry_m,k_s_sat_m, hks_m, h_transp_act_m, h_transp_pot_m 
         real(dp)::h_pond_i                   ! ponding value to be used inside the cycle
         !!
         ! init
@@ -165,7 +167,11 @@ module mod_crop_soil_water
             
             h_perc1 = percolation(adj_perc_par, h_soil_mean, h_r, h_sat, k_sat, fatt_n)!
 
-            call transpiration(h_soil_mean, k_cb, p_day, h_wp, h_fc, rf_e, h_transp_act, h_transp_pot, hks, h_et0)!
+            call calculate_water_stresses(h_soil_mean,h_fc,h_wp,h_sat,p_day,k_stress_dry,k_stress_sat)
+
+            hks = min(k_stress_dry,k_stress_sat)
+
+            call transpiration(k_cb,rf_e, h_transp_act, h_transp_pot, hks, h_et0)!
             
             ! water balance equation (TODO: h_soil_mean)
             h_soil_new = h_soil0 + (h_inf + h_net_irr + h_pond_i) - h_eva_act - h_perc1 - h_transp_act!
@@ -200,7 +206,7 @@ module mod_crop_soil_water
             
             do k=1, k_max
                 call water_balance_evap_lay(h_net_irr/k_max, h_soil1, h_inf/k_max, h_eva_act_m, h_eva_pot_m, h_perc1_m, h_pond_i, h_pond, &
-                    & h_transp_act_m, h_transp_pot_m, k_cb, p_day, h_et0/k_max, k_e, k_r, hks_m, kc_max, few, rf_e, & ! RR: add k_r
+                    & h_transp_act_m, h_transp_pot_m, k_cb, p_day, h_et0/k_max, k_e, k_r,k_s_dry_m,k_s_sat_m, hks_m, kc_max, few, rf_e, & ! RR: add k_r
                     & h_rew, h_sat, h_fc, h_wp, h_r, k_sat/k_max , fatt_n, n_iter1, adj_perc_par, mmax)
 
                 h_pond_i = h_pond
@@ -220,7 +226,7 @@ module mod_crop_soil_water
 
     ! TODO: %AB%: check consistency between water_balance_eva_lay and  water_balance_transp_lay
     recursive subroutine water_balance_transp_lay(h_soil2, h_transp_act, h_transp_pot, h_perc2, &!
-        & h_perc1, hks, h_eva_pot, h_caprise, h_rise, sr, zr, rf_t, k_cb, p_day, cn_group, h_et0,h_sat,h_fc,h_wp,h_r, k_sat, &!
+        & h_perc1, k_stress_dry, k_stress_sat, hks, h_eva_pot, h_caprise, h_rise, sr, zr, rf_t, k_cb, p_day, cn_group, h_et0,h_sat,h_fc,h_wp,h_r, k_sat, &!
         & fatt_n, a3 , a4 , b1 , b2, b3, b4, depth_under_rz, &!
         & n_iter2, adj_perc_par,caprise_flag,mmax)!
         ! water balance of the evapotranspirative layer
@@ -257,6 +263,8 @@ module mod_crop_soil_water
         real(dp), intent(out)::h_transp_act ! effective transpiration [mm] - (sub)hourly
         real(dp), intent(out)::h_transp_pot ! potential transpiration [mm] - (sub)hourly
         real(dp), intent(out)::h_perc2      ! percolation from the second layer (mm) - (sub)hourly
+        real(dp), intent(out):: k_stress_dry! water scarcity stress coefficient [-]
+        real(dp), intent(out):: k_stress_sat! water saturation stress coefficient [-]
         real(dp), intent(out)::hks          ! water stress coefficient [-]
         real(dp), intent(out)::h_caprise    ! water uplifted due to capillary rise[mm]
         real(dp), intent(out)::h_rise       ! water uplifted due to saturation excess [mm]
@@ -268,7 +276,7 @@ module mod_crop_soil_water
         real(dp),parameter::converg=0.0001!
         real(dp)::h_soil0,h_soil_old,h_soil_mean,h_soil_new,h_delta!
         integer::n, m, k!
-        real(dp)::h_caprise_m, h_transp_act_m, h_transp_pot_m, hks_m, h_perc2_m, h_rise_m
+        real(dp)::h_caprise_m, h_transp_act_m, h_transp_pot_m,k_s_dry_m,k_s_sat_m, hks_m, h_perc2_m, h_rise_m
         !
         ! init
         h_soil0 = h_soil2!
@@ -279,8 +287,12 @@ module mod_crop_soil_water
         do n=1,nmax!
             h_caprise = 0.
             h_rise = 0.
-                    
-            call transpiration(h_soil_mean, k_cb, p_day, h_wp, h_fc, rf_t, h_transp_act, h_transp_pot, hks, h_et0)!
+            
+            call calculate_water_stresses(h_soil_mean,h_fc,h_wp,h_sat,p_day,k_stress_dry,k_stress_sat)
+
+            hks = min(k_stress_dry,k_stress_sat)
+
+            call transpiration(k_cb,rf_t, h_transp_act, h_transp_pot, hks, h_et0)!
             
             ! %AB%: calculate capillary rise if required (only during growing season and not rice paddy)
             ! TODO: %CG%: add transpiration from the 1st layer
@@ -332,7 +344,7 @@ module mod_crop_soil_water
             h_perc2 = 0
             n = 0
             do k = 1, kmax
-                call water_balance_transp_lay(h_soil2, h_transp_act_m, h_transp_pot_m, h_perc2_m, h_perc1/kmax, hks_m, h_eva_pot/kmax, h_caprise_m, &
+                call water_balance_transp_lay(h_soil2, h_transp_act_m, h_transp_pot_m, h_perc2_m, h_perc1/kmax,k_s_dry_m,k_s_sat_m, hks_m, h_eva_pot/kmax, h_caprise_m, &
                     & h_rise_m, sr, zr, rf_t, k_cb, p_day, cn_group, h_et0/kmax, h_sat,h_fc,h_wp,h_r, k_sat/kmax, fatt_n, &
                     & a3 , a4 , b1 , b2 , b3, b4 , depth_under_rz, n_iter2, adj_perc_par,caprise_flag,mmax)
                 ! %AB%: save all the variable

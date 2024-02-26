@@ -916,7 +916,7 @@ module cli_simulation_manager!
                                     & wat_bal_hour%esten%h_perc1(i,j), wat_bal_hour%inten%h_pond0(i,j), wat_bal_hour%esten%h_pond(i,j), &
                                     & wat_bal_hour%esten%h_transp_act1(i,j), wat_bal_hour%esten%h_transp_pot1(i,j), &
                                     & pheno%k_cb(i,j), pheno%p_day(i,j),  meteo%et0(i,j)*pars%fet0(hour), wat_bal_hour%esten%k_e(i,j), &
-                                    & wat_bal_hour%esten%k_r(i,j), &
+                                    & wat_bal_hour%esten%k_r(i,j), wat_bal_hour%inten%k_s_dry(i,j), wat_bal_hour%inten%k_s_sat(i,j),&
                                     & wat_bal_hour%inten%k_s(i,j), wat%kc_max(i,j), wat%few(i,j), pheno%RF_e(i,j), &
                                     & wat%wat1_rew(i,j), wat%layer(1)%h_sat(i,j), wat%layer(1)%h_fc(i,j), &
                                     & wat%layer(1)%h_wp(i,j), wat%layer(1)%h_r(i,j), &
@@ -926,7 +926,8 @@ module cli_simulation_manager!
                                 ! water balance for the transpirative layer
                                 call water_balance_transp_lay(wat_bal_hour%inten%h_soil2(i,j), wat_bal_hour%esten%h_transp_act2(i,j), &!
                                     & wat_bal_hour%esten%h_transp_pot2(i,j), wat_bal_hour%esten%h_perc2(i,j), &!
-                                    & wat_bal_hour%esten%h_perc1(i,j), wat_bal_hour%inten%k_s(i,j), &!
+                                    & wat_bal_hour%esten%h_perc1(i,j), &
+                                    & wat_bal_hour%inten%k_s_dry(i,j),wat_bal_hour%inten%k_s_sat(i,j), wat_bal_hour%inten%k_s(i,j), &!
                                     & wat_bal_hour%esten%h_eva_pot(i,j), wat_bal_hour%esten%h_caprise(i,j), &!
                                     & wat_bal_hour%esten%h_rise(i,j), &!
                                     & pheno%d_r(i,j), wat_bal2%d_t(i,j), pheno%RF_t(i,j), &!
@@ -1979,10 +1980,10 @@ module cli_simulation_manager!
         end where!
     end subroutine x_wat!
     !
-    subroutine init_wat_bal1_matrices(wat_ball,imax,jmax,f_allocate)!
+    subroutine init_wat_bal1_matrices(wat_bal1,imax,jmax,f_allocate)!
         ! init/destroy water balance variable
         implicit none!
-        type(balance1_matrices),intent(inout)::wat_ball!
+        type(balance1_matrices),intent(inout)::wat_bal1!
         integer,intent(in)::imax!
         integer,intent(in)::jmax!
         logical,intent(in)::f_allocate
@@ -1990,38 +1991,44 @@ module cli_simulation_manager!
         character (len=*),parameter:: error_message = "wat_ball has been wrongly allocated"
         !!
         if(f_allocate)then!
-            allocate(wat_ball%d_e(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message!
-            allocate(wat_ball%h_eva(imax,jmax),stat=checkstat)          ; if(checkstat/=0)print*,error_message!
-            allocate(wat_ball%h_eva_pot(imax,jmax),stat=checkstat)      ; if(checkstat/=0)print*,error_message!
-            allocate(wat_ball%h_transp_act(imax,jmax),stat=checkstat)    ; if(checkstat/=0)print*,error_message!
-            allocate(wat_ball%h_transp_pot(imax,jmax),stat=checkstat)    ; if(checkstat/=0)print*,error_message!
-            allocate(wat_ball%h_soil(imax,jmax),stat=checkstat)          ; if(checkstat/=0)print*,error_message!
-            allocate(wat_ball%t_soil(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message!
-            allocate(wat_ball%h_interc(imax,jmax),stat=checkstat)       ; if(checkstat/=0)print*,error_message!
-            allocate(wat_ball%h_perc(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message!
-            allocate(wat_ball%h_inf(imax,jmax),stat=checkstat)          ; if(checkstat/=0)print*,error_message!
-            allocate(wat_ball%h_eff_rain(imax,jmax),stat=checkstat)     ; if(checkstat/=0)print*,error_message!
-            allocate(wat_ball%h_net_av_water(imax,jmax),stat=checkstat)  ; if(checkstat/=0)print*,error_message!
-            allocate(wat_ball%h_gross_av_water(imax,jmax),stat=checkstat); if(checkstat/=0)print*,error_message!
-            allocate(wat_ball%h_runoff(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message!
-            allocate(wat_ball%h_pond(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%d_e(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%h_eva(imax,jmax),stat=checkstat)          ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%h_eva_pot(imax,jmax),stat=checkstat)      ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%h_transp_act(imax,jmax),stat=checkstat)    ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%h_transp_pot(imax,jmax),stat=checkstat)    ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%h_soil(imax,jmax),stat=checkstat)          ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%t_soil(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%h_interc(imax,jmax),stat=checkstat)       ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%h_perc(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%h_inf(imax,jmax),stat=checkstat)          ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%h_eff_rain(imax,jmax),stat=checkstat)     ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%h_net_av_water(imax,jmax),stat=checkstat)  ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%h_gross_av_water(imax,jmax),stat=checkstat); if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%h_runoff(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%h_pond(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%k_s_dry(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%k_s_sat(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal1%k_s(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message!
             !
         else!
-            deallocate(wat_ball%d_e) !
-            deallocate(wat_ball%h_eva) !
-            deallocate(wat_ball%h_eva_pot) !
-            deallocate(wat_ball%h_transp_act) !
-            deallocate(wat_ball%h_transp_pot) !
-            deallocate(wat_ball%h_soil) !
-            deallocate(wat_ball%t_soil) !
-            deallocate(wat_ball%h_interc) !
-            deallocate(wat_ball%h_perc) !
-            deallocate(wat_ball%h_inf) !
-            deallocate(wat_ball%h_eff_rain) !
-            deallocate(wat_ball%h_net_av_water) !
-            deallocate(wat_ball%h_gross_av_water) !
-            deallocate(wat_ball%h_runoff)!
-            deallocate(wat_ball%h_pond)!
+            deallocate(wat_bal1%d_e) !
+            deallocate(wat_bal1%h_eva) !
+            deallocate(wat_bal1%h_eva_pot) !
+            deallocate(wat_bal1%h_transp_act) !
+            deallocate(wat_bal1%h_transp_pot) !
+            deallocate(wat_bal1%h_soil) !
+            deallocate(wat_bal1%t_soil) !
+            deallocate(wat_bal1%h_interc) !
+            deallocate(wat_bal1%h_perc) !
+            deallocate(wat_bal1%h_inf) !
+            deallocate(wat_bal1%h_eff_rain) !
+            deallocate(wat_bal1%h_net_av_water) !
+            deallocate(wat_bal1%h_gross_av_water) !
+            deallocate(wat_bal1%h_runoff)!
+            deallocate(wat_bal1%h_pond)!
+            deallocate(wat_bal1%k_s_dry)
+            deallocate(wat_bal1%k_s_sat)
+            deallocate(wat_bal1%k_s)
         end if!
     end subroutine init_wat_bal1_matrices!
     !
@@ -2034,23 +2041,25 @@ module cli_simulation_manager!
         logical,intent(in)::f_allocate!
         !!
         integer::checkstat!
-        character (len=*),parameter:: errormessage = "wat_bal2 has been wrongly allocated"
+        character (len=*),parameter:: error_message = "wat_bal2 has been wrongly allocated"
         !!
         if(f_allocate)then!
-            allocate(wat_bal2%d_t(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,errormessage!
-            allocate(wat_bal2%h_soil(imax,jmax),stat=checkstat)          ; if(checkstat/=0)print*,errormessage!
-            allocate(wat_bal2%t_soil(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,errormessage!
-            allocate(wat_bal2%h_transp_act(imax,jmax),stat=checkstat)    ; if(checkstat/=0)print*,errormessage!
-            allocate(wat_bal2%h_transp_pot(imax,jmax),stat=checkstat)    ; if(checkstat/=0)print*,errormessage!
-            allocate(wat_bal2%h_perc(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,errormessage!
-            allocate(wat_bal2%h_raw_sup(imax,jmax),stat=checkstat)       ; if(checkstat/=0)print*,errormessage!
-            allocate(wat_bal2%h_raw(imax,jmax),stat=checkstat)          ; if(checkstat/=0)print*,errormessage!
-            allocate(wat_bal2%h_raw_inf(imax,jmax),stat=checkstat)       ; if(checkstat/=0)print*,errormessage!
-            allocate(wat_bal2%h_raw_priv(imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
-            allocate(wat_bal2%k_s(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,errormessage!
-            allocate(wat_bal2%depth_under_rz(imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage!
-            allocate(wat_bal2%h_caprise(imax,jmax),stat=checkstat)      ; if(checkstat/=0)print*,errormessage!
-            allocate(wat_bal2%h_rise(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,errormessage!
+            allocate(wat_bal2%d_t(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal2%h_soil(imax,jmax),stat=checkstat)          ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal2%t_soil(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal2%h_transp_act(imax,jmax),stat=checkstat)    ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal2%h_transp_pot(imax,jmax),stat=checkstat)    ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal2%h_perc(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal2%h_raw_sup(imax,jmax),stat=checkstat)       ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal2%h_raw(imax,jmax),stat=checkstat)          ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal2%h_raw_inf(imax,jmax),stat=checkstat)       ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal2%h_raw_priv(imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal2%k_s_dry(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal2%k_s_sat(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal2%k_s(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal2%depth_under_rz(imax,jmax),stat=checkstat); if(checkstat/=0)print*,error_message!
+            allocate(wat_bal2%h_caprise(imax,jmax),stat=checkstat)      ; if(checkstat/=0)print*,error_message!
+            allocate(wat_bal2%h_rise(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message!
         else!
             deallocate(wat_bal2%d_t) !
             deallocate(wat_bal2%h_soil) !
@@ -2062,6 +2071,8 @@ module cli_simulation_manager!
             deallocate(wat_bal2%h_raw) !
             deallocate(wat_bal2%h_raw_inf) !
             deallocate(wat_bal2%h_raw_priv) !
+            deallocate(wat_bal2%k_s_dry) !
+            deallocate(wat_bal2%k_s_sat) !
             deallocate(wat_bal2%k_s) !
             deallocate(wat_bal2%depth_under_rz) !
             deallocate(wat_bal2%h_caprise) !
@@ -2069,68 +2080,72 @@ module cli_simulation_manager!
         end if!
     end subroutine init_wat_bal2_matrices!
     !
-    subroutine init_wat_bal_hour(wat_ball_hour,imax,jmax,f_allocate)!
+    subroutine init_wat_bal_hour(wat_bal1_hour,imax,jmax,f_allocate)!
         ! init/destroy wat_bal_hourly
         implicit none!
-        type(hourly),intent(inout)::wat_ball_hour!
+        type(hourly),intent(inout)::wat_bal1_hour!
         integer,intent(in)::imax!
         integer,intent(in)::jmax!
         logical,intent(in)::f_allocate!
         integer::checkstat!
-        character (len=*),parameter:: errormessage = "wat_ball_hour has been wrongly allocated"
+        character (len=*),parameter:: error_message = "wat_bal1_hour has been wrongly allocated"
 
         if(f_allocate .eqv. .true.)then!
-            allocate(wat_ball_hour%esten%k_e           (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%esten%k_r           (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage ! aggiunto RR
-            allocate(wat_ball_hour%esten%h_eva         (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%esten%h_eva_pot     (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%esten%h_inf         (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%esten%h_perc1       (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%esten%h_perc2      (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%esten%h_pond        (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%esten%h_transp_act1  (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%esten%h_transp_pot1  (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%esten%h_transp_act2 (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%esten%h_transp_pot2 (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%esten%h_caprise     (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%esten%h_rise        (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%esten%h_net_av_water (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%esten%h_gross_av_water (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%esten%h_eff_rain    (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%inten%h_soil1        (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%inten%h_soil2        (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%inten%k_s          (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%inten%h_pond0       (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%n_iter1            (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%n_iter2            (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%n_max1              (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
-            allocate(wat_ball_hour%n_max2              (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,errormessage
+            allocate(wat_bal1_hour%esten%k_e           (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%esten%k_r           (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message ! %RR% added
+            allocate(wat_bal1_hour%esten%h_eva         (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%esten%h_eva_pot     (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%esten%h_inf         (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%esten%h_perc1       (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%esten%h_perc2      (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%esten%h_pond        (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%esten%h_transp_act1  (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%esten%h_transp_pot1  (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%esten%h_transp_act2 (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%esten%h_transp_pot2 (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%esten%h_caprise     (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%esten%h_rise        (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%esten%h_net_av_water (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%esten%h_gross_av_water (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%esten%h_eff_rain    (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%inten%h_soil1        (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%inten%h_soil2        (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%inten%k_s_dry        (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%inten%k_s_sat        (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%inten%k_s          (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%inten%h_pond0       (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%n_iter1            (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%n_iter2            (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%n_max1              (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
+            allocate(wat_bal1_hour%n_max2              (imax,jmax),stat=checkstat) ; if(checkstat/=0)print*,error_message
         else!
-            deallocate(wat_ball_hour%esten%k_e      )!
-            deallocate(wat_ball_hour%esten%k_r      )! %RR% added
-            deallocate(wat_ball_hour%esten%h_eva      )!
-            deallocate(wat_ball_hour%esten%h_eva_pot      )!
-            deallocate(wat_ball_hour%esten%h_inf      )!
-            deallocate(wat_ball_hour%esten%h_perc1    )!
-            deallocate(wat_ball_hour%esten%h_perc2   )!
-            deallocate(wat_ball_hour%esten%h_pond   )!
-            deallocate(wat_ball_hour%esten%h_transp_act1    ) !
-            deallocate(wat_ball_hour%esten%h_transp_pot1  )!
-            deallocate(wat_ball_hour%esten%h_transp_act2    ) !
-            deallocate(wat_ball_hour%esten%h_transp_pot2  )!
-            deallocate(wat_ball_hour%esten%h_caprise  )!
-            deallocate(wat_ball_hour%esten%h_rise  )!
-            deallocate(wat_ball_hour%esten%h_net_av_water )!
-            deallocate(wat_ball_hour%esten%h_gross_av_water)!
-            deallocate(wat_ball_hour%esten%h_eff_rain     )!
-            deallocate(wat_ball_hour%inten%h_soil1)     !
-            deallocate(wat_ball_hour%inten%h_soil2)     !
-            deallocate(wat_ball_hour%inten%k_s  )     !
-            deallocate(wat_ball_hour%inten%h_pond0   )!
-            deallocate(wat_ball_hour%n_iter1)         !
-            deallocate(wat_ball_hour%n_iter2)         !
-            deallocate(wat_ball_hour%n_max1)         !
-            deallocate(wat_ball_hour%n_max2)         !
+            deallocate(wat_bal1_hour%esten%k_e      )!
+            deallocate(wat_bal1_hour%esten%k_r      )! %RR% added
+            deallocate(wat_bal1_hour%esten%h_eva      )!
+            deallocate(wat_bal1_hour%esten%h_eva_pot      )!
+            deallocate(wat_bal1_hour%esten%h_inf      )!
+            deallocate(wat_bal1_hour%esten%h_perc1    )!
+            deallocate(wat_bal1_hour%esten%h_perc2   )!
+            deallocate(wat_bal1_hour%esten%h_pond   )!
+            deallocate(wat_bal1_hour%esten%h_transp_act1    ) !
+            deallocate(wat_bal1_hour%esten%h_transp_pot1  )!
+            deallocate(wat_bal1_hour%esten%h_transp_act2    ) !
+            deallocate(wat_bal1_hour%esten%h_transp_pot2  )!
+            deallocate(wat_bal1_hour%esten%h_caprise  )!
+            deallocate(wat_bal1_hour%esten%h_rise  )!
+            deallocate(wat_bal1_hour%esten%h_net_av_water )!
+            deallocate(wat_bal1_hour%esten%h_gross_av_water)!
+            deallocate(wat_bal1_hour%esten%h_eff_rain     )!
+            deallocate(wat_bal1_hour%inten%h_soil1)     !
+            deallocate(wat_bal1_hour%inten%h_soil2)     !
+            deallocate(wat_bal1_hour%inten%k_s_dry  )     !
+            deallocate(wat_bal1_hour%inten%k_s_sat  )     !
+            deallocate(wat_bal1_hour%inten%k_s  )     !
+            deallocate(wat_bal1_hour%inten%h_pond0   )!
+            deallocate(wat_bal1_hour%n_iter1)         !
+            deallocate(wat_bal1_hour%n_iter2)         !
+            deallocate(wat_bal1_hour%n_max1)         !
+            deallocate(wat_bal1_hour%n_max2)         !
         end if!
     end subroutine init_wat_bal_hour!
     !
