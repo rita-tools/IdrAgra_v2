@@ -450,6 +450,7 @@ module mod_irrigation
                 ! average net discharge required by the irrigation unit
                 ! it doesn't consider the field efficiency
                 ! it is estimated from the water depth from the irrigation method
+                ! TODO: not used q_mean!
                 q_mean = sum(s_v_irr_cell)/(n*sec_to_day) 
                 
                 ! TODOs:
@@ -473,6 +474,7 @@ module mod_irrigation
                 
                         ! %AB% record the index of the current cell.
                         ! It could be the latest irrigated in the current day and the first in the following 
+                        Q_tot_pot = Q_tot_pot + q_cell
                         irr_units(k)%last_cell_id = vid(p)  
                         vcells(p) = vid(p)!
                     
@@ -516,7 +518,7 @@ module mod_irrigation
                 !%AB% store the water actually used
                 irr_units(k)%q_day=Q_tot_act
                                 
-                ! UNMONOTORED PRIVATE ONLY
+                ! UNMONITORED PRIVATE ONLY
                 ! %AB% restart n 
                 n = count(irr_mask)!
                 
@@ -530,6 +532,7 @@ module mod_irrigation
                     
                     
                     if(dist>n) dist=n!
+                    ! TODO: check shift is the same as before
                     ! vector shift
                     vi=cshift(vi,shift)!
                     vj=cshift(vj,shift)!
@@ -545,7 +548,7 @@ module mod_irrigation
                     
                     do p=1,n!
                         if((p>=dist).and.(.not.(any(vcells==vid(p)))))then!
-                            if(s_h_old(p) <= s_h_raw_priv(p))then!
+                            if(s_h_old(p) <= s_h_raw_priv(p)) then!
                                 ! %AB% irrigation volume is equal to the irrigation depth of the method
                                 priv_irr(vi(p),vj(p))=s_h_met(p)                    
                                 irr_units(k)%q_un_priv=irr_units(k)%q_un_priv+s_v_irr_cell(p)/sec_to_day
@@ -574,6 +577,7 @@ module mod_irrigation
         end do irr_units_loop ! end irrigation units loop
         !!
         !verifica che coll_irr(i,j)/=priv_irr(i,j) e costruzione della matrice irrigazione!
+        ! TODO: split irrigation sources
         do j=1,domain%header%jmax!
             do i=1,domain%header%imax!
                 if(domain%mat(i,j)/=domain%header%nan)then!
