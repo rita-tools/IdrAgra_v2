@@ -205,7 +205,8 @@ module mod_crop_phenology
 
     end subroutine populate_crop_yield_matrices
 
-    subroutine populate_crop_pars_matrices(crop_pars_mat,info_pheno,irandom,doy,ws_idx,domain,soil_use,y, year_length, crop_mat)!
+    subroutine populate_crop_pars_matrices(crop_pars_mat,info_pheno,irandom,doy,ws_idx,&
+                                           & domain,soil_use,y, year_length, crop_mat)!
         ! populate crop parameters matrices from weather stations time series
         integer,intent(in)::doy,year_length,y!
         type(grid_i),intent(in)::domain,soil_use!
@@ -221,23 +222,23 @@ module mod_crop_phenology
         do j=1,size(domain%mat,2)!
             do i=1,size(domain%mat,1)!
                 scans_domain: if(domain%mat(i,j) /= domain%header%nan)then!
-                    if (crop_mat%ii0(i,j,crop_pars_mat%n_crops_by_year(i,j)) == 0 .and. crop_mat%iie(i,j,crop_pars_mat%n_crops_by_year(i,j)) == 0 ) then  ! no crop
+                    if (crop_mat%ii0(i,j,crop_pars_mat%n_crops_by_year(i,j)) == 0 &
+                        & .and. crop_mat%iie(i,j,crop_pars_mat%n_crops_by_year(i,j)) == 0 ) then  ! no crop
                         doy_s = doy - irandom(i,j)
                     else if (crop_mat%ii0(i,j,crop_pars_mat%n_crops_by_year(i,j)) < crop_mat%iie(i,j,crop_pars_mat%n_crops_by_year(i,j))) then            ! annuals or perennials
                         ! emergence date is shifted as ii0(i,j,cs)-irandom(i,j,cs)
                         ! nint((gg-ii0(i,j))*dij(i,j)) contracts/expands the series
                         ! randomization of emergence date (ii0/irandom) and factor of dilatation (dij) are used to calculate gg1
                         doy_s = crop_mat%ii0_ref(i,j,crop_pars_mat%n_crops_by_year(i,j)) - irandom(i,j) + &
-                            & nint((doy-crop_mat%ii0(i,j,crop_pars_mat%n_crops_by_year(i,j))) * crop_mat%dij(i,j,crop_pars_mat%n_crops_by_year(i,j)))
+                            & nint((doy-crop_mat%ii0(i,j,crop_pars_mat%n_crops_by_year(i,j))) * &
+                            & crop_mat%dij(i,j,crop_pars_mat%n_crops_by_year(i,j)))
                     else                                                                                                ! biennals
-                        if (doy < crop_mat%iie(i,j,crop_pars_mat%n_crops_by_year(i,j)) + &
-                            & irandom(i,j)) then
+                        if (doy < crop_mat%iie(i,j,crop_pars_mat%n_crops_by_year(i,j)) + irandom(i,j)) then
                             ! from 1/1 to harvest date, only the contraction/expansion of crop cycle is taken into account
                             ! in the first part of the year, the limits are 1/1 and harvest date (only contraction/expansion)
                             doy_s = doy * (crop_mat%iie_ref(i,j,crop_pars_mat%n_crops_by_year(i,j))) / &
 								& crop_mat%iie(i,j,crop_pars_mat%n_crops_by_year(i,j)) - irandom(i,j)
-                        else if (doy >= crop_mat%ii0(i,j,crop_pars_mat%n_crops_by_year(i,j)) + &
-                            & irandom(i,j)) then
+                        else if (doy >= crop_mat%ii0(i,j,crop_pars_mat%n_crops_by_year(i,j)) + irandom(i,j)) then
                             
                             ! from emergence to 31/12, both parameters are taken into account: the randomization of emergence date and the contraction/expansion of crop cycle
                             ! in the second part of the year, the limits are the randomized emergence date and 31/12 (day 365/366)

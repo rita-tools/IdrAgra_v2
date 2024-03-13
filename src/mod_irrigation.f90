@@ -576,7 +576,7 @@ module mod_irrigation
             end if
         end do irr_units_loop ! end irrigation units loop
         !!
-        !verifica che coll_irr(i,j)/=priv_irr(i,j) e costruzione della matrice irrigazione!
+        ! check coll_irr(i,j)/=priv_irr(i,j) e record irrigated volumes!
         ! TODO: split irrigation sources
         do j=1,domain%header%jmax!
             do i=1,domain%header%imax!
@@ -682,8 +682,8 @@ module mod_irrigation
 
     function deliverable_ratio_unm_coll(cells_un_coll, h_soil, h_transp_pot, h_raw, theta_fc, &
                                 & d_r, irr_class, pars, imax, jmax, wat_src_idx)!
-        ! calcuate the actual deliverable ratio from unmitored water sources (e.g. collective wells plan)
-        ! deliverable ratio is caòlculated from average water deficit of the serverd cells
+        ! calculate the actual deliverable ratio from unmonitored water sources (e.g. collective wells plan)
+        ! deliverable ratio is calculated from average water deficit of the served cells
         integer,intent(in)::imax,jmax!
         integer,dimension(:,:),intent(in)::cells_un_coll     ! map of cells irrigated by unmonitored collective sources
         real(dp),dimension(:,:),intent(in)::h_soil, h_transp_pot, h_raw, theta_fc, d_r
