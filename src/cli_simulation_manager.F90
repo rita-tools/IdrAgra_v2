@@ -794,15 +794,18 @@ module cli_simulation_manager!
                         if (doy==1) irr_units(:)%q_surplus = 0
                         ! calculate the daily water duty for each irrigation units, considering the water distribution efficiency 
                         call calc_daily_duty(doy, irr_units, info_sources, wat_src_tbl, info_spat%irr_unit_id, &
-                            & info_spat%domain, pars, pheno%irrigation_class, wat_bal2_old%h_soil, wat_bal2_old%h_transp_pot, wat_bal2%h_raw, &
-                            &info_spat%theta(2)%fc%mat, wat_bal2_old%d_t)!
+                            & info_spat%domain, pars, pheno%irrigation_class, &
+                            & (wat_bal1_old%h_soil + wat_bal2_old%h_soil), (wat_bal1_old%h_transp_pot + wat_bal2_old%h_transp_pot), &
+                            & wat_bal2%h_raw, info_spat%theta(2)%fc%mat, wat_bal2_old%d_t)!
                         ! %EAC%: save irrigation units results
                         call save_irr_unit_debug_data(doy,out_tbl_list,irr_units)
 
                         call irrigation_use(info_spat%domain, info_spat%irr_unit_id, pheno%irrigation_class,&
-                            & info_spat%irr_meth_id, irr_units, wat_bal2_old%h_transp_pot, (wat_bal1_old%h_soil + wat_bal2_old%h_soil),wat_bal2%h_raw_sup,&
-                            & wat_bal2%h_raw_inf,wat_bal2%h_raw,wat_bal2%h_raw_priv, h_irr,doy,priv_irr,coll_irr, day_from_irr,esp_perc,&
-                            & info_spat%a_perc,info_spat%b_perc, pars%sim%f_shapearea, info_spat%cell_area%mat, &
+                            & info_spat%irr_meth_id, irr_units, &
+                            & (wat_bal1_old%h_transp_pot+wat_bal2_old%h_transp_pot), (wat_bal1_old%h_soil + wat_bal2_old%h_soil), &
+                            & wat_bal2%h_raw_sup, wat_bal2%h_raw_inf, wat_bal2%h_raw, wat_bal2%h_raw_priv, &
+                            & h_irr, doy, priv_irr, coll_irr, day_from_irr, esp_perc, &
+                            & info_spat%a_perc, info_spat%b_perc, pars%sim%f_shapearea, info_spat%cell_area%mat, &
                             & info_spat%h_meth%mat, info_spat%irr_starts%mat, info_spat%irr_ends%mat)!pars%sim%end_irr_season)!
                         ! %EAC%: save irrigation units results
                         call save_irr_unit_data(doy,out_tbl_list,irr_units)
