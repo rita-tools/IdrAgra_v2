@@ -622,8 +622,8 @@ module mod_irrigation
         !!
         integer,dimension(:,:),allocatable::cells_un_coll       ! map of the cells irrigated by unmonitored collective water sources
         real(dp)::frac_rel_un_coll                              ! fraction of water released respect to the maximum water available
-        integer:: n_cells_irr_un_coll                           ! number of cells irrigable and irrigated by unmonitored collective water sources                            
-        integer:: n_cells_irr                                   ! number of cells irrigable
+        integer:: n_cells_irr_un_coll                           ! number of cells irrigated by unmonitored collective water sources
+        integer:: n_cells_un_coll                               ! number of cells irrigable by unmonitored collective water sources
         real(dp),dimension(par%cr%n_withdrawals)::q_un_coll!
         integer::i,j,k!
         !!
@@ -664,13 +664,14 @@ module mod_irrigation
                     frac_rel_un_coll = deliverable_ratio_unm_coll(cells_un_coll,h_soil,h_transp_pot,raw,h_fc,zr,irrigation_class,par, &
                                         & domain_map%header%imax, domain_map%header%jmax, k)!
                     n_cells_irr_un_coll = count(cells_un_coll==k .and. irrigation_class==1)!
-                    n_cells_irr = count(cells_un_coll==k)
-                    if(n_cells_irr==0) cycle
+                    n_cells_un_coll = count(cells_un_coll==k)
+                    if(n_cells_un_coll==0) cycle
                     irr_units(j)%q_act_fld(4)= &
-                        & frac_rel_un_coll*wat_sources(i)%duty_frc * sources_info%unm_src_tbl%q_max(k) * irr_units(j)%int_distr_eff * (real(n_cells_irr_un_coll)/real(n_cells_irr)) + &
+                        & frac_rel_un_coll*wat_sources(i)%duty_frc * sources_info%unm_src_tbl%q_max(k) * irr_units(j)%int_distr_eff * (real(n_cells_irr_un_coll)/real(n_cells_un_coll)) + &
                         & irr_units(j)%q_act_fld(4)!
                     
-                    q_un_coll(k) = frac_rel_un_coll*wat_sources(i)%duty_frc * sources_info%unm_src_tbl%q_max(k)*(real(n_cells_irr_un_coll)/real(n_cells_irr))+&
+                    q_un_coll(k) = &n_cells_un_coll
+                        & frac_rel_un_coll*wat_sources(i)%duty_frc * sources_info%unm_src_tbl%q_max(k)*(real(n_cells_irr_un_coll)/real(n_cells_irr))+&
                         & q_un_coll(k)   ! only for printing %AB% gross used water
                 case default!
             end select!
