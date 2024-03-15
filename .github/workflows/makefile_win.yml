@@ -30,6 +30,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           branch: ${{ github.ref }}
           tags: true
+          force: true
 
       # - uses: actions/upload-artifact@v4
       #   with:
