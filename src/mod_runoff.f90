@@ -24,15 +24,15 @@ module mod_runoff
 
     contains!
     
-    subroutine CN_runoff(gross_av_water,net_av_water,v_irr, domain, pheno, runoff, cn, lambda_cn)!
+    subroutine CN_runoff(gross_av_water,net_av_water,h_irr, domain, pheno, runoff, cn, lambda_cn)!
         ! Runoff calculation according to SCS-CN method (daily calculation)
-        real(dp),dimension(:,:),intent(in)::v_irr                      ! irrigation water [mm]
+        real(dp),dimension(:,:),intent(in)::h_irr                      ! irrigation water [mm]
         type(grid_i),intent(in)::domain                                ! simulation domain [-,-]
-        type(crop_pars_matrices),intent(in)::pheno                         ! phenological parameters
-        real(dp),dimension(:,:),intent(in)::cn                     !
+        type(crop_pars_matrices),intent(in)::pheno                     ! phenological parameters
+        real(dp),dimension(:,:),intent(in)::cn                         ! cn distribution
         real(dp),intent(in)::lambda_cn                                 ! lambda CN [-]]
-        real(dp),dimension(:,:),intent(inout)::gross_av_water           ! water available [mm]
-        real(dp),dimension(:,:),intent(inout)::net_av_water             ! water available for infiltration [mm]
+        real(dp),dimension(:,:),intent(inout)::gross_av_water          ! water available [mm]
+        real(dp),dimension(:,:),intent(inout)::net_av_water            ! water available for infiltration [mm]
         real(dp),dimension(:,:),intent(out)::runoff                    ! runoff [mm]
         real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::S   ! potential maximum retention after runoff begins [mm]
         real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::Ia  ! initial abstractions [mm]
@@ -51,7 +51,7 @@ module mod_runoff
                 net_av_water = net_av_water - runoff
             end where
         end where
-        gross_av_water=v_irr+gross_av_water
+        gross_av_water=h_irr+gross_av_water
     end subroutine CN_runoff!
 
     
