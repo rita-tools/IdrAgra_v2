@@ -73,6 +73,38 @@ module mod_crop_soil_water
         
     end function cap_rise
     
+    function percolation_NEW(adj_perc_par,theta_act,theta_r, theta_fc, theta_sat,k_sat, fatt_n)
+        ! Percolation model suggested by %CG% Jan 2024
+        implicit none
+        !
+        real(dp),intent(in)::theta_act           ! actual water content [m3/m3 or mm]
+        real(dp),intent(in)::theta_r             ! residual water content [m3/m3 or mm]
+        real(dp),intent(in)::theta_fc            ! water content at field capacity [m3/m3 or mm]
+        real(dp),intent(in)::theta_sat           ! saturated water content [m3/m3 or mm]
+        !
+        real(dp),intent(in)::k_sat              ! saturated hydraulic conductivity [cm/h]
+        real(dp),intent(in)::fatt_n             ! Brooks & Corey curve fitting parameter [-]
+        real(dp),intent(in)::adj_perc_par       ! factor that takes into account irrigation method and days spent from last irrigation [-]
+        !
+        real(dp)::k_theta                       ! hydraulic conductivity at theta [cm/h]
+        real(dp)::percolation_NEW                   ! percolation in selected time frame - (sub)hourly [mm/h]
+        !
+        k_theta = k_sat*((theta_act-theta_r)/(theta_sat-theta_r))**fatt_n
+        k_fc = k_sat*((theta_fc-theta_r)/(theta_sat-theta_r))**fatt_n
+            
+        if(theta_act < theta_r)then
+            percolation_NEW=0.
+        else if(theta_act>= theta_sat)then
+            percolation_NEW=k_sat*10
+        else if(theta_act>= theta_fc)then
+            percolation_NEW=k_fc*10                                                    ! cm/h -> mm/h
+        else
+            percolation_NEW= ((theta_act-theta_fc)*(1-exp(-k_theta/(theta_sat-theta_fc)))+k_fc)*10
+        end if
+        !
+        ! Adjusted percolation
+        percolation_NEW=percolation_NEW*adj_perc_par! TODO: %CG% not consider adj_perc_par
+    end function percolation_NEW
 
     function percolation(adj_perc_par,theta_act,theta_r,theta_sat,k_sat, fatt_n)
         ! Percolation model
@@ -82,9 +114,9 @@ module mod_crop_soil_water
         ! J. Irr. Drain. Div. 92(1966):61-88
         implicit none
         !
-        real(dp),intent(in)::theta_act           ! actual water content [m3/m3 or mm]
-        real(dp),intent(in)::theta_r             ! residual water content [m3/m3 or mm]
-        real(dp),intent(in)::theta_sat           ! saturated water content [m3/m3 or mm]
+        real(dp),intent(in)::theta_act          ! actual water content [m3/m3 or mm]
+        real(dp),intent(in)::theta_r            ! residual water content [m3/m3 or mm]
+        real(dp),intent(in)::theta_sat          ! saturated water content [m3/m3 or mm]
         !
         real(dp),intent(in)::k_sat              ! saturated hydraulic conductivity [cm/h]
         real(dp),intent(in)::fatt_n             ! Brooks & Corey curve fitting parameter [-]
