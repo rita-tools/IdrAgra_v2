@@ -86,10 +86,11 @@ module mod_crop_soil_water
         real(dp),intent(in)::fatt_n             ! Brooks & Corey curve fitting parameter [-]
         real(dp),intent(in)::adj_perc_par       ! factor that takes into account irrigation method and days spent from last irrigation [-]
         !
-        real(dp)::k_theta                       ! hydraulic conductivity at theta [cm/h]
-        real(dp)::percolation_NEW                   ! percolation in selected time frame - (sub)hourly [mm/h]
+        real(dp)::k_act                         ! hydraulic conductivity at actual soil water content [cm/h]
+        real(dp)::k_fc                          ! hydraulic conductivity at field capacity [cm/h]
+        real(dp)::percolation_NEW               ! percolation in selected time frame - (sub)hourly [mm/h]
         !
-        k_theta = k_sat*((theta_act-theta_r)/(theta_sat-theta_r))**fatt_n
+        k_act = k_sat*((theta_act-theta_r)/(theta_sat-theta_r))**fatt_n
         k_fc = k_sat*((theta_fc-theta_r)/(theta_sat-theta_r))**fatt_n
             
         if(theta_act < theta_r)then
@@ -99,7 +100,7 @@ module mod_crop_soil_water
         else if(theta_act>= theta_fc)then
             percolation_NEW=k_fc*10                                                    ! cm/h -> mm/h
         else
-            percolation_NEW= ((theta_act-theta_fc)*(1-exp(-k_theta/(theta_sat-theta_fc)))+k_fc)*10
+            percolation_NEW= ((theta_act-theta_fc)*(1-exp(-k_act/(theta_sat-theta_fc)))+k_fc)*10
         end if
         !
         ! Adjusted percolation
