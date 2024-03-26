@@ -5,6 +5,7 @@ module cli_read_parameter!
     use mod_irrigation, only: calc_perc_booster_pars
     use cli_watsources
     use mod_TDx_index
+    use mod_system
 
     use cli_save_outputs
     implicit none!
@@ -92,12 +93,14 @@ module cli_read_parameter!
         integer :: ios          ! state variable (0 = ok)
         integer :: line
         logical :: dir_exists
-        character :: delimiter
+        
         integer :: i, j, k
         integer :: actcroplen
         integer,parameter :: nanvalue=-9999       ! general NaN value
         integer,dimension(:),allocatable :: dummy
         character(len=300) :: dir_ic, dir_fc
+
+        character :: delimiter
 
         ErrorFlag = 0
         line = 0
@@ -137,7 +140,6 @@ module cli_read_parameter!
                     select case (label)
                         case ('outputpath')
                             read(buffer, *, iostat=ios) xml%sim%path
-                            ! check if the dir exists or make a new dir
                             inquire(file=trim(xml%sim%path), exist=dir_exists)   ! dir_exists will be TRUE if the directory exists
                             if (dir_exists .eqv. .true.) then
                                 print *,'The directory ', trim(xml%sim%path), ' already exists and will be updated'
@@ -146,7 +148,8 @@ module cli_read_parameter!
                             else
                                 ! TODO: intrinsic 'system' not included in std2008
                                 call get_environment_variable('DELIMITER',delimiter)
-                                call system('mkdir '//delimiter//trim(xml%sim%path))
+                                !call system('mkdir '//delimiter//trim(xml%sim%path))
+                                call make_dir(xml%sim%path)
                             end if
                         case ('inputpath') ! path to spazialized input files !
                             read(buffer, *, iostat=ios) xml%sim%input_path
@@ -207,7 +210,8 @@ module cli_read_parameter!
                             else
                                 ! TODO: intrinsic 'system' non inclusa nello standard std2008
                                 call get_environment_variable('DELIMITER',delimiter)
-                                call system('mkdir '//delimiter//trim(xml%sim%final_condition))
+                                !call system('mkdir '//delimiter//trim(xml%sim%final_condition))
+                                call make_dir(xml%sim%final_condition)
                             end if
                         case ('finalcondition') ! final condition input filenames (root)
                             read(buffer, *, iostat=ios) xml%sim%thetaI_end_fn

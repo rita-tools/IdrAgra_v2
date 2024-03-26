@@ -11,6 +11,8 @@ program main!
     use cli_simulation_manager                                                  ! simulation manager: control IO and daily cycle
     use cli_read_parameter
 
+    use mod_system
+
     implicit none!
 
     type(parameters) :: xml                                     ! stores parameters of input file
@@ -33,6 +35,9 @@ program main!
     logical :: debug = .false.
     logical :: summary = .false.
     logical :: showpreview = .false.
+
+    character :: delimiter
+
     
     ! get options
     do i = 1, iargc()
@@ -65,6 +70,10 @@ program main!
     end do
 
 	! TODO: check if there are other strings without '-', as it can be related to a skipped -f option
+
+    ! set up environment options
+    call get_environment_variable('DELIMITER',delimiter)
+    call set_command('mkdir',delimiter)
     
     call print_header()
     ! Memorization of time in which simulation starts
@@ -72,6 +81,9 @@ program main!
 
     ! Reads simulation input parameters
     call read_all_parameters(filename, xml, xml_TDx, ErrorFlag, debug)!
+
+    ! check if output dir already exists
+    call check_out_path(xml)
 
     if (showpreview .eqv. .true.) then
         print *, '=== PREVIEW ==='
@@ -200,6 +212,16 @@ subroutine print_header()
     print *, '============================================================'
     print *, ''
 end subroutine print_header
+
+subroutine check_out_path(xml)
+    use mod_parameters
+    type(parameters), intent(in) :: xml
+    logical :: dir_exists
+    character :: delimiter
+    ! check if the dir exists or make a new dir
+   
+
+end subroutine
 
 ! TODO: replace with direct initialization of the variable
 subroutine make_default(xml, xml_dtx)
