@@ -1,8 +1,8 @@
 module mod_system
     implicit none
 
-    character(len = 10) :: mkdir_cmd_priv
-    character :: delimiter_priv
+    character(len = 10), private :: mkdir_cmd_priv
+    character, private :: delimiter_priv
 
     contains
 

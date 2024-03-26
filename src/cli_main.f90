@@ -72,8 +72,8 @@ program main!
 	! TODO: check if there are other strings without '-', as it can be related to a skipped -f option
 
     ! set up environment options
-    call get_environment_variable('DELIMITER',delimiter)
-    call set_command('mkdir',delimiter)
+    !call get_environment_variable('DELIMITER',delimiter)
+    call set_command(MKDIR,SEP)
     
     call print_header()
     ! Memorization of time in which simulation starts
