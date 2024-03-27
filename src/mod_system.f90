@@ -1,22 +1,22 @@
 module mod_system
     implicit none
 
-    character(len = 10), private :: mkdir_cmd_priv
-    character, private :: delimiter_priv
-
-    contains
-
-    subroutine set_command(mkdir_os,delimiter_os)
-        character(len = *), intent(in) :: mkdir_os
-        character, intent(in) :: delimiter_os
-        mkdir_cmd_priv = mkdir_os
-        delimiter_priv = delimiter_os
+    ! default is unix
+    character(len = 10), private :: mkdir_cmd = 'mkdir'
+    character, private :: delimiter = '/'
     
-    end subroutine
+    contains
 
     subroutine make_dir(path)
         character(200), intent(in) :: path
-        call system(trim(mkdir_cmd_priv)//' '//delimiter_priv//trim(path))
+! don't indent macro!!!
+#if WIN == 1
+        mkdir_cmd = 'mkdir'
+        delimiter = '\\'
+        !call get_environment_variable('DELIMITER',delimiter)
+#endif
+        !print*,'mkdir: ',mkdir_cmd,' delimiter: ',delimiter,' path: ',trim(path)
+        call system(trim(mkdir_cmd)//' .'//delimiter//trim(path))
     end subroutine
     
 end module 

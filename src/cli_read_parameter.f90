@@ -100,7 +100,7 @@ module cli_read_parameter!
         integer,dimension(:),allocatable :: dummy
         character(len=300) :: dir_ic, dir_fc
 
-        character :: delimiter
+        !character :: delimiter
 
         ErrorFlag = 0
         line = 0
@@ -147,7 +147,7 @@ module cli_read_parameter!
                                 read *
                             else
                                 ! TODO: intrinsic 'system' not included in std2008
-                                call get_environment_variable('DELIMITER',delimiter)
+                                !call get_environment_variable('DELIMITER',delimiter)
                                 !call system('mkdir '//delimiter//trim(xml%sim%path))
                                 call make_dir(xml%sim%path)
                             end if
@@ -209,7 +209,7 @@ module cli_read_parameter!
                                 print *,'The directory ', trim(xml%sim%final_condition), ' already exists and will be updated'
                             else
                                 ! TODO: intrinsic 'system' non inclusa nello standard std2008
-                                call get_environment_variable('DELIMITER',delimiter)
+                                !call get_environment_variable('DELIMITER',delimiter)
                                 !call system('mkdir '//delimiter//trim(xml%sim%final_condition))
                                 call make_dir(xml%sim%final_condition)
                             end if

@@ -5,8 +5,7 @@ CURRENTDATE := $(shell date --iso=seconds)
 # Windows OS variables & settings
 DEL = rm
 EXE = .exe
-MKDIR := mkdir
-SEP := \ #
+WIN = 1
 
 # Compiler settings
 # -cpp: activates compiler pre processing
@@ -15,7 +14,7 @@ SEP := \ #
 
 CC = gfortran
 CPP = gfortran -cpp
-GFFLAGS = -cpp -DGIT_VERSION=\"$(COMMIT)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DMKDIR=\"$(MKDIR)\" -DSEP=\"$(SEP)\"  -g -Wall  -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all -ffpe-trap=zero,overflow,underflow -finit-real=nan -c
+GFFLAGS = -cpp -DGIT_VERSION=\"$(COMMIT)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -g -Wall  -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all -ffpe-trap=zero,overflow,underflow -finit-real=nan -c
 #GFFLAGS = -g -O0 -Wall -Wextra -Wshadow -pedantic -static -c
 #GFFLAGS =  -cpp -DMY_VERSION=\"$(COMMIT)\" -g -Wall -c
 LDFLAGS = 
@@ -55,7 +54,7 @@ FILES = mod_constants mod_utility mod_parameters mod_grid mod_common mod_evapotr
 $(APPNAME): $(patsubst %, $(OBJDIR)/%.o, $(FILES))
 	$(DEL) -f /$(OBJDIR)/cli_main.o
 	$(CC) -o $(OBJDIR)/cli_main.o -J$(OBJDIR) $(GFFLAGS) $(SRCDIR)/cli_main.f90
-	$(CC) -g -o $(RELDIR)/$@$(EXE) $^ $(OBJDIR)/cli_main.o $(LDFLAGS) -static
+	$(CPP) -g -o $(RELDIR)/$@$(EXE) $^ $(OBJDIR)/cli_main.o $(LDFLAGS) -static
 
 # The following sets a function that creates makefile rules
 # Additionally:
