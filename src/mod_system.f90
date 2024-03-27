@@ -13,7 +13,6 @@ module mod_system
 #if WIN == 1
         mkdir_cmd = 'mkdir'
         delimiter = '\\'
-        !call get_environment_variable('DELIMITER',delimiter)
 #endif
         !print*,'mkdir: ',mkdir_cmd,' delimiter: ',delimiter,' path: ',trim(path)
         call system(trim(mkdir_cmd)//' .'//delimiter//trim(path))
