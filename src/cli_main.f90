@@ -11,6 +11,8 @@ program main!
     use cli_simulation_manager                                                  ! simulation manager: control IO and daily cycle
     use cli_read_parameter
 
+    use mod_system
+
     implicit none!
 
     type(parameters) :: xml                                     ! stores parameters of input file
@@ -65,6 +67,8 @@ program main!
     end do
 
 	! TODO: check if there are other strings without '-', as it can be related to a skipped -f option
+
+    ! set up environment options
     
     call print_header()
     ! Memorization of time in which simulation starts
@@ -200,6 +204,7 @@ subroutine print_header()
     print *, '============================================================'
     print *, ''
 end subroutine print_header
+
 
 ! TODO: replace with direct initialization of the variable
 subroutine make_default(xml, xml_dtx)

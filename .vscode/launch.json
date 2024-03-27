@@ -12,7 +12,7 @@
             "program": "${workspaceFolder}/release/idragra.exe",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/demo/",
+            "cwd": "C:/enricodata/progetto_GardaChiese/simulazioni/Colombarola_21_newcode",//"${workspaceFolder}/demo/",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",

@@ -670,8 +670,8 @@ module mod_irrigation
                         & frac_rel_un_coll*wat_sources(i)%duty_frc * sources_info%unm_src_tbl%q_max(k) * irr_units(j)%int_distr_eff * (real(n_cells_irr_un_coll)/real(n_cells_un_coll)) + &
                         & irr_units(j)%q_act_fld(4)!
                     
-                    q_un_coll(k) = &n_cells_un_coll
-                        & frac_rel_un_coll*wat_sources(i)%duty_frc * sources_info%unm_src_tbl%q_max(k)*(real(n_cells_irr_un_coll)/real(n_cells_irr))+&
+                    q_un_coll(k) = &
+                        & frac_rel_un_coll*wat_sources(i)%duty_frc * sources_info%unm_src_tbl%q_max(k)*(real(n_cells_irr_un_coll)/real(n_cells_un_coll))+&
                         & q_un_coll(k)   ! only for printing %AB% gross used water
                 case default!
             end select!

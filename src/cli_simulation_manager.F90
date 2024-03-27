@@ -127,7 +127,7 @@ module cli_simulation_manager!
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::fw_irr
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::fw_day, fw_old! fw daily updated
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::fc ! cover fraction - %RR%
-        real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::a_loss, b_loss, c_loss, f_interception ! appication losses model
+        real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::a_loss, b_loss, c_loss, f_interception ! application losses model
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::h_irr_sum, h_bypass
         !! TDx
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,pars_TDx%temp%n_ind)::tot_deficit      ! TDx sum
