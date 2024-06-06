@@ -308,8 +308,9 @@ module mod_meteo!
         integer::IOstatus
         !!
         do i=1,size(info_meteo)!
-            read(info_meteo(i)%unit,*,iostat=IOstatus) info_meteo(i)%T_max,info_meteo(i)%T_min,info_meteo(i)%P,info_meteo(i)%RH_max, &!
-                & info_meteo(i)%RH_min,info_meteo(i)%wind_vel,info_meteo(i)%sol_rad!
+            read(info_meteo(i)%unit,*,iostat=IOstatus) &
+                info_meteo(i)%T_max,info_meteo(i)%T_min,info_meteo(i)%P,info_meteo(i)%RH_max, &!
+                info_meteo(i)%RH_min,info_meteo(i)%wind_vel,info_meteo(i)%sol_rad!
             ! init and populate cumulate precipitation
             info_meteo(i)%P_cum = info_meteo(i)%P 
             do ii=1,forecast_day
@@ -326,7 +327,8 @@ module mod_meteo!
         ! calculate ET0!
         do i=1,size(info_meteo)!
             info_meteo(i)%et0=ET_reference(info_meteo(i)%T_max,info_meteo(i)%T_min,info_meteo(i)%RH_max, &!
-                & info_meteo(i)%RH_min,info_meteo(i)%wind_vel,info_meteo(i)%sol_rad,info_meteo(i)%lat_deg,info_meteo(i)%alt_m,res_surf,current_doy)!
+                                            info_meteo(i)%RH_min,info_meteo(i)%wind_vel,info_meteo(i)%sol_rad,&
+                                            info_meteo(i)%lat_deg,info_meteo(i)%alt_m,res_surf,current_doy)!
         end do!
     end subroutine read_meteo_data!
     !
