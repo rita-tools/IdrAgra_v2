@@ -117,7 +117,7 @@ module mod_parameters!
         real(dp) :: b_min = 0.0D0                   ! min value of the "b" parameter for percolation model
         real(dp) :: b_max = 0.0D0                   ! max value of the "b" parameter for percolation model
         
-        ! irrigation losses estimation model: H_loss=a_loss+b_loss x wind_vel+c_loss x T_mean
+        ! irrigation losses estimation model: losses=a_loss+b_loss x wind_vel+c_loss x T_mean
         real(dp) :: a_loss
         real(dp) :: b_loss
         real(dp) :: c_loss

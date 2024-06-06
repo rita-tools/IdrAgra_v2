@@ -61,12 +61,12 @@ module cli_save_outputs!
     ! TODO: check meaning
     type yield_t
         type(out_3d_mat):: biomass_pot                   ! potential biomass
-        type(out_3d_mat):: yield_pot                     ! potential yeald [t/ha]
-        type(out_3d_mat):: yield_act                     ! actual yeald [t/ha]
-        type(out_3d_mat):: fcT                           ! water-stess yield reduction factor - overall [-]
-        type(out_3d_mat):: fcCS                          ! water-stess yield reduction factor - stages [-]
-        type(out_3d_mat):: fHS                           ! heat-stess yield reduction factor [-]
-        type(out_3d_mat):: fHS_sum                       ! somma dei valori per il calcolo del fattore di riduzione correlato allo stress
+        type(out_3d_mat):: yield_pot                     ! potential yield [t/ha]
+        type(out_3d_mat):: yield_act                     ! actual yield [t/ha]
+        type(out_3d_mat):: f_WS                          ! water-stress yield reduction factor - overall [-]
+        type(out_3d_mat):: f_WS_stage                    ! water-stress yield reduction factor - stages [-]
+        type(out_3d_mat):: f_HS                          ! heat-stress yield reduction factor [-]
+        type(out_3d_mat):: f_HS_sum                      ! somma dei valori per il calcolo del fattore di riduzione correlato allo stress
         type(out_3d_mat):: transp_ratio_sum              ! somma del rapporto tra traspirazione potenziale ed evapotraspirazione di riferimento
         type(out_4d_mat):: T_act_sum                     ! somma della traspirazione effettiva per ciascuna fase del kcb
         type(out_4d_mat):: T_pot_sum                     ! somma della traspirazione potenziale per ciascuna fase del kcb
@@ -707,10 +707,10 @@ module cli_save_outputs!
         allocate(yield_map%biomass_pot%mat(size(domain,1),size(domain,2),cs))!
         allocate(yield_map%yield_pot%mat(size(domain,1),size(domain,2),cs))!
         allocate(yield_map%yield_act%mat(size(domain,1),size(domain,2),cs))!
-        allocate(yield_map%fcT%mat(size(domain,1),size(domain,2),cs))!
-        allocate(yield_map%fcCS%mat(size(domain,1),size(domain,2),cs))!
-        allocate(yield_map%fHS%mat(size(domain,1),size(domain,2),cs))!
-        allocate(yield_map%fHS_sum%mat(size(domain,1),size(domain,2),cs))!
+        allocate(yield_map%f_WS%mat(size(domain,1),size(domain,2),cs))!
+        allocate(yield_map%f_WS_stage%mat(size(domain,1),size(domain,2),cs))!
+        allocate(yield_map%f_HS%mat(size(domain,1),size(domain,2),cs))!
+        allocate(yield_map%f_HS_sum%mat(size(domain,1),size(domain,2),cs))!
         allocate(yield_map%transp_ratio_sum%mat(size(domain,1),size(domain,2),cs))!
         allocate(yield_map%T_act_sum%mat(size(domain,1),size(domain,2),fasi_kcb, cs))!
         allocate(yield_map%T_pot_sum%mat(size(domain,1),size(domain,2),fasi_kcb, cs))!
@@ -779,10 +779,10 @@ module cli_save_outputs!
         deallocate(yld_map%biomass_pot%mat)!
         deallocate(yld_map%yield_pot%mat)!
         deallocate(yld_map%yield_act%mat)!
-        deallocate(yld_map%fcT%mat)!
-        deallocate(yld_map%fcCS%mat)!
-        deallocate(yld_map%fHS%mat)!
-        deallocate(yld_map%fHS_sum%mat)!
+        deallocate(yld_map%f_WS%mat)!
+        deallocate(yld_map%f_WS_stage%mat)!
+        deallocate(yld_map%f_HS%mat)!
+        deallocate(yld_map%f_HS_sum%mat)!
         deallocate(yld_map%transp_ratio_sum%mat)!
         deallocate(yld_map%T_act_sum%mat)!
         deallocate(yld_map%T_pot_sum%mat)!
@@ -912,10 +912,10 @@ module cli_save_outputs!
         yield%yield_act%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'yield_act'))
         yield%T_act_sum%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'T_act_sum'))
         yield%T_pot_sum%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'T_pot_sum'))
-        yield%fcCS%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fcCS'))
-        yield%fcT%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fcT'))
-        yield%fHS%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fHS'))
-        yield%fHS_sum%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fHS_sum'))
+        yield%f_WS_stage%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fcCS'))
+        yield%f_WS%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fcT'))
+        yield%f_HS%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fHS'))
+        yield%f_HS_sum%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fHS_sum'))
         yield = 0.0D0    ! set to zero after
     end subroutine init_yield_output_file!
     !
@@ -1216,17 +1216,17 @@ module cli_save_outputs!
                 print*,"print file: ", trim(trim(yield%T_pot_sum%fn)//"_"//trim(adjustl(stri))//"_"//trim(adjustl(strj))//".asc")!
             end do
         end do
-        do i=1, size(yield%fcT%mat,3)
+        do i=1, size(yield%f_WS%mat,3)
             write(stri,*)i
-            call print_mat_as_grid(trim(trim(yield%fcT%fn)//"_"//trim(adjustl(stri))//".asc"), &
-                & domain%header,yield%fcT%mat(:,:,i),errorflag)!
-            print*,"print file: ", (trim(trim(yield%fcT%fn)//"_"//trim(adjustl(stri))//".asc"))!
-            call print_mat_as_grid(trim(trim(yield%fcCS%fn)//"_"//trim(adjustl(stri))//".asc"), &
-                & domain%header,yield%fcCS%mat(:,:,i),errorflag)!
-            print*,"print file: ", (trim(trim(yield%fcCS%fn)//"_"//trim(adjustl(stri))//".asc"))!
-            call print_mat_as_grid(trim(trim(yield%fHS%fn)//"_"//trim(adjustl(stri))//".asc"), &
-                & domain%header,yield%fHS%mat(:,:,i),errorflag)!
-            print*,"print file: ", (trim(trim(yield%fHS%fn))//"_"//trim(adjustl(stri))//".asc")!
+            call print_mat_as_grid(trim(trim(yield%f_WS%fn)//"_"//trim(adjustl(stri))//".asc"), &
+                & domain%header,yield%f_WS%mat(:,:,i),errorflag)!
+            print*,"print file: ", (trim(trim(yield%f_WS%fn)//"_"//trim(adjustl(stri))//".asc"))!
+            call print_mat_as_grid(trim(trim(yield%f_WS_stage%fn)//"_"//trim(adjustl(stri))//".asc"), &
+                & domain%header,yield%f_WS_stage%mat(:,:,i),errorflag)!
+            print*,"print file: ", (trim(trim(yield%f_WS_stage%fn)//"_"//trim(adjustl(stri))//".asc"))!
+            call print_mat_as_grid(trim(trim(yield%f_HS%fn)//"_"//trim(adjustl(stri))//".asc"), &
+                & domain%header,yield%f_HS%mat(:,:,i),errorflag)!
+            print*,"print file: ", (trim(trim(yield%f_HS%fn))//"_"//trim(adjustl(stri))//".asc")!
         end do
     end subroutine save_yield_debug_data!
     !
@@ -1287,10 +1287,10 @@ module cli_save_outputs!
         yield_map%biomass_pot%mat = a!
         yield_map%yield_pot%mat = a!
         yield_map%yield_act%mat = a!
-        yield_map%fcT%mat = a!
-        yield_map%fcCS%mat = a!
-        yield_map%fHS%mat = a!
-        yield_map%fHS_sum%mat = a!
+        yield_map%f_WS%mat = a!
+        yield_map%f_WS_stage%mat = a!
+        yield_map%f_HS%mat = a!
+        yield_map%f_HS_sum%mat = a!
         yield_map%transp_ratio_sum%mat = a!
         yield_map%T_act_sum%mat = a!
         yield_map%T_pot_sum%mat = a!

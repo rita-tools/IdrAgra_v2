@@ -130,7 +130,8 @@ module mod_crop_phenology
                     if(domain%mat(i,j)/=domain%header%nan)then!
                         ii0_r(i,j,:)   =info_pheno(dir_meteo(i,j,k))%ii0(soiluse(i,j),:)*meteo_weight(i,j,k) + ii0_r(i,j,:)
                         iie_r(i,j,:)   =info_pheno(dir_meteo(i,j,k))%iie(soiluse(i,j),:)*meteo_weight(i,j,k) + iie_r(i,j,:)
-                        crop_mat%iid(i,j,:)=info_pheno(dir_meteo(i,j,k))%iid(soiluse(i,j),:)*meteo_weight(i,j,k) + crop_mat%iid(i,j,:)  ! crop cycle length (real)
+                        crop_mat%iid(i,j,:)=info_pheno(dir_meteo(i,j,k))%iid(soiluse(i,j),:)*meteo_weight(i,j,k) &
+                                             + crop_mat%iid(i,j,:)  ! crop cycle length (real)
                     end if!
                 end do!                
             end do!
@@ -225,7 +226,8 @@ module mod_crop_phenology
                     if (crop_mat%ii0(i,j,crop_pars_mat%n_crops_by_year(i,j)) == 0 &
                         & .and. crop_mat%iie(i,j,crop_pars_mat%n_crops_by_year(i,j)) == 0 ) then  ! no crop
                         doy_s = doy - irandom(i,j)
-                    else if (crop_mat%ii0(i,j,crop_pars_mat%n_crops_by_year(i,j)) < crop_mat%iie(i,j,crop_pars_mat%n_crops_by_year(i,j))) then            ! annuals or perennials
+                    else if (crop_mat%ii0(i,j,crop_pars_mat%n_crops_by_year(i,j)) < &
+                        crop_mat%iie(i,j,crop_pars_mat%n_crops_by_year(i,j))) then            ! annuals or perennials
                         ! emergence date is shifted as ii0(i,j,cs)-irandom(i,j,cs)
                         ! nint((gg-ii0(i,j))*dij(i,j)) contracts/expands the series
                         ! randomization of emergence date (ii0/irandom) and factor of dilatation (dij) are used to calculate gg1
@@ -260,13 +262,17 @@ module mod_crop_phenology
                     ! conveniently updates phenological data from its series - update occurs only if Kcb varies
                     crop_pars_mat%k_cb(i,j)=info_pheno(ws_idx(i,j))%k_cb%tab(doy_s,soil_use%mat(i,j))
                     
-                    if (crop_pars_mat%k_cb(i,j) /= crop_pars_mat%k_cb_low(i,j) .or. crop_pars_mat%k_cb_old(i,j) /= crop_pars_mat%k_cb_low(i,j)) then
-                        if (crop_pars_mat%k_cb_old(i,j) > crop_pars_mat%k_cb_low(i,j) .and. crop_pars_mat%k_cb(i,j) == crop_pars_mat%k_cb_low(i,j) &
+                    if (crop_pars_mat%k_cb(i,j) /= crop_pars_mat%k_cb_low(i,j) .or. &
+                        crop_pars_mat%k_cb_old(i,j) /= crop_pars_mat%k_cb_low(i,j)) then
+                        if (crop_pars_mat%k_cb_old(i,j) > crop_pars_mat%k_cb_low(i,j) .and. &
+                            crop_pars_mat%k_cb(i,j) == crop_pars_mat%k_cb_low(i,j) &
                             & .and. info_pheno(ws_idx(i,j))%n_crops_by_year(soil_use%mat(i,j))>1) then
-                            if (crop_pars_mat%n_crops_by_year(i,j) < info_pheno(ws_idx(i,j))%n_crops_by_year(soil_use%mat(i,j))) then       ! cult_switch cycle
+                            if (crop_pars_mat%n_crops_by_year(i,j) < &
+                                info_pheno(ws_idx(i,j))%n_crops_by_year(soil_use%mat(i,j))) then       ! cult_switch cycle
                                 crop_pars_mat%n_crops_by_year(i, j) = crop_pars_mat%n_crops_by_year(i, j) + 1
                                 crop_pars_mat%pheno_idx(i,j) = 1
-                            else if (crop_pars_mat%n_crops_by_year(i,j) == info_pheno(ws_idx(i,j))%n_crops_by_year(soil_use%mat(i,j))) then ! if cult_switch cycle ends, switch is set back to 1
+                            else if (crop_pars_mat%n_crops_by_year(i,j) == &
+                                info_pheno(ws_idx(i,j))%n_crops_by_year(soil_use%mat(i,j))) then ! if cult_switch cycle ends, switch is set back to 1
                                 crop_pars_mat%n_crops_by_year(i, j) = 1
                                 crop_pars_mat%pheno_idx(i,j) = 1
                             end if
@@ -280,23 +286,37 @@ module mod_crop_phenology
                        
                         crop_pars_mat%irrigation_class(i,j)=&
                             info_pheno(ws_idx(i,j))%irrigation_class(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
-                        crop_pars_mat%cn_class(i,j)=info_pheno(ws_idx(i,j))%cn_class(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
+                        crop_pars_mat%cn_class(i,j)= &
+                            info_pheno(ws_idx(i,j))%cn_class(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
                         ! TEST: replace here with variable p value
                         !crop_pars_mat%p(i,j)=info_pheno(ws_idx(i,j))%p_raw%tab(doy_s,soil_use%mat(i,j))
-                        crop_pars_mat%p(i,j)=info_pheno(ws_idx(i,j))%p_raw_const(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
+                        crop_pars_mat%p(i,j)= &
+                            info_pheno(ws_idx(i,j))%p_raw_const(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
 
-                        crop_pars_mat%a(i,j)=info_pheno(ws_idx(i,j))%a(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
-                        crop_pars_mat%max_d_r(i,j)=info_pheno(ws_idx(i,j))%max_d_r(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
-                        crop_pars_mat%max_RF_t(i,j)=info_pheno(ws_idx(i,j))%max_RF_t(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
-                        crop_pars_mat%T_lim(i,j)=info_pheno(ws_idx(i,j))%T_lim(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
-                        crop_pars_mat%T_crit(i,j)=info_pheno(ws_idx(i,j))%T_crit(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
-                        crop_pars_mat%HI(i,j)=info_pheno(ws_idx(i,j))%HI(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
-                        crop_pars_mat%Ky_tot(i,j)=info_pheno(ws_idx(i,j))%Ky_tot(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
-                        crop_pars_mat%Ky_pheno(i,j,:)=info_pheno(ws_idx(i,j))%Ky_pheno(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j),:)
-                        crop_pars_mat%k_cb_low(i,j)=info_pheno(ws_idx(i,j))%kcb_phases%low(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
-                        crop_pars_mat%k_cb_mid(i,j)=info_pheno(ws_idx(i,j))%kcb_phases%mid(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
-                        crop_pars_mat%k_cb_high(i,j)=info_pheno(ws_idx(i,j))%kcb_phases%high(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
-                        crop_pars_mat%wp_adj(i,j) = info_pheno(ws_idx(i,j))%wp_adj(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j),y)
+                        crop_pars_mat%a(i,j)=&
+                            info_pheno(ws_idx(i,j))%a(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
+                        crop_pars_mat%max_d_r(i,j)= &
+                            info_pheno(ws_idx(i,j))%max_d_r(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
+                        crop_pars_mat%max_RF_t(i,j)= &
+                            info_pheno(ws_idx(i,j))%max_RF_t(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
+                        crop_pars_mat%T_lim(i,j)= &
+                            info_pheno(ws_idx(i,j))%T_lim(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
+                        crop_pars_mat%T_crit(i,j)= &
+                            info_pheno(ws_idx(i,j))%T_crit(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
+                        crop_pars_mat%HI(i,j)= &
+                            info_pheno(ws_idx(i,j))%HI(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
+                        crop_pars_mat%Ky_tot(i,j)= &
+                            info_pheno(ws_idx(i,j))%Ky_tot(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
+                        crop_pars_mat%Ky_pheno(i,j,:)= &
+                            info_pheno(ws_idx(i,j))%Ky_pheno(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j),:)
+                        crop_pars_mat%k_cb_low(i,j)= &
+                            info_pheno(ws_idx(i,j))%kcb_phases%low(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
+                        crop_pars_mat%k_cb_mid(i,j)= &
+                            info_pheno(ws_idx(i,j))%kcb_phases%mid(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
+                        crop_pars_mat%k_cb_high(i,j)= &
+                            info_pheno(ws_idx(i,j))%kcb_phases%high(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
+                        crop_pars_mat%wp_adj(i,j) = &
+                            info_pheno(ws_idx(i,j))%wp_adj(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j),y)
                     end if
                 end if scans_domain
             end do!
@@ -311,8 +331,9 @@ module mod_crop_phenology
         type(crop_pars_matrices),intent(inout)::crop_par_mat
         
         ! populate pheno%RF_t & pheno%RF_e
-        crop_par_mat%RF_t = merge(crop_par_mat%max_RF_t * (d_r / (crop_par_mat%max_d_r-d_e_fix)), crop_par_mat%RF_t, crop_par_mat%max_RF_t /= domain%header%nan)
-        crop_par_mat%RF_e = merge(1- crop_par_mat%RF_t, crop_par_mat%RF_e, crop_par_mat%max_RF_t /= domain%header%nan)    
+        crop_par_mat%RF_t = merge(crop_par_mat%max_RF_t * (d_r / (crop_par_mat%max_d_r-d_e_fix)), &
+                                  crop_par_mat%RF_t, crop_par_mat%max_RF_t /= domain%header%nan)
+        crop_par_mat%RF_e = merge(1- crop_par_mat%RF_t, crop_par_mat%RF_e, crop_par_mat%max_RF_t /= domain%header%nan)
 
     end subroutine calculate_RF_t!
     

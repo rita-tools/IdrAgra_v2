@@ -312,13 +312,13 @@ module cli_read_parameter!
                             read(buffer, *, iostat=ios)xml%depth%ze_fix
                         case ('zroot') ! Zr_fix: default thickness of the second layer
                             read(buffer, *, iostat=ios)xml%depth%zr_fix
-                        case ('lambdacn') ! lambda_CN: coefficent for calculate the initial abstraction
+                        case ('lambdacn') ! lambda_CN: coefficient for calculate the initial abstraction
                             read(buffer, *, iostat=ios)xml%sim%lambda_cn                       
                         case ('dtxmode') ! DTx mode calculation
                             read(buffer, *, iostat=ios)xml_dtx%mode
                         case ('dtxnumxs') ! Number of indicators to calculate
                             read(buffer, *, iostat=ios)xml_dtx%temp%n_ind
-                        case ('dtx_x') ! number of days to use tocalculate the dtx indicators
+                        case ('dtx_x') ! number of days to use to calculate the dtx indicators
                             allocate(xml_dtx%temp%x(xml_dtx%temp%n_ind))
                             read(buffer, *, iostat=ios) xml_dtx%temp%x
                         case ('dtxdeltadate') ! validity of the report

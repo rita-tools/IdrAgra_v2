@@ -549,7 +549,16 @@ module cli_watsources
         irr_units%q_nom = irr_units%q_pot_fld(1) + irr_units%q_pot_fld(2) + irr_units%q_pot_fld(3) + irr_units%q_pot_fld(4)
         ! TODO: shapearea
         if (f_shapearea .eqv. .false.) then
-            irr_units%n_irrigable_cells = irr_units%q_nom*sec_to_day / (1.e-3*irr_units%h_irr_mean*cell_size**2)
+            !irr_units%n_irrigable_cells = irr_units%q_nom*sec_to_day / (1.e-3*irr_units%h_irr_mean*cell_size**2)
+            do i=1, size(irr_units)
+                if ((1.e-3* irr_units(i)%h_irr_mean *cell_size**2)>0.)then
+                    irr_units(i)%n_irrigable_cells = irr_units(i)%q_nom * sec_to_day / &
+                                                    & (1.e-3* irr_units(i)%h_irr_mean *cell_size**2)
+                else
+                    print *,"No irrigation required in irrigation unit: ", irr_units(i)%id, " h_irr_mean: ",irr_units(i)%h_irr_mean
+                    irr_units(i)%n_irrigable_cells = 0.
+                end if
+            end do
         else
             do i=1, size(irr_units)
                 irr_units(i)%n_irrigable_cells = irr_units(i)%q_nom * sec_to_day / &
