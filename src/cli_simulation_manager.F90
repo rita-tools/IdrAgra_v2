@@ -513,7 +513,7 @@ module cli_simulation_manager!
 
             ! Allocation of yield variables
             call init_yearly_yield_output(yield, info_spat%domain%mat, size(info_pheno(1)%ii0,2))
-
+            
             select case(pars%sim%mode)
                 case (1)                                                ! USE mode
                     ! Read water sources and dynamic allocation of info_sources%deriv%qt(:,:)!
@@ -550,7 +550,7 @@ module cli_simulation_manager!
                     pars%sim%intervals = cshift(pars%sim%intervals,1)
                 end if
             end if
-
+            
             ! Output files *.csv inizialization 
             if (pars%sim%mode == 1) then
                 call init_cell_output_by_year(out_tbl_list, pars%sim%path, s_years, info_meteo%filename, &
@@ -569,7 +569,7 @@ module cli_simulation_manager!
                 call init_yield_output_file(yield,pars%sim%path,s_years)
                 if (debug .eqv. .true.) call init_debug_yearly_output_file(yr_deb_map,pars%sim%path,s_years)
             end if
-            
+
             ! Calendar initializing to take into account start of year
             if (info_meteo(1)%start%month > 2) then
                 call days_x_month(days_in_yr, pars%sim%start_year+y)
@@ -578,7 +578,7 @@ module cli_simulation_manager!
             end if
             shift_days = calc_doy(info_meteo(1)%start%day, info_meteo(1)%start%month, pars%sim%start_year+y-1) - calc_doy(1, 1, pars%sim%start_year+y-1)
             days_in_yr = cshift(days_in_yr, info_meteo(1)%start%month-1)
-
+            
             ! Daily simulation cycle
             day_cycle: do doy=1, min(pars%sim%year_step(y), pars%sim%year_step(y) - &
                     & (pars%sim%start_simulation%doy - (info_meteo(1)%start%doy + sum(pars%sim%year_step(1:(y-1))))))
@@ -824,7 +824,7 @@ module cli_simulation_manager!
                             & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, day_from_irr, esp_perc)
                         ! if outside the irrigation period, set irrigation height to zero
                         do z=1, pars%sim%n_irr_meth
-                            where(doy<info_spat%irr_starts%mat .and. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
+                            where(doy<info_spat%irr_starts%mat .or. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
                         end do
                         irr_loss = 0. ! not consider irrigation losses
                     case (3)                        ! need mode with fixed volume
@@ -835,17 +835,18 @@ module cli_simulation_manager!
                         ! if outside the irrigation period, set irrigation height to zero
                         ! and calculate net irrigation
                         do z=1, pars%sim%n_irr_meth
-                            where(doy<info_spat%irr_starts%mat .and. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
+                            where(doy<info_spat%irr_starts%mat .or. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
                             h_irr(:,:,z) = h_irr(:,:,z) * (1.0-irr_loss/100.0)
                         end do
                     case (4)                        ! scheduled irrigation mode
                         call irrigation_scheduled(info_spat, doy, current_year, irr_sch, pheno, &
                             & h_irr, day_from_irr, esp_perc, debug, wat_bal1_old, wat_bal2, wat_bal2_old, &
-                            & a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min),irr_loss)
+                            & a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min),irr_loss,&
+                            wat_bal1%h_eff_rain, theta2_rice%k_sat_2)
                         ! if outside the irrigation period, set irrigation height to zero
                         ! and calculate net irrigation
                         do z=1, pars%sim%n_irr_meth
-                            where(doy<info_spat%irr_starts%mat .and. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
+                            where(doy<info_spat%irr_starts%mat .or. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
                             h_irr(:,:,z) = h_irr(:,:,z) * (1.0-irr_loss/100.0)
                         end do
                     case default
@@ -881,8 +882,9 @@ module cli_simulation_manager!
                 wat_bal1%h_gross_av_water = meteo%p + h_irr_sum*f_interception
 
                 ! the net available precipitation is the net precipitation + ponding
-                wat_bal1%h_net_av_water = wat_bal1%h_eff_rain + wat_bal1_old%h_pond
-                
+                wat_bal1%h_net_av_water = wat_bal1%h_eff_rain ! + wat_bal1_old%h_pond %CG% 2024-03-29 removed
+                !wat_bal1%h_net_av_water = wat_bal1%h_eff_rain  + wat_bal1_old%h_pond
+
                 
                 ! calculate the runoff with the CN model
                 call CN_runoff(wat_bal1%h_gross_av_water, wat_bal1%h_net_av_water, &
@@ -890,6 +892,7 @@ module cli_simulation_manager!
                     & wat_bal1%h_runoff, out_cn_day, pars%sim%lambda_cn)
                 
                 ! HOURLY LOOP OF THE SIMULATION
+                
                 hr_loop: do hour = 1,24
                     ! init the variables to zero (except for f_eff_rain, h_net_av_water)
                     wat_bal_hour = 0.0D0
@@ -897,6 +900,8 @@ module cli_simulation_manager!
                     where (info_spat%domain%mat /= info_spat%domain%header%nan)
                         wat_bal_hour%esten%h_eff_rain = wat_bal1%h_eff_rain*pars%f_eff_rain(hour)
                         wat_bal_hour%esten%h_inf  = wat_bal1%h_net_av_water*pars%f_eff_rain(hour)
+                        !%CG% 2024-03-29 add total ponding to the first hour
+                        wat_bal_hour%esten%h_inf = wat_bal_hour%esten%h_inf + wat_bal1_old%h_pond
                     end where
                     ! calculate parameters for evaporation that remain constant during the day
                     if(hour==1) then
@@ -991,7 +996,7 @@ module cli_simulation_manager!
                         end if
                     end if
                 end do hr_loop
-
+                
                 ! update the soil water content (dimensionless)
                 if(doy == pars%sim%year_step(y)) then
                     where(info_spat%domain%mat /= info_spat%domain%header%nan)!
@@ -1007,7 +1012,7 @@ module cli_simulation_manager!
 
                 ! update the ponding variable for each day
                 wat_bal1%h_pond = wat_bal_hour%esten%h_pond
-                
+
                 ! Calculate the crop production
                 if(out_yearly .eqv. .true.)then
                     ! TODO:
@@ -1020,11 +1025,11 @@ module cli_simulation_manager!
                                 if (doy >= crop_map%TSP_low(i,j,pheno%n_crops_by_year(i,j)) .and. &
                                     & doy < crop_map%TSP_high(i,j,pheno%n_crops_by_year(i,j))) then
                                     if (meteo%T_ave(i,j) < pheno%T_crit(i,j)) then
-                                        yield%fHS_sum%mat(i,j,pheno%n_crops_by_year(i,j)) = &
-                                            & yield%fHS_sum%mat(i,j,pheno%n_crops_by_year(i,j)) + 1
+                                        yield%f_HS_sum%mat(i,j,pheno%n_crops_by_year(i,j)) = &
+                                            & yield%f_HS_sum%mat(i,j,pheno%n_crops_by_year(i,j)) + 1
                                     else if (meteo%T_ave(i,j) >= pheno%T_crit(i,j) .and. meteo%T_ave(i,j) < pheno%T_lim(i,j)) then
-                                        yield%fHS_sum%mat(i,j,pheno%n_crops_by_year(i,j)) = &
-                                            & yield%fHS_sum%mat (i,j,pheno%n_crops_by_year(i,j)) + 1 - &
+                                        yield%f_HS_sum%mat(i,j,pheno%n_crops_by_year(i,j)) = &
+                                            & yield%f_HS_sum%mat (i,j,pheno%n_crops_by_year(i,j)) + 1 - &
                                             & (meteo%T_ave(i,j) - pheno%T_crit(i,j))/ (pheno%T_lim(i,j) - pheno%T_crit(i,j))
                                     end if
                                 end if
@@ -1078,10 +1083,11 @@ module cli_simulation_manager!
                                 end if
                                 
                                 ! Update transpiration ratio
-                                yield%transp_ratio_sum%mat(i,j,pheno%n_crops_by_year(i,j)) = &
-                                    &  yield%transp_ratio_sum%mat(i,j,pheno%n_crops_by_year(i,j)) + &
-                                    & (wat_bal1%h_transp_pot(i,j) + wat_bal2%h_transp_pot(i,j)) / meteo%et0(i,j)
-                                    
+                                if ( meteo%et0(i,j)>0) then
+                                    yield%transp_ratio_sum%mat(i,j,pheno%n_crops_by_year(i,j)) = &
+                                        &  yield%transp_ratio_sum%mat(i,j,pheno%n_crops_by_year(i,j)) + &
+                                        & (wat_bal1%h_transp_pot(i,j) + wat_bal2%h_transp_pot(i,j)) / meteo%et0(i,j)
+                                end if    
                             end if
                         end do
                     end do
@@ -1159,7 +1165,7 @@ module cli_simulation_manager!
                     do z=1, size(crop_map%TSP_high,3)
                         if(info_spat%domain%mat(i,j) /= info_spat%domain%header%nan) then
                             
-                            yield%fHS%mat(i,j,z) = yield%fHS_sum%mat(i,j,z) / &
+                            yield%f_HS%mat(i,j,z) = yield%f_HS_sum%mat(i,j,z) / &
                                 & (crop_map%TSP_high(i,j,z) - crop_map%TSP_low(i,j,z))
                             
                             yield%biomass_pot%mat(i,j,z) = &
@@ -1169,44 +1175,44 @@ module cli_simulation_manager!
                                 & yield%biomass_pot%mat(i,j,z) * crop_map%HI(i,j,z)
                             
                             ! Calculate the reduction of the production from the water stress
-                            yield%fcT%mat(i,j,z) = 1 - pheno%Ky_tot(i,j) * &
+                            yield%f_WS%mat(i,j,z) = 1 - pheno%Ky_tot(i,j) * &
                                 & (1- sum(yield%T_act_sum%mat(i,j,:,z)) / &
                                 & sum(yield%T_pot_sum%mat(i,j,:,z)))
 
-                            if (yield%fcT%mat(i,j,z) < 0) yield%fcT%mat(i,j,z) = 0    ! limit to zero
+                            if (yield%f_WS%mat(i,j,z) < 0) yield%f_WS%mat(i,j,z) = 0    ! limit to zero
                             
-                            yield%fcCS%mat(i,j,z) = (1 - pheno%Ky_pheno(i,j,1) * &
+                            yield%f_WS_stage%mat(i,j,z) = (1 - pheno%Ky_pheno(i,j,1) * &
                                 & (1 - (yield%T_act_sum%mat(i,j,1,z) / &
                                 & yield%T_pot_sum%mat(i,j,1,z)))) &
                                 & ** (yield%dev_stage%mat(i,j,1,z) &
                                 & / sum(yield%dev_stage%mat(i,j,:,z)))
                             
-                            yield%fcCS%mat(i,j,z) = (1 - pheno%Ky_pheno(i,j,2) * &
+                            yield%f_WS_stage%mat(i,j,z) = (1 - pheno%Ky_pheno(i,j,2) * &
                                 & (1 - (yield%T_act_sum%mat(i,j,2,z) / &
                                 & yield%T_pot_sum%mat(i,j,2,z)))) &
                                 & ** (yield%dev_stage%mat(i,j,2,z) &
                                 & / sum(yield%dev_stage%mat(i,j,:,z))) * &
-                                & yield%fcCS%mat(i,j,z)
+                                & yield%f_WS_stage%mat(i,j,z)
                             
-                            yield%fcCS%mat(i,j,z) = (1 - pheno%Ky_pheno(i,j,3) * &
+                            yield%f_WS_stage%mat(i,j,z) = (1 - pheno%Ky_pheno(i,j,3) * &
                                 & (1 - (yield%T_act_sum%mat(i,j,3,z) / &
                                 & yield%T_pot_sum%mat(i,j,3,z)))) &
                                 & ** (yield%dev_stage%mat(i,j,3,z) &
                                 & / sum(yield%dev_stage%mat(i,j,:,z))) * &
-                                & yield%fcCS%mat(i,j,z)
+                                & yield%f_WS_stage%mat(i,j,z)
                             
-                            yield%fcCS%mat(i,j,z) = (1 - pheno%Ky_pheno(i,j,4) * &
+                            yield%f_WS_stage%mat(i,j,z) = (1 - pheno%Ky_pheno(i,j,4) * &
                                 & (1 - (yield%T_act_sum%mat(i,j,4,z) / &
                                 & yield%T_pot_sum%mat(i,j,4,z)))) &
                                 & ** (yield%dev_stage%mat(i,j,4,z) &
                                 & / sum(yield%dev_stage%mat(i,j,:,z))) * &
-                                & yield%fcCS%mat(i,j,z)
+                                & yield%f_WS_stage%mat(i,j,z)
                             
                             yield%yield_act%mat(i,j,z) = &
                                 & yield%yield_pot%mat(i,j,z) * &
-                                & min(yield%fcT%mat(i,j,z), &
-                                & yield%fcCS%mat(i,j,z)) * &
-                                & yield%fHS%mat(i,j,z)
+                                & min(yield%f_WS%mat(i,j,z), &
+                                & yield%f_WS_stage%mat(i,j,z)) * &
+                                & yield%f_HS%mat(i,j,z)
                         end if
                     end do
                 end do
@@ -1736,6 +1742,7 @@ module cli_simulation_manager!
         meteo%T_max = a!
         meteo%T_min = a!
         meteo%P = a!
+        meteo%P_cum = a!
         meteo%RH_max = a!
         meteo%RH_min = a!
         meteo%Wind_vel = a!
@@ -1762,16 +1769,16 @@ module cli_simulation_manager!
         meteo = 0.0D0!
         do k=1,size(meteo_weight,3)!
             forall(i=1:size(domain%mat,1),j=1:size(domain%mat,2),domain%mat(i,j)/=domain%header%nan)!
-                meteo%T_max(i,j)    = info_meteo(dir_meteo(i,j,k))%T_max*meteo_weight(i,j,k) + meteo%T_max(i,j)!
-                meteo%T_min(i,j)    = info_meteo(dir_meteo(i,j,k))%T_min*meteo_weight(i,j,k) + meteo%T_min(i,j)!
-                meteo%P(i,j)        = info_meteo(dir_meteo(i,j,k))%P*meteo_weight(i,j,k) + meteo%P(i,j)!
-                meteo%P_cum(i,j)    = info_meteo(dir_meteo(i,j,k))%P_cum*meteo_weight(i,j,k) + meteo%P_cum(i,j)!
-                meteo%RH_max(i,j)   = info_meteo(dir_meteo(i,j,k))%RH_max*meteo_weight(i,j,k) + meteo%RH_max(i,j)!
-                meteo%RH_min(i,j)   = info_meteo(dir_meteo(i,j,k))%RH_min*meteo_weight(i,j,k) + meteo%RH_min(i,j)!
-                meteo%Wind_vel(i,j) = info_meteo(dir_meteo(i,j,k))%wind_vel*meteo_weight(i,j,k) + meteo%Wind_vel(i,j)!
-                meteo%Rad_sol(i,j)  = info_meteo(dir_meteo(i,j,k))%sol_rad*meteo_weight(i,j,k) + meteo%Rad_sol(i,j)!
-                meteo%lat(i,j)      = info_meteo(dir_meteo(i,j,k))%lat_deg*meteo_weight(i,j,k) + meteo%lat(i,j)!
-                meteo%alt(i,j)      = info_meteo(dir_meteo(i,j,k))%alt_m*meteo_weight(i,j,k) + meteo%alt(i,j)!
+                            meteo%T_max(i,j)    = info_meteo(dir_meteo(i,j,k))%T_max*meteo_weight(i,j,k) + meteo%T_max(i,j)!
+                            meteo%T_min(i,j)    = info_meteo(dir_meteo(i,j,k))%T_min*meteo_weight(i,j,k) + meteo%T_min(i,j)!
+                            meteo%P(i,j)        = info_meteo(dir_meteo(i,j,k))%P*meteo_weight(i,j,k) + meteo%P(i,j)!
+                            meteo%P_cum(i,j)    = info_meteo(dir_meteo(i,j,k))%P_cum*meteo_weight(i,j,k) + meteo%P_cum(i,j)!
+                            meteo%RH_max(i,j)   = info_meteo(dir_meteo(i,j,k))%RH_max*meteo_weight(i,j,k) + meteo%RH_max(i,j)!
+                            meteo%RH_min(i,j)   = info_meteo(dir_meteo(i,j,k))%RH_min*meteo_weight(i,j,k) + meteo%RH_min(i,j)!
+                            meteo%Wind_vel(i,j) = info_meteo(dir_meteo(i,j,k))%wind_vel*meteo_weight(i,j,k) + meteo%Wind_vel(i,j)!
+                            meteo%Rad_sol(i,j)  = info_meteo(dir_meteo(i,j,k))%sol_rad*meteo_weight(i,j,k) + meteo%Rad_sol(i,j)!
+                            meteo%lat(i,j)      = info_meteo(dir_meteo(i,j,k))%lat_deg*meteo_weight(i,j,k) + meteo%lat(i,j)!
+                            meteo%alt(i,j)      = info_meteo(dir_meteo(i,j,k))%alt_m*meteo_weight(i,j,k) + meteo%alt(i,j)!
             end forall!
         end do!
         ! calculate ET0 from distributed parameters
