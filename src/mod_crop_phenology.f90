@@ -29,21 +29,22 @@ module mod_crop_phenology
         type(file_phenology_r)::d_r                         ! root depth
         type(file_phenology_r)::lai                         ! leaf area index
         type(file_phenology_r)::f_c                         ! cover fraction
-        type(file_phenology_r)::p_raw                       ! EDIT: daily variable readly available water factor [-]
+        type(file_phenology_r)::r_stress                    ! plant resistance to water stress
         type(file_phenology_i)::cn_day                      ! %AB% soil moisture adjusted cn value 
         type(k_cb_matrices)::kcb_phases                     ! k_cb change points during phenology
-        real(dp),dimension(:,:),pointer::p_raw_const        ! readly available water factor [-]
+        real(dp),dimension(:,:),pointer::p_raw_const        ! readily available water factor [-]
         real(dp),dimension(:,:),pointer::a                  ! interception coefficient according to the Von Hoyningen-Hune & Braden method [-]
         real(dp),dimension(:,:),pointer::max_d_r            ! maximum root depth [m]
-        real(dp),dimension(:,:),pointer::max_RF_t           ! maximum fractio of active roots in transpirative layer [-]
-        real(dp),dimension(:,:),pointer::T_lim              ! limit temperature threshold - termic stress [°C]
-        real(dp),dimension(:,:),pointer::T_crit             ! critical temperature threshold - termic stress [°C]
+        real(dp),dimension(:,:),pointer::max_RF_t           ! maximum fraction of active roots in transpirative layer [-]
+        real(dp),dimension(:,:),pointer::T_lim              ! limit temperature threshold - thermic stress [°C]
+        real(dp),dimension(:,:),pointer::T_crit             ! critical temperature threshold - thermic stress [°C]
         real(dp),dimension(:,:),pointer::HI                 ! harvest index
         real(dp),dimension(:,:),pointer::Ky_tot             ! water stress coefficient - overall
         real(dp),dimension(:,:,:),pointer::Ky_pheno         ! water stress coefficient - phases
-        integer,dimension(:,:),pointer::irrigation_class    ! 1 = irrigated, 0 = not irrgated
+        integer,dimension(:,:),pointer::irrigation_class    ! 1 = irrigated, 0 = not irrigated
         integer,dimension(:,:),pointer::cn_class            ! CN class
-        real(dp),dimension(:,:,:),pointer::wp_adj            ! normalized biomass water productivity 
+        real(dp),dimension(:,:,:),pointer::wp_adj           ! normalized biomass water productivity
+         
     end type crop_pheno_info   !es: valday(:)%kcb%unit; valday(:)%kcb%tab(:,:)!
 
     type crop_pars_matrices!
@@ -76,6 +77,7 @@ module mod_crop_phenology
         real(dp),dimension(:,:),pointer::k_cb_old           ! k_cb of previous day
         integer,dimension(:,:),pointer::n_crops_by_year
         integer,dimension(:,:),pointer::pheno_idx           ! phenological stage index
+        real(dp),dimension(:,:),pointer::r_stress           ! plant resistance to (water) stress
     end type crop_pars_matrices!
 
     type crop_matrices
@@ -282,8 +284,8 @@ module mod_crop_phenology
                         crop_pars_mat%lai(i,j)=info_pheno(ws_idx(i,j))%lai%tab(doy_s,soil_use%mat(i,j))
                         crop_pars_mat%cn_day(i,j)=info_pheno(ws_idx(i,j))%cn_day%tab(doy_s,soil_use%mat(i,j))
                         crop_pars_mat%f_c(i,j)=info_pheno(ws_idx(i,j))%f_c%tab(doy_s,soil_use%mat(i,j))
-
-                       
+                        crop_pars_mat%r_stress(i,j)=info_pheno(ws_idx(i,j))%r_stress%tab(doy_s,soil_use%mat(i,j))
+                                               
                         crop_pars_mat%irrigation_class(i,j)=&
                             info_pheno(ws_idx(i,j))%irrigation_class(soil_use%mat(i,j),crop_pars_mat%n_crops_by_year(i,j))
                         crop_pars_mat%cn_class(i,j)= &

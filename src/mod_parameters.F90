@@ -128,6 +128,8 @@ module mod_parameters!
         integer :: irr_starts = 1                    ! irrigation period can start from
         integer :: irr_ends  = 366                   ! irrigation period will end to
 
+        real(dp) :: h_maxpond = 10000.0D0            ! maximum ponding depth
+
     end type par_method!
 
     type par_irr_event

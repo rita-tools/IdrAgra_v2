@@ -342,7 +342,7 @@ module cli_crop_parameters!
             call open_daily_crop_par_file(info_pheno(i)%cn_day%unit,trim(dir)//trim(froot)//trim(dir_name)//"\cnvalue.dat",errorflag)!
             call open_daily_crop_par_file(info_pheno(i)%f_c%unit,trim(dir)//trim(froot)//trim(dir_name)//"\fc.dat",errorflag)
             ! EDIT: add support for seasonal p_raw
-            !call open_daily_crop_par_file(info_pheno(i)%p_raw%unit,trim(dir)//trim(froot)//trim(dir_name)//"\praw.dat",errorflag)
+            call open_daily_crop_par_file(info_pheno(i)%r_stress%unit,trim(dir)//trim(froot)//trim(dir_name)//"\r_stress.dat",errorflag)
             !
             ! TODO - add tabulated ky
             
@@ -422,8 +422,7 @@ module cli_crop_parameters!
             call read_crop_pars(info_pheno(i)%lai,n_days,n_crop)!
             call read_crop_pars(info_pheno(i)%cn_day,n_days,n_crop)!
             call read_crop_pars(info_pheno(i)%f_c,n_days,n_crop)! %RR%
-        
-            ! call read_crop_pars(info_pheno(i)%p_raw,n_days,n_crop)! EDIT: add daily p_raw %EAC%
+            call read_crop_pars(info_pheno(i)%r_stress,n_days,n_crop)! %EAC%
         
             ! find minimum and maximum k_cb value to define stages
             info_pheno(i)%kcb_phases%low(:,1) = minval(info_pheno(i)%k_cb%tab, dim=1) ! low not to be re-calculated
@@ -551,9 +550,6 @@ module cli_crop_parameters!
                         info_pheno(i)%iid(crop_idx,1) = info_pheno(i)%iie(crop_idx,1) - info_pheno(i)%ii0(crop_idx,1) + 1
                     end if
                 else   ! alternate crops
-
-!!!!! TODO: fino a qui
-
                     ii_idx = 1 ! init the day index at the beginning of the year
                     do cs = 1, info_pheno(i)%n_crops_by_year(crop_idx)
                         ! update the day index for the alternative crop

@@ -151,14 +151,21 @@ module cli_simulation_manager!
         real(dp):: value
         !CHARACTER(LEN=20)::fc_name
         TYPE(grid_r)::pheno_grd 
+        TYPE(grid_r)::h_maxpond ! a grid object that store the maximum ponding depth TODO: set as spatial map
+        
         pheno_grd = info_spat%domain
-
+        
         ! spread irrigation start and end days
         info_spat%irr_starts = info_spat%domain
         info_spat%irr_starts%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_starts)
         
         info_spat%irr_ends = info_spat%domain
         info_spat%irr_ends%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_ends)
+        
+        ! init maximum pond
+        h_maxpond=info_spat%cell_area
+        h_maxpond%mat = 10000.0D0
+        h_maxpond%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_maxpond)
         
         ! Variables allocation
         call allocate_all (stp_map, yr_map, deb_map, yr_deb_map, wat_bal1, wat_bal1_old, wat_bal2, wat_bal2_old, wat_bal_hour, meteo, wat, pheno, &
@@ -594,6 +601,9 @@ module cli_simulation_manager!
 
                 print*,'Simulation day', achar(9), trim(adjustl(s_doy)), achar(9), 'year', achar(9), trim(adjustl(s_year))
 
+                !if (doy>35) exit !FAKE
+                !print*,'doy hour h_soil1 h_inf h_pond0 h_pond h_perc1 h_soil2 h_rise h_perc2' !FAKE
+                
                
                 ! Updating daily data matrix for water table depth
                 if(pars%sim%f_cap_rise .eqv. .true.)then!
@@ -690,6 +700,10 @@ module cli_simulation_manager!
                 wat_bal1_old = wat_bal1!
                 wat_bal2_old = wat_bal2!
                 
+                ! %EAC%: reset h_perc each day
+                wat_bal1%h_perc = 0.0D0
+                wat_bal2%h_perc = 0.0D0
+                
                 ! %EAC%: limit root depth to water table interface
                 where ((info_spat%domain%mat /= info_spat%domain%header%nan) &
                             .and. (info_spat%wat_tab%mat<pheno%d_r))
@@ -739,7 +753,7 @@ module cli_simulation_manager!
 !~                     bil2%RAWinf =   wat%layer(2)%fc - (wat%layer(2)%fc-wat%layer(2)%wp)*((pheno%pday+1)/2)
 !~                     bil2%RAWaz =    wat%layer(2)%fc - (wat%layer(2)%fc-wat%layer(2)%wp)*pheno%pday*mkpraw
                     wat_bal2%h_raw_sup =   wat%layer(1)%h_fc + wat%layer(2)%h_fc - &
-                        & (wat%layer(1)%h_fc - wat%layer(1)%h_wp + wat%layer(2)%h_fc - wat%layer(2)%h_wp)*pheno%p_day*alpha_ms_map
+                        & (wat%layer(1)%h_fc - wat%layer(1)%h_wp + wat%layer(2)%h_fc - wat%layer(2)%h_wp)*pheno%p_day*(alpha_ms_map+pheno%r_stress)
 
                     wat_bal2%h_raw    =   wat%layer(1)%h_fc + wat%layer(2)%h_fc - &
                         & (wat%layer(1)%h_fc - wat%layer(1)%h_wp + wat%layer(2)%h_fc - wat%layer(2)%h_wp)*pheno%p_day
@@ -748,7 +762,7 @@ module cli_simulation_manager!
                         & (wat%layer(1)%h_fc - wat%layer(1)%h_wp + wat%layer(2)%h_fc - wat%layer(2)%h_wp)*((pheno%p_day+1)/2)
                         
                     wat_bal2%h_raw_priv    =   wat%layer(1)%h_fc + wat%layer(2)%h_fc - &
-                        & (wat%layer(1)%h_fc - wat%layer(1)%h_wp + wat%layer(2)%h_fc - wat%layer(2)%h_wp)*pheno%p_day*alpha_unm_map
+                        & (wat%layer(1)%h_fc - wat%layer(1)%h_wp + wat%layer(2)%h_fc - wat%layer(2)%h_wp)*pheno%p_day*(alpha_unm_map+pheno%r_stress)
                 end where
                 !!
                 ! read weather daily data and calculate ET0 for each weather stations 
@@ -892,6 +906,7 @@ module cli_simulation_manager!
                     & wat_bal1%h_runoff, out_cn_day, pars%sim%lambda_cn)
                 
                 ! HOURLY LOOP OF THE SIMULATION
+                            
                 
                 hr_loop: do hour = 1,24
                     ! init the variables to zero (except for f_eff_rain, h_net_av_water)
@@ -900,14 +915,14 @@ module cli_simulation_manager!
                     where (info_spat%domain%mat /= info_spat%domain%header%nan)
                         wat_bal_hour%esten%h_eff_rain = wat_bal1%h_eff_rain*pars%f_eff_rain(hour)
                         wat_bal_hour%esten%h_inf  = wat_bal1%h_net_av_water*pars%f_eff_rain(hour)
-                        !%CG% 2024-03-29 add total ponding to the first hour
-                        wat_bal_hour%esten%h_inf = wat_bal_hour%esten%h_inf + wat_bal1_old%h_pond
                     end where
                     ! calculate parameters for evaporation that remain constant during the day
                     if(hour==1) then
                         call b1_no_iter_eva(pheno,meteo, pars%sim%h_prec_lim, wat, fw_day, fw_irr, pars%irr%f_w, fc, &
                                             h_irr_sum, f_interception, info_spat%domain, wat_bal1_old, fw_old)
                         wat_bal_hour%inten%h_pond0 = 0.
+                        !%CG% 2024-03-29 add total ponding to the first hour
+                        wat_bal_hour%esten%h_inf = wat_bal_hour%esten%h_inf + wat_bal1_old%h_pond
                     end if
                     
                     ! compute water balance for each cells
@@ -949,18 +964,25 @@ module cli_simulation_manager!
                                     & wat_bal2%depth_under_rz(i,j), wat_bal_hour%n_iter2(i,j), &!
                                     & esp_perc(i,j,2),pars%sim%f_cap_rise, wat_bal_hour%n_max2(i,j))!
                             end if
+                            
                         end do
                     end do
                     
                     ! TODO: %AB% move to subroutine
                     ! update the soil water content of the evaporative layer according to the rise from the transpirative layer
-                    where (wat_bal_hour%esten%h_rise > 0)
-                        wat_bal_hour%inten%h_soil1 = wat_bal_hour%inten%h_soil1 + wat_bal_hour%esten%h_rise
-                        wat_bal_hour%esten%h_pond = merge (wat_bal_hour%esten%h_pond + wat_bal_hour%inten%h_soil1 - wat%layer(1)%h_sat, &
-                            & wat_bal_hour%esten%h_pond, wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
-                        wat_bal_hour%inten%h_soil1 = merge (wat%layer(1)%h_sat, wat_bal_hour%inten%h_soil1, &
-                            & wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
-                    end where
+                    ! where (wat_bal_hour%esten%h_rise > 0)
+                    !     wat_bal_hour%inten%h_soil1 = wat_bal_hour%inten%h_soil1 + wat_bal_hour%esten%h_rise
+                    !     wat_bal_hour%esten%h_pond = merge (wat_bal_hour%esten%h_pond + wat_bal_hour%inten%h_soil1 - wat%layer(1)%h_sat, &
+                    !         & wat_bal_hour%esten%h_pond, wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
+                    !     wat_bal_hour%inten%h_soil1 = merge (wat%layer(1)%h_sat, wat_bal_hour%inten%h_soil1, &
+                    !         & wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
+                    ! end where
+
+                    wat_bal_hour%inten%h_soil1 = wat_bal_hour%inten%h_soil1 + wat_bal_hour%esten%h_rise
+                    wat_bal_hour%esten%h_pond = merge (wat_bal_hour%inten%h_soil1 - wat%layer(1)%h_sat, &
+                             & 0.0D0, wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
+                    wat_bal_hour%inten%h_soil1 = merge (wat%layer(1)%h_sat, wat_bal_hour%inten%h_soil1, &
+                             & wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
 
                     ! update water balance variables
                     wat_bal1%h_soil = wat_bal_hour%inten%h_soil1!
@@ -978,6 +1000,11 @@ module cli_simulation_manager!
                     wat_bal2%h_caprise = wat_bal2%h_caprise + wat_bal_hour%esten%h_caprise!
                     wat_bal2%h_rise = wat_bal2%h_rise + wat_bal_hour%esten%h_rise!
                     wat_bal_hour%inten%h_pond0 = wat_bal_hour%esten%h_pond
+                    
+                    i = 3
+                    j = 1
+                    !if (doy>31) print*,doy,hour,wat_bal_hour%inten%h_soil1(i,j),wat_bal_hour%esten%h_inf(i,j),wat_bal_hour%inten%h_pond0(i,j),wat_bal_hour%esten%h_pond(i,j),wat_bal_hour%esten%h_perc1(i,j),&
+                    !                wat_bal_hour%inten%h_soil2(i,j),wat_bal_hour%esten%h_rise(i,j),wat_bal_hour%esten%h_perc2(i,j) !FAKE
                     
                     ! update the number of iterations
                     iter1 = merge(iter1,wat_bal_hour%n_iter1,iter1>wat_bal_hour%n_iter1)
@@ -1011,7 +1038,9 @@ module cli_simulation_manager!
                 end where!
 
                 ! update the ponding variable for each day
-                wat_bal1%h_pond = wat_bal_hour%esten%h_pond
+                wat_bal1%h_runoff = max(wat_bal_hour%esten%h_pond-h_maxpond%mat,0.0D0)
+                wat_bal1%h_pond = min(wat_bal_hour%esten%h_pond,h_maxpond%mat)
+                !wat_bal1%h_pond = wat_bal_hour%esten%h_pond
 
                 ! Calculate the crop production
                 if(out_yearly .eqv. .true.)then
@@ -1157,6 +1186,7 @@ module cli_simulation_manager!
                         yr_deb_map%iter2%mat = merge(yr_deb_map%iter2%mat,dble(iter2),iter2<yr_deb_map%iter2%mat)!
                     end if
                 end if
+
             end do day_cycle!
             
             ! Calculate productivity
@@ -1732,6 +1762,7 @@ module cli_simulation_manager!
         pheno%k_cb_high = a!
         pheno%wp_adj = a!
         pheno%p_day = a!
+        pheno%r_stress = a!
     end subroutine init_pheno!
     !
     subroutine init_meteo(meteo,a)!
@@ -1784,6 +1815,7 @@ module cli_simulation_manager!
         ! calculate ET0 from distributed parameters
         meteo%et0 = ET_reference(meteo%T_max, meteo%T_min, meteo%RH_max, meteo%RH_min, meteo%Wind_vel, meteo%Rad_sol,&
                                        meteo%lat, meteo%alt, res_canopy, doy, domain%header%imax, domain%header%jmax)!
+        meteo%et0 = 0. !FAKE
     end subroutine create_meteo_matrices!
     
         function calc_interception(p,pheno)!
@@ -2237,6 +2269,8 @@ module cli_simulation_manager!
             allocate(pheno%n_crops_by_year    (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%pheno_idx   (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%Ky_pheno            (imax,jmax,phases),stat=checkstat) ; if(checkstat/=0) print*,errormessage! 3d matrix
+            allocate(pheno%r_stress           (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
+            
         else!
             deallocate(pheno%k_cb_old        )!
             deallocate(pheno%k_cb            )!
@@ -2265,6 +2299,7 @@ module cli_simulation_manager!
             deallocate(pheno%p_day           )!
             deallocate(pheno%n_crops_by_year    )!
             deallocate(pheno%pheno_idx   )!
+            deallocate(pheno%r_stress   )!
         end if!
     end subroutine init_pheno_matrices
     !

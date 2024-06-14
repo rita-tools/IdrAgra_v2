@@ -485,6 +485,8 @@ module cli_read_parameter!
                             read (buffer, *, iostat = ios)  met(p)%irr_starts ! doy when irrigation season starts
                         case ('irr_ends')
                             read (buffer, *, iostat = ios)  met(p)%irr_ends ! doy when irrigation season starts
+                        case ('h_maxpond')
+                            read (buffer, *, iostat = ios)  met(p)%h_maxpond ! maximum ponding depth
                         case default
                             read (label, *, iostat = e) num
                             if ((e==0) .and. (num>=1) .and. (num<=24)) then
