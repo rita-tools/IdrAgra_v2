@@ -193,6 +193,9 @@ module mod_crop_soil_water
         h_soil_old = h_soil0
         h_soil_mean = h_soil0
         h_pond_i = h_pond0
+
+        
+
         !
         do n=1,n_max
             ! TODO: check order and update h_soil_mean
@@ -244,6 +247,7 @@ module mod_crop_soil_water
             n = 0 ! store the number of cycles inside the convergence loop
             
             do k=1, k_max
+                print*, 'k:',k
                 call water_balance_evap_lay(h_net_irr/k_max, h_soil1, h_inf/k_max, h_eva_act_m, h_eva_pot_m, h_perc1_m, h_pond_i, h_pond, &
                     & h_transp_act_m, h_transp_pot_m, k_cb, p_day, h_et0/k_max, k_e, k_r,k_s_dry_m,k_s_sat_m, hks_m, kc_max, few, rf_e, & ! RR: add k_r
                     & h_rew, h_sat, h_fc, h_wp, h_r, k_sat/k_max , fatt_n, n_iter1, adj_perc_par, mmax)
@@ -364,10 +368,12 @@ module mod_crop_soil_water
 
             ! convergence of the solution
             h_delta = abs(h_soil_new-h_soil_old)
-        
+            
             if (h_delta <= converg) exit
             h_soil_mean = ((h_soil_new+h_soil_old)*0.5+h_soil0)*0.5!
             h_soil_old = h_soil_new!
+
+           
 
         end do!
         
@@ -392,6 +398,7 @@ module mod_crop_soil_water
                 h_transp_pot = h_transp_pot + h_transp_pot_m
                 h_perc2 = h_perc2 + h_perc2_m
                 h_rise = h_rise + h_rise_m
+                print*,'k:',k,'h_rise:',h_rise
                 hks = hks_m ! consistent with those externally calculated
                 n = max(n_iter2,n)
             end do

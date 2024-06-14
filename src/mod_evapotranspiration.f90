@@ -94,7 +94,7 @@ module mod_evapotranspiration
     end subroutine transpiration
 
     function ET_reference_sc(T_max, T_min, HUM_max, HUM_min, Wind_vel, Rad_sol, lat_ws, alt_ws, res_surf, doy)!
-        ! calculate refeterence evapotranspiration considering the elevation
+        ! calculate reference evapotranspiration considering the elevation
         ! see FAO-56
         ! Note: scalar mode
         implicit none!

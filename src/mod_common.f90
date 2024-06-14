@@ -142,6 +142,8 @@ module mod_common
         type(grid_r),dimension(2)::b_perc           ! calibration parameter b for the percolation booster parameter
         type(grid_r)::h_meth                        ! irrigation volume [mm] 
         type(grid_r)::cell_area                     ! area of the calculation cell (vectorialization)
+        !TODO: Fortran runtime error: Pointer argument 'id_grid' is not associated
+        !type(grid_r):: h_maxpond                    ! maximum ponding depth [mm]
         type(grid_i)::irr_starts                    ! doy of the year when irrigation period starts
         type(grid_i)::irr_ends                      ! doy of the year when irrigation period ends
     end type spatial_info!

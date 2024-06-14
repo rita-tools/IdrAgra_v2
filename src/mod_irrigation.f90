@@ -124,7 +124,14 @@ module mod_irrigation
         where(pheno%irrigation_class==1 .and. pheno%k_cb>0)
             !!! %RR% %CG% %EAC% %AB% (feb-23) network efficiency no more considered in need mode [info_spat%eff_rete%mat]
             where(pheno%cn_class==7)                   ! irrigation matrix for rice
-                h_irr_temp = (bil1_old%h_eva + bil2_old%h_transp_pot)!
+                !h_irr_temp = (bil1_old%h_eva + bil2_old%h_transp_pot)!
+                ! %CG% add water to fill soil, ponding and ET
+                h_irr_temp = ((info_spat%h_meth%mat-  bil1_old%h_pond)+ & ! fill the ponding layer
+                                (info_spat%theta(1)%sat%mat*bil1_old%d_e*1000-bil1_old%h_soil)+ &!
+                                (info_spat%theta(2)%sat%mat*bil2%d_t*1000-bil2_old%h_soil) + & ! fill the soil layer to saturation
+                                (bil1_old%h_eva + bil2_old%h_transp_pot))/ & ! fill ET
+                                1.0 ! don't consider efficiency
+
             else where ((bil1_old%h_soil + bil2_old%h_soil) < bil2%h_raw_sup) ! all other crops
                 ! TODO: %AB% why only 2nd layer RAWbig?
                 ! else where (bil2_old%tmm<bil2%RAWbig)
@@ -166,7 +173,15 @@ module mod_irrigation
         !!! %RR% %CG% %EAC% %AB% (feb-23) network efficiency no more considered in need mode [info_spat%eff_rete%mat]
         where (pheno%irrigation_class==1 .and. pheno%k_cb>0)
             where (pheno%cn_class==7)                      ! %AB% irrigation matrix for rice
-                h_irr_temp = (bil1_old%h_eva+bil2_old%h_transp_pot)/(info_spat%eff_met%mat)
+                h_irr_temp = (bil1_old%h_eva + bil2_old%h_transp_pot)/(info_spat%eff_met%mat)
+
+                ! TODO: info_spat%h_meth%mat is not initialized in FC mode
+                !h_irr_temp = ((info_spat%h_meth%mat-bil1_old%h_pond)+ & ! fill the ponding layer
+                !             (info_spat%theta(1)%sat%mat*bil1_old%d_e*1000-bil1_old%h_soil)+ &!
+                !             (info_spat%theta(2)%sat%mat*bil2%d_t*1000-bil2_old%h_soil) + & ! fill the soil layer to saturation
+                !             (bil1_old%h_eva + bil2_old%h_transp_pot))/ & ! fill ET
+                !             (info_spat%eff_met%mat) ! consider also efficiency
+
 !~             else where (bil2_old%tmm<bil2%RAWbig)       !all other crops
             else where ((bil1_old%h_soil + bil2_old%h_soil) < bil2%h_raw_sup)       !all other crops
                 ! TODO: %AB% why only 2nd layer RAWbig?
@@ -194,7 +209,7 @@ module mod_irrigation
 
     subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_irr, &
         & day_from_irr, adj_perc_par, debug, bil1_old, bil2, bil2_old, &
-        & a_loss, b_loss, c_loss, wind_vel, temp_ave,losses)
+        & a_loss, b_loss, c_loss, wind_vel, temp_ave,losses,eff_rain,xrice_ksat)
         ! spread irrigation height when scheduled
         ! TODO: need for testing
         ! TODO: include losses calculation inside
@@ -215,6 +230,8 @@ module mod_irrigation
         real(dp),dimension(:,:),intent(in)::wind_vel
         real(dp),dimension(:,:),intent(in)::temp_ave
         real(dp),dimension(:,:),intent(inout)::losses
+        real(dp),dimension(:,:),intent(in)::eff_rain
+        real(dp),intent(in)::xrice_ksat     ! ksat of the transpirative layer for rice
         
         real(dp),dimension(size(info_spat%domain%mat,1),size(info_spat%domain%mat,2))::h_irr_temp!
         
@@ -244,7 +261,12 @@ module mod_irrigation
                     ! add water with fixed volume
                     where (info_spat%irr_unit_id%mat == sch_irr(i)%irr_unit_id .and. pheno%irrigation_class==1)
                         where(pheno%cn_class==7)                   ! irrigation matrix for rice
-                            h_irr_temp = (bil1_old%h_eva+bil2_old%h_transp_pot)!
+                            !h_irr_temp = (bil1_old%h_eva+bil2_old%h_transp_pot)!
+                            h_irr_temp = ((info_spat%h_meth%mat-bil1_old%h_pond)+ & ! fill the ponding layer
+                                        (info_spat%theta(1)%sat%mat*bil1_old%d_e*1000-bil1_old%h_soil)+ &!
+                                        (info_spat%theta(2)%sat%mat*bil2%d_t*1000-bil2_old%h_soil) + & ! fill the soil layer to saturation
+                                        (bil1_old%h_eva + bil2_old%h_transp_pot))/ & ! fill ET
+                                        1.0 ! don't consider efficiency
                         else where ((bil1_old%h_soil + bil2_old%h_soil) < bil2%h_raw_sup) ! all other crops
                             ! TODO: %AB% why only 2nd layer RAWbig?
                             ! else where (bil2_old%tmm<bil2%RAWbig)
@@ -258,7 +280,12 @@ module mod_irrigation
                     ! add water to field capacity
                     where (info_spat%irr_unit_id%mat == sch_irr(i)%irr_unit_id .and. pheno%irrigation_class==1)
                         where (pheno%cn_class==7)                      ! %AB% irrigation matrix for rice
-                            h_irr_temp = (bil1_old%h_eva+bil2_old%h_transp_pot)/(info_spat%eff_met%mat)
+                            !h_irr_temp = (bil1_old%h_eva+bil2_old%h_transp_pot)/(info_spat%eff_met%mat)
+                            h_irr_temp = ((info_spat%h_meth%mat-bil1_old%h_pond)+ & ! fill the ponding layer
+                                        (info_spat%theta(1)%sat%mat*bil1_old%d_e*1000-bil1_old%h_soil)+ &!
+                                        (info_spat%theta(2)%sat%mat*bil2%d_t*1000-bil2_old%h_soil) + & ! fill the soil layer to saturation
+                                        (bil1_old%h_eva + bil2_old%h_transp_pot))/ & ! fill ET
+                                        (info_spat%eff_met%mat) ! consider also efficiency
                             ! else where (bil2_old%tmm<bil2%RAWbig)       !all other crops
                         else where ((bil1_old%h_soil + bil2_old%h_soil) < bil2%h_raw_sup)       !all other crops
                             ! TODO: %AB% why only 2nd layer RAWbig?
@@ -286,6 +313,8 @@ module mod_irrigation
             end if
         end do!
 
+        call irrigate_rice(h_irr_temp,pheno,eff_rain,xrice_ksat)!
+
         ! split the irrigation matrix for each irrigation method 
         ! n is the number of irrigation methods
         forall(i=1:size(info_spat%domain%mat,1),j=1:size(info_spat%domain%mat,2),&
@@ -300,18 +329,21 @@ module mod_irrigation
     
     subroutine irrigate_rice(h_irr,pheno,eff_rain,k_sat)!
         ! calculate irrigation event for paddy fields
-        real(dp),dimension(:,:),intent(inout)::h_irr!
-        type(crop_pars_matrices),intent(in)::pheno!
-        real(dp),dimension(:,:),intent(in)::eff_rain!
+        real(dp),dimension(:,:),intent(inout)::h_irr    ! TODO: externally set to equal the potential crop ET,
+                                                        !       the soil water content to saturation and the ponding height
+        type(crop_pars_matrices),intent(in)::pheno      ! 
+        real(dp),dimension(:,:),intent(in)::eff_rain    ! effective rain
         real(dp),intent(in)::k_sat!
         real(dp)::h_irr_min!
         !!
         ! init the minimum irrigation height (equal to infiltration)
         h_irr_min = 10.*24.*k_sat ! k_sat is in mm
         where(pheno%irrigation_class==1 .and. pheno%cn_class==7)  
-            where(h_irr<=h_irr_min) h_irr = h_irr_min            ! irrigation height at least equal to the minimum irrigation height
-            where(eff_rain>=h_irr) h_irr = 0.                    ! if effective precipitation > irrigation height -> zero irrigation height
-            where(pheno%k_cb<pheno%k_cb_old) h_irr = 0           ! if last crop period don't irrigate
+            h_irr = max(0.0D0,h_irr_min + h_irr - eff_rain)  ! %CG%: irrigation compensate ET and Percolation, minus effective rain 
+            !where(h_irr<=h_irr_min) h_irr = h_irr_min       ! irrigation height at least equal to the minimum irrigation height
+            !where(eff_rain>=h_irr) h_irr = 0.               ! if effective precipitation > irrigation height -> zero irrigation height
+            ! adjust start and end of the season
+            where(pheno%k_cb<pheno%k_cb_old) h_irr = 0       ! %CG%: if last crop period don't irrigate
         end where!
     end subroutine irrigate_rice!
 
@@ -651,7 +683,11 @@ module mod_irrigation
         end if
         !
         do i=1,size(wat_sources)!
-            j=wat_sources(i)%irr_unit_idx!
+            j=wat_sources(i)%irr_unit_idx;
+            if (j==0) then
+                print*,'WARNING: water source ',wat_sources(i)%id_wat_src,' returns zero index'
+                cycle
+            end if
             k=wat_sources(i)%wat_src_idx!
             select case(wat_sources(i)%type_id)!
                 case(1)!

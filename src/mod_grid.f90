@@ -527,7 +527,7 @@ module mod_grid!
     end function id_to_par_r!
 
     function id_to_par_i(id_grid,pars_list)!
-        ! return a matrix of real values
+        ! return a matrix of integer values
         ! choosing the values from the list provided (pars_list)
         ! base on the position in the list
         implicit none!
