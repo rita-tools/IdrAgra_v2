@@ -1,0 +1,31 @@
+input files
+ Domain;            1
+ Slope;    1.0000000000000000E-003
+ Soil use;            3
+ Irrigation subdistrict; null
+ Irrigation method; null
+ Method efficiency; null
+ Conveyance efficiency; null
+ Hydrologic soil group;            3
+ Hydrologic condition;            1
+ ThetaI_sat;   0.48899999999999999     
+ ThetaI_fc;   0.28291899999999998     
+ ThetaI_wp;    6.9188000000000000E-002
+ ThetaI_r;    5.0000000000000003E-002
+ ThetaII_sat;   0.48899999999999999     
+ ThetaII_fc;   0.28291899999999998     
+ ThetaII_wp;    6.9188000000000000E-002
+ ThetaII_r;    5.0000000000000003E-002
+ ksat_I;    1.8230090000000001     
+ ksat_II;    1.8230090000000001     
+ expn_I;    12.133891126120746     
+ expn_II;    12.133891126120746     
+ CapFluxParam_a3; null
+ CapFluxParam_a4; null
+ CapFluxParam_b1; null
+ CapFluxParam_b2; null
+ CapFluxParam_b3; null
+ CapFluxParam_b4; null
+ Water depth; null
+ Meteorological Station nr           1 ;    100.50000000000000     
+ Meteorological Station nr           2 ;    100.50000000000000     
