@@ -157,15 +157,17 @@ module cli_simulation_manager!
         
         ! spread irrigation start and end days
         info_spat%irr_starts = info_spat%domain
-        info_spat%irr_starts%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_starts)
-        
         info_spat%irr_ends = info_spat%domain
-        info_spat%irr_ends%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_ends)
         
         ! init maximum pond
         h_maxpond=info_spat%cell_area
         h_maxpond%mat = 10000.0D0
-        h_maxpond%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_maxpond)
+        
+        if (pars%sim%mode>0) then
+            info_spat%irr_starts%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_starts)
+            info_spat%irr_ends%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_ends)
+            h_maxpond%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_maxpond)
+        end if
         
         ! Variables allocation
         call allocate_all (stp_map, yr_map, deb_map, yr_deb_map, wat_bal1, wat_bal1_old, wat_bal2, wat_bal2_old, wat_bal_hour, meteo, wat, pheno, &
