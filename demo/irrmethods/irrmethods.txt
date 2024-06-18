@@ -1,0 +1,16 @@
+######################################## Irrigation methods parameters  #########################################
+#														#
+#                                   Note: lines starting with <#> are comments                                  #
+# 														#
+#################################################################################################################
+
+# IrrMethNum: number of considered irrigation methods
+IrrMethNum = 4
+
+# List of irrigation methods parameters' files
+List =
+1_Surface_ir.txt
+2_Sprinkler_.txt
+3_Micro_irri.txt
+4_Flood_irri.txt
+EndList =

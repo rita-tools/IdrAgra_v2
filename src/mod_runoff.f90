@@ -48,6 +48,7 @@ module mod_runoff
                 runoff = ((gross_av_water-Ia)**2.)/(gross_av_water+0.8*S)
                 runoff = merge (runoff,0.0D0,gross_av_water > Ia)
                 runoff = merge (runoff, net_av_water, net_av_water > runoff)
+                runoff = 0.0D0 !FAKE
                 net_av_water = net_av_water - runoff
             end where
         end where

@@ -1,0 +1,75 @@
+######################################### Irrigation method input file  #########################################
+#														#
+#                                   Note: lines starting with <#> are comments                                  #
+# 														#
+#################################################################################################################
+
+# Irrigation method: Flood irrigation
+# Id: Irrigation method code
+Id = 4
+
+# Irrigation efficiency: 0.4
+
+# Qadaq: irrigation water depth [mm]
+Qadaq = 15.0
+
+# K_stress: water stress coefficient for the activation of irrigation from water diversions
+K_stress = 0.01
+
+# K_stresspozzi: water stress coefficient for the activation of irrigation from private wells
+K_stresswells = 0.99
+
+# fw: exposed and wetted soil fraction
+fw = 1.0
+
+# Min_a & Max_a: parameters of percolation model
+Min_a = 0.0
+Max_a = 0.0
+
+# Min_b & Max_b: parameters of percolation model
+Min_b = 0.0
+Max_b = 0.0
+
+# a, b, c: parameters of irrigation losses model
+# Irrigation losses model is described by the equation:
+# Irrigation_losses = a + b * wind_speed + c * average_temperature
+# If irrigation losses do not depend from wind speed or average temperature, set:
+# a = fixed irrigation loss (expressed as a percentage between 0 & 100); b = 0; c = 0
+a = 0.0
+b = 0.0
+c = 0.0
+
+# InterceptionFlag: irrigation water is intercepted by foliage?
+# InterceptionFlag = TRUE or T if irrigation water is interception by foliage
+# InterceptionFlag = FALSE or F if irrigation water is not interception by foliage
+InterceptionFlag = F
+
+# Add here extra option(s)
+
+
+# Irrigation run time
+1 = 0 # Irrigation between 00:00 and 00:59
+2 = 0 # Irrigation between 01:00 and 01:59
+3 = 0 # Irrigation between 02:00 and 02:59
+4 = 0 # Irrigation between 03:00 and 03:59
+5 = 0 # Irrigation between 04:00 and 04:59
+6 = 0 # Irrigation between 05:00 and 05:59
+7 = 0 # Irrigation between 06:00 and 06:59
+8 = 0 # Irrigation between 07:00 and 07:59
+9 = 0 # Irrigation between 08:00 and 08:59
+10 = 0 # Irrigation between 09:00 and 09:59
+11 = 0 # Irrigation between 10:00 and 10:59
+12 = 0.333 # Irrigation between 11:00 and 11:59
+13 = 0.334 # Irrigation between 12:00 and 12:59
+14 = 0.333 # Irrigation between 13:00 and 13:59
+15 = 0 # Irrigation between 14:00 and 14:59
+16 = 0 # Irrigation between 15:00 and 15:59
+17 = 0 # Irrigation between 16:00 and 16:59
+18 = 0 # Irrigation between 17:00 and 17:59
+19 = 0 # Irrigation between 18:00 and 18:59
+20 = 0 # Irrigation between 19:00 and 19:59
+21 = 0 # Irrigation between 20:00 and 20:59
+22 = 0 # Irrigation between 21:00 and 21:59
+23 = 0 # Irrigation between 22:00 and 22:59
+24 = 0 # Irrigation between 23:00 and 23:59
+

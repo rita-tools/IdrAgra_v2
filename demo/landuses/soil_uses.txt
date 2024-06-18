@@ -1,0 +1,6 @@
+# List of crops to be simulated, columns must be separated by one or more tab characters
+Cr_ID	Crop1	Crop2	# Comments
+1	3_maize_clas.tab	*	# corn monoculture
+2	4_autumn-sow.tab	2_maize_clas.tab	# wheat and corn alternate
+3	1_bare_soil_.tab	*	# bare soil
+endTable

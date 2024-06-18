@@ -83,7 +83,7 @@ module mod_common
 
     type intensive
     ! Definition of type intensive
-    ! Stores in distributed form all balance terms that are calculated at hourly step that depends on previus iteration
+    ! Stores in distributed form all balance terms that are calculated at hourly step that depends on previous iteration
         real(dp),dimension(:,:),pointer::h_soil1         ! water content of evaporative layer [mm] - hourly, h-1 (previous iteration)
         real(dp),dimension(:,:),pointer::h_soil2         ! water content of transpirative layer [mm] - hourly, h-1 (previous iteration)
         real(dp),dimension(:,:),pointer::k_s_dry         ! water scarcity stress coefficient [-] - hourly, h-1 (previous iteration)

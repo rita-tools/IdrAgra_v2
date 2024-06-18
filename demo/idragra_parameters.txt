@@ -1,0 +1,187 @@
+################ Input file for Idragra ##########################
+#
+#                   Note: lines starting with <#> are comments
+# 
+########################################################
+
+### 1. General section ###
+
+# 1.1. Input and output folders and files
+
+# 1.1.1. Output folder
+
+# OutputPath: path to output folder [name_outputpath\\]
+OutputPath = simout\\
+
+# 1.1.2. Input folders
+
+# InputPath: path to spatialized input folder (default: spatial_data\\)
+InputPath = geodata\\
+
+# MeteoPath: path to meteorological stations folder (default: meteo_data\\)
+MeteoPath = meteodata\\
+# MeteoFileName: file, located in root folder, in which meteorological filenames are stored (default: weather_stations.dat)
+MeteoFileName = weather_stations.dat
+
+# PhenoPath: path to phenological parameters folder (default: crop_series\\)
+PhenoPath = pheno\\
+# PhenoFileRoot: first part of the name of phenological parameters subfolders (labelled as PhenoFileRoot_MeteoNum.dat) (default: pheno_)
+PhenoFileRoot = pheno_
+
+# IrrMethPath: path to irrigation methods folder (default: irrmeth_data\\)
+IrrMethPath = irrmethods\\
+# IrrMethFileName: file, located in irrigation methods folder, in which irrigation methods filenames are stored (default: irrmethods.txt)
+IrrMethFileName = irrmethods.txt 
+
+# WatSourPath: path to water sources folder (default: watsour_data\\)
+WatSourPath = wsources\\
+
+# 1.2. Simulation settings
+
+# 1.2.1.  Type of simulation
+
+# Mode: type of simulation [0...4]
+# Mode = 0 # simulation without irrigation
+# Mode = 1 # simulation with irrigation, mode consumptions
+# Mode = 2 # simulation with irrigation, field capacity needs satisfaction
+# Mode = 3 # simulation with irrigation, fixed volumes
+# Mode = 4 # fixed irrigation applications, data and volumes are specified in a file
+Mode = 0
+
+# 1.2.2. Simulation conditions
+
+# InitialThetaFlag: switch, external setting of initial soil moisture condition [T F] (T=true, F= false)
+# InitialThetaFlag = T # initial moisture condition read from external file
+# InitialThetaFlag = F # internally generated initial moisture condition by running the first year and using its output as initial moisture for the simulation
+InitialThetaFlag = T
+InitialConditionPath = init_cond\\
+InitialCondition = IC_theta
+
+# CapillaryFlag: switch, simulation of capillary rise [T F] (T=true, F= false)
+# CapillaryFlag = T # capillary rise simulated
+# CapillaryFlag = F # capillary rise not simulated
+CapillaryFlag = F
+
+# SoilUseVarFlag: switch, simulation uses yearly soil uses [T F] (T=true, F= false)
+# SoilUseVarFlag = T # soil uses changes every year
+# SoilUseVarFlag = F # soil uses does not change
+SoilUseVarFlag = T
+
+# 1.2.3. Meteorological inputs
+
+# MeteoStatTotNum: number of meteorological stations
+MeteoStatTotNum = 1
+# MeteoStatWeightNum: number of nearest meteorological stations used to weight crop phenology
+MeteoStatWeightNum = 2
+
+# 1.2.4. Soil uses inputs
+
+# SoilUsesNum: number of considered soil uses in each of phenological series
+SoilUsesNum = 3
+# SimulatedSoilUses: list of soil uses to be simulated (e.g. 1 2 3 4 5 ...)
+SimulatedSoilUses = 1 2 3
+# RandSowDaysWind: number of days of window for sowing date randomization
+RandSowDaysWind = 0
+
+# 1.2.5. Periodical output setting
+
+# MonthlyFlag: output interval (monthly or specific interval) [T F] (T=true, F= false)
+# MonthlyFlag = T # switch, output each month
+# MonthlyFlag = F # switch, periodical output
+MonthlyFlag = T
+
+# if MonthlyFlag = F, choose output interval - output will be recorded from StartDate to EndDate every DeltaDate days
+# StartDate: start Julian day [1...366] for periodic output 
+StartDate = 105
+# EndDate: end Julian day [1...366] for periodic output
+EndDate = 273
+# DeltaDate: output interval, Julian days [1... 366]
+DeltaDate = 10
+
+### 2. Simulation specifications  ###
+
+# 2.1. Ponding parameters
+
+# PondSlopeMin: slope below which (or equal to) maximum ponding (q_max) occurs
+# PondSlopeMin = 0.00
+
+# PondFracMax : maximum ponding ratio between ponded water and theorical runoff
+# PondFracMax = 0.90
+
+# PondSlopeMax: slope over which minimum ponding (q_min) occurs
+# PondSlopeMax = 0.05
+
+# PondFracMin: minimum ponding ratio between ponded water and theorical runoff
+#PondFracMin = 0.10
+
+# 2.2. Soil conductivity parameters
+
+# 01q_eva: 10th percentile of soil conductivity for evaporative layer
+01q_eva = 0.575118
+
+# 09q_eva: 90th percentile of soil conductivity for evaporative layer
+09q_eva = 8.026400
+
+# 01q_trasp: 10th percentile of soil conductivity for traspirative layer
+01q_trasp = 0.472116
+
+# 09q_trasp: 90th percentile of soil conductivity for traspirative layer
+09q_trasp = 7.706101
+
+# 2.2. Irrigation inputs
+
+# StartIrrSeason: Julian day [1...366] in which irrigation season starts (e.g. 105)
+StartIrrSeason = 1
+
+# EndIrrSeason: Julian day [1...366] in which irrigation season starts (e.g. 273)
+EndIrrSeason = 366 
+
+# if Mode = 1 (consumptions), define irrigation sources
+# BasinsTotNum: total number of irrigation districts
+# BasinsTotNum = 0
+
+# BasinsXSourceTotNum: number of combinations of irrigation districts and diversions
+# BasinsXSourceTotNum = 0
+
+# SourceSurfDerivTotNum: total number of surface derivations
+# SourceSurfDerivTotNum = 0
+
+# SourceFlowWellTotNum: total number of flowing wells
+# SourceFlowWellTotNum = 0
+
+# SourceTailwaterTotNum: total number of tailwater sources
+# SourceTailwaterTotNum = 0
+
+# SourceWellTotNum: total number of public wells
+# SourceWellTotNum = 0
+
+# 2.3. Layers depth [m]
+
+# zEvap: evaporative layer depth [m]
+zEvap = 0.1
+
+# zRoot: transpirative layer depth [m]
+zRoot = 0.9
+
+### 3. DTx specifications ###
+
+# DTxMode: DTx calculation off [none], DTx statistical analysis [analysis] or DTx application [application]
+# DTxMode = none
+# DTxMode = analysis
+# DTxMode = application
+DTxMode = none
+
+# DTxNumXs: number of calculated indices (one for each integration period), i.e. elements of DTx_x
+DTxNumXs = 3 
+
+# DTx_x: integration period  (DT10 sums transpirative deficit of 10 days)
+DTx_x = 10 20 30
+
+# DTxDeltaDate: DTx calculation interval
+DTxDeltaDate = 10
+# DTxDelayDays: delay from the first day of year to start calculation 
+DTxDelayDays = 1 
+
+# if DTxMode = analysis, choose minimum cardinality (i.e. number of elements for a valid estimate)
+# DTxMinCard: minimum cardinality for statistical analysis
+DTxMinCard = 3 
