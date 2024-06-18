@@ -29,7 +29,7 @@ module cli_simulation_manager!
 ! Contains functions:
 ! calc_interception              <- interception calculation
 ! Pioggia_Efficace          <- effective rainfall calculation
-    !
+!
     use mod_utility, only: sp, dp, get_value_index, make_numbered_name, get_uniform_sample, days_x_month, calc_date, day_of_week
     use mod_parameters
     use mod_grid, only: read_grid, write_grid, print_mat_as_grid, overlay_domain, &
