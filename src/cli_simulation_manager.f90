@@ -603,8 +603,8 @@ module cli_simulation_manager!
 
                 print*,'Simulation day', achar(9), trim(adjustl(s_doy)), achar(9), 'year', achar(9), trim(adjustl(s_year))
 
-                if (doy>35) exit !FAKE
-                print*,'doy hour h_soil1 h_inf h_pond0 h_pond h_perc1 h_soil2 h_rise h_perc2' !FAKE
+                !if (doy>35) exit !FAKE
+                !print*,'doy hour h_soil1 h_inf h_pond0 h_pond h_perc1 h_soil2 h_rise h_perc2' !FAKE
                 
                
                 ! Updating daily data matrix for water table depth
@@ -1003,11 +1003,11 @@ module cli_simulation_manager!
                     wat_bal2%h_rise = wat_bal2%h_rise + wat_bal_hour%esten%h_rise!
                     wat_bal_hour%inten%h_pond0 = wat_bal_hour%esten%h_pond
                     
-                    i = 3
-                    j = 1
-                    if (doy>31) print*,doy,hour,wat_bal_hour%inten%h_soil1(i,j),wat_bal_hour%esten%h_inf(i,j),&
-                                       wat_bal_hour%inten%h_pond0(i,j),wat_bal_hour%esten%h_pond(i,j),wat_bal_hour%esten%h_perc1(i,j),&
-                                       wat_bal_hour%inten%h_soil2(i,j),wat_bal_hour%esten%h_rise(i,j),wat_bal_hour%esten%h_perc2(i,j) !FAKE
+                    !i = 3
+                    !j = 1
+                    !if (doy>31) print*,doy,hour,wat_bal_hour%inten%h_soil1(i,j),wat_bal_hour%esten%h_inf(i,j),&
+                    !                  wat_bal_hour%inten%h_pond0(i,j),wat_bal_hour%esten%h_pond(i,j),wat_bal_hour%esten%h_perc1(i,j),&
+                    !                   wat_bal_hour%inten%h_soil2(i,j),wat_bal_hour%esten%h_rise(i,j),wat_bal_hour%esten%h_perc2(i,j) !FAKE
                     
                     ! update the number of iterations
                     iter1 = merge(iter1,wat_bal_hour%n_iter1,iter1>wat_bal_hour%n_iter1)
