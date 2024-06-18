@@ -12,7 +12,7 @@
             "program": "${workspaceFolder}/release/idragra.exe",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "C:\\test_idragra\\test2_confronto_swap_SIM_ET0",//"C:/enricodata/progetto_GardaChiese/simulazioni/Colombarola_21_newcode",//"${workspaceFolder}/demo/",
+            "cwd": "${workspaceFolder}/demo/",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
