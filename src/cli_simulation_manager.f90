@@ -1818,7 +1818,7 @@ module cli_simulation_manager!
         ! calculate ET0 from distributed parameters
         meteo%et0 = ET_reference(meteo%T_max, meteo%T_min, meteo%RH_max, meteo%RH_min, meteo%Wind_vel, meteo%Rad_sol,&
                                        meteo%lat, meteo%alt, res_canopy, doy, domain%header%imax, domain%header%jmax)!
-        meteo%et0 = 0. !FAKE
+        !meteo%et0 = 0. !FAKE
     end subroutine create_meteo_matrices!
     
         function calc_interception(p,pheno)!
