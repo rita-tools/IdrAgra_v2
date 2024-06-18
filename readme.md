@@ -156,7 +156,7 @@ sudo apt install make
 Clone your repo with the following git command:
 
 ```Shell
-git clone https://github.com/rita-tools/IdrAgra_v2@linux_comp
+git clone --branch linux_comp https://github.com/rita-tools/IdrAgra_v2
 ```
 
 Change your terminal into that new subdirectory:
