@@ -92,7 +92,9 @@ module mod_crop_soil_water
         real(dp)::percolation_first_layer       ! percolation in selected time frame - (sub)hourly [mm/h]
         !
         k_uns = k_sat*((theta_act-theta_r)/(theta_sat-theta_r))**fatt_n
-        
+    
+        !print*, 'h_act:', theta_act,'h_fc:',theta_fc,'h_sat:',theta_sat !FAKE
+
         if(theta_act <= theta_r)then
             percolation_first_layer = 0.
         else if(theta_act > theta_sat)then
@@ -140,7 +142,7 @@ module mod_crop_soil_water
 
     recursive subroutine water_balance_evap_lay(h_net_irr, h_soil1, & !
         & h_inf, h_eva_act, h_eva_pot, h_perc1, h_pond0, h_pond, h_transp_act, h_transp_pot, k_cb, p_day, h_et0, &
-        & k_e, k_r, k_stress_dry, k_stress_sat, hks, kc_max, few, rf_e, h_rew, h_sat, h_fc, h_wp, h_r, & !RR: add kr
+        & k_e, k_r,k_stress_dry, k_stress_sat, hks, kc_max, few, rf_e, h_rew, h_sat, h_fc, h_wp, h_r, & !RR: add kr
         & k_sat, fatt_n, n_iter1, adj_perc_par, mmax)
         ! water balance of the evapotranspirative layer
         ! recursive: time is divided by 2 in case solution not found
@@ -185,7 +187,7 @@ module mod_crop_soil_water
         !
         real(dp)::h_soil0,h_soil_old,h_soil_mean,h_soil_new,h_delta !
         integer::n,m,k
-        real(dp)::h_eva_act_m, h_eva_pot_m, h_perc1_m,k_s_dry_m,k_s_sat_m, hks_m, h_transp_act_m, h_transp_pot_m 
+        real(dp)::h_eva_act_m, h_eva_pot_m, h_perc1_m, k_s_dry_m,k_s_sat_m, hks_m, h_transp_act_m, h_transp_pot_m 
         real(dp)::h_pond_i                   ! ponding value to be used inside the cycle
         !!
         ! init
@@ -193,37 +195,27 @@ module mod_crop_soil_water
         h_soil_old = h_soil0
         h_soil_mean = h_soil0
         h_pond_i = h_pond0
-
-        
-
         !
         do n=1,n_max
             ! TODO: check order and update h_soil_mean
             call evaporation(h_soil_mean, h_rew, h_wp, kc_max, few, k_e, k_cb,h_et0,h_eva_act,h_eva_pot,k_r)!
             
-            !h_perc1 = percolation(adj_perc_par, h_soil_mean, h_r, h_sat, k_sat, fatt_n)!
-            
+            h_perc1 = percolation(adj_perc_par,h_soil_mean, h_r, h_sat, k_sat, fatt_n)!
+            !h_perc1 = percolation_first_layer(adj_perc_par,h_soil_mean, h_r, h_fc, h_sat, k_sat, fatt_n)!
+
             call calculate_water_stresses(h_soil_mean,h_fc,h_wp,h_sat,p_day,k_stress_dry,k_stress_sat)
 
             hks = min(k_stress_dry,k_stress_sat)
 
             call transpiration(k_cb,rf_e, h_transp_act, h_transp_pot, hks, h_et0)!
-
-            ! partial water balance equation to calculate water availability for percolation
-            h_soil_new = h_soil0 + (h_inf + h_net_irr + h_pond_i) - h_eva_act  - h_transp_act!
-            
-            !h_perc1 = percolation_first_layer(adj_perc_par,h_soil_mean,h_r, h_fc, h_sat, k_sat, fatt_n)
-            h_perc1 = percolation(adj_perc_par, h_soil_mean, h_r, h_sat, k_sat, fatt_n)!
             
             ! water balance equation (TODO: h_soil_mean)
-            !h_soil_new = h_soil0 + (h_inf + h_net_irr + h_pond_i) - h_eva_act - h_perc1 - h_transp_act!
-            h_soil_new = h_soil_new - h_perc1
+            h_soil_new = h_soil0 + (h_inf+h_net_irr+h_pond_i) - h_eva_act - h_perc1 - h_transp_act!
             !
-            h_pond_i = 0
-            
+            h_pond = 0
             ! surplus check: compare the WB solution with the maximum capacity of the soil layer
             if(h_soil_new>=h_sat)then
-                h_pond_i = h_soil_new-h_sat ! put surplus to the surface (ponding)
+                h_pond = h_soil_new-h_sat ! put surplus to the surface (ponding)
                 h_soil_new = h_sat
             else if(h_soil_new<=(0.5*h_wp)) then
                 h_perc1 = h_perc1 + (h_soil_new-(0.5*h_wp)) ! reduce percolation volume to set v_soil_new = 0.5 * 0.5_wp
@@ -238,8 +230,6 @@ module mod_crop_soil_water
             h_soil_mean = ((h_soil_new + h_soil_old) * 0.5 + h_soil0) * 0.5
             h_soil_old = h_soil_new
         end do
-
-        h_pond = h_pond_i
         
         ! if no convergence
         if(n == n_max + 1) then
@@ -251,7 +241,6 @@ module mod_crop_soil_water
             n = 0 ! store the number of cycles inside the convergence loop
             
             do k=1, k_max
-                print*, 'k:',k
                 call water_balance_evap_lay(h_net_irr/k_max, h_soil1, h_inf/k_max, h_eva_act_m, h_eva_pot_m, h_perc1_m, h_pond_i, h_pond, &
                     & h_transp_act_m, h_transp_pot_m, k_cb, p_day, h_et0/k_max, k_e, k_r,k_s_dry_m,k_s_sat_m, hks_m, kc_max, few, rf_e, & ! RR: add k_r
                     & h_rew, h_sat, h_fc, h_wp, h_r, k_sat/k_max , fatt_n, n_iter1, adj_perc_par, mmax)
@@ -402,7 +391,6 @@ module mod_crop_soil_water
                 h_transp_pot = h_transp_pot + h_transp_pot_m
                 h_perc2 = h_perc2 + h_perc2_m
                 h_rise = h_rise + h_rise_m
-                print*,'k:',k,'h_rise:',h_rise
                 hks = hks_m ! consistent with those externally calculated
                 n = max(n_iter2,n)
             end do
