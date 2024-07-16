@@ -151,22 +151,24 @@ module cli_simulation_manager!
         real(dp):: value
         !CHARACTER(LEN=20)::fc_name
         TYPE(grid_r)::pheno_grd 
-        TYPE(grid_r)::h_maxpond ! a grid object that store the maximum ponding depth TODO: set as spatial map
         
         pheno_grd = info_spat%domain
         
-        ! spread irrigation start and end days
+        ! init irrigation time limits
         info_spat%irr_starts = info_spat%domain
-        info_spat%irr_starts%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_starts)
-        
         info_spat%irr_ends = info_spat%domain
-        info_spat%irr_ends%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_ends)
         
         ! init maximum pond
-        h_maxpond=info_spat%cell_area
-        h_maxpond%mat = 10000.0D0
-        h_maxpond%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_maxpond)
+        info_spat%h_maxpond=info_spat%cell_area
+        info_spat%h_maxpond%mat = 10000.0D0
         
+        ! spread irrigation variables
+        if (pars%sim%mode>0) then
+            info_spat%irr_ends%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_ends)
+            info_spat%irr_starts%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_starts)
+            info_spat%h_maxpond%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_maxpond)
+        end if
+
         ! Variables allocation
         call allocate_all (stp_map, yr_map, deb_map, yr_deb_map, wat_bal1, wat_bal1_old, wat_bal2, wat_bal2_old, wat_bal_hour, meteo, wat, pheno, &
             & info_spat%domain%header%imax,info_spat%domain%header%jmax, info_spat%domain%mat, debug)
@@ -601,8 +603,8 @@ module cli_simulation_manager!
 
                 print*,'Simulation day', achar(9), trim(adjustl(s_doy)), achar(9), 'year', achar(9), trim(adjustl(s_year))
 
-                if (doy>35) exit !FAKE
-                print*,'doy hour h_soil1 h_inf h_pond0 h_pond h_perc1 h_soil2 h_rise h_perc2' !FAKE
+                !if (doy>40) exit !FAKE
+                !print*,'doy hour h_soil1 h_inf h_pond0 h_pond h_perc1 h_soil2 h_rise h_perc2' !FAKE
                 
                
                 ! Updating daily data matrix for water table depth
@@ -1003,9 +1005,9 @@ module cli_simulation_manager!
                     
                     i = 3
                     j = 1
-                    if (doy>31) print*,doy,hour,wat_bal_hour%inten%h_soil1(i,j),wat_bal_hour%esten%h_inf(i,j),&
-                                       wat_bal_hour%inten%h_pond0(i,j),wat_bal_hour%esten%h_pond(i,j),wat_bal_hour%esten%h_perc1(i,j),&
-                                       wat_bal_hour%inten%h_soil2(i,j),wat_bal_hour%esten%h_rise(i,j),wat_bal_hour%esten%h_perc2(i,j) !FAKE
+                    !if (doy>31) print*,doy,hour,wat_bal_hour%inten%h_soil1(i,j),wat_bal_hour%esten%h_inf(i,j),&
+                    !                   wat_bal_hour%inten%h_pond0(i,j),wat_bal_hour%esten%h_pond(i,j),wat_bal_hour%esten%h_perc1(i,j),&
+                    !                   wat_bal_hour%inten%h_soil2(i,j),wat_bal_hour%esten%h_rise(i,j),wat_bal_hour%esten%h_perc2(i,j) !FAKE
                     
                     ! update the number of iterations
                     iter1 = merge(iter1,wat_bal_hour%n_iter1,iter1>wat_bal_hour%n_iter1)
@@ -1039,8 +1041,8 @@ module cli_simulation_manager!
                 end where!
 
                 ! update the ponding variable for each day
-                wat_bal1%h_runoff = wat_bal1%h_runoff+ max(wat_bal_hour%esten%h_pond-h_maxpond%mat,0.0D0)
-                wat_bal1%h_pond = min(wat_bal_hour%esten%h_pond,h_maxpond%mat)
+                wat_bal1%h_runoff = wat_bal1%h_runoff+ max(wat_bal_hour%esten%h_pond-info_spat%h_maxpond%mat,0.0D0)
+                wat_bal1%h_pond = min(wat_bal_hour%esten%h_pond,info_spat%h_maxpond%mat)
                 !wat_bal1%h_pond = wat_bal_hour%esten%h_pond
 
                 ! Calculate the crop production
@@ -1816,7 +1818,7 @@ module cli_simulation_manager!
         ! calculate ET0 from distributed parameters
         meteo%et0 = ET_reference(meteo%T_max, meteo%T_min, meteo%RH_max, meteo%RH_min, meteo%Wind_vel, meteo%Rad_sol,&
                                        meteo%lat, meteo%alt, res_canopy, doy, domain%header%imax, domain%header%jmax)!
-        meteo%et0 = 0. !FAKE
+        !meteo%et0 = 0. !FAKE
     end subroutine create_meteo_matrices!
     
         function calc_interception(p,pheno)!
