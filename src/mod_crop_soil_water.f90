@@ -212,16 +212,18 @@ module mod_crop_soil_water
             ! partial water balance equation to calculate water availability for percolation
             h_soil_new = h_soil0 + (h_inf + h_net_irr + h_pond_i) - h_eva_act  - h_transp_act!
             
-            h_perc1 = percolation_first_layer(adj_perc_par,h_soil_mean,h_r, h_fc, h_sat, k_sat, fatt_n)
+            !h_perc1 = percolation_first_layer(adj_perc_par,h_soil_mean,h_r, h_fc, h_sat, k_sat, fatt_n)
+            h_perc1 = percolation(adj_perc_par, h_soil_mean, h_r, h_sat, k_sat, fatt_n)!
             
             ! water balance equation (TODO: h_soil_mean)
             !h_soil_new = h_soil0 + (h_inf + h_net_irr + h_pond_i) - h_eva_act - h_perc1 - h_transp_act!
             h_soil_new = h_soil_new - h_perc1
             !
-            h_pond = 0
+            h_pond_i = 0
+            
             ! surplus check: compare the WB solution with the maximum capacity of the soil layer
             if(h_soil_new>=h_sat)then
-                h_pond = h_soil_new-h_sat ! put surplus to the surface (ponding)
+                h_pond_i = h_soil_new-h_sat ! put surplus to the surface (ponding)
                 h_soil_new = h_sat
             else if(h_soil_new<=(0.5*h_wp)) then
                 h_perc1 = h_perc1 + (h_soil_new-(0.5*h_wp)) ! reduce percolation volume to set v_soil_new = 0.5 * 0.5_wp
@@ -236,6 +238,8 @@ module mod_crop_soil_water
             h_soil_mean = ((h_soil_new + h_soil_old) * 0.5 + h_soil0) * 0.5
             h_soil_old = h_soil_new
         end do
+
+        h_pond = h_pond_i
         
         ! if no convergence
         if(n == n_max + 1) then
