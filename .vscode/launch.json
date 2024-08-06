@@ -9,14 +9,14 @@
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/release/idragra.exe",
+            "program": "${workspaceFolder}/release/idragra.out",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "C:/enricodata/progetto_GardaChiese/simulazioni/Colombarola_21_newcode",//"${workspaceFolder}/demo/",
+            "cwd": "${workspaceFolder}/demo/",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
-            "miDebuggerPath": "C:\\msys64\\mingw64\\bin\\gdb.exe",
+            "miDebuggerPath": "gdb",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",

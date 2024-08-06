@@ -4,8 +4,8 @@ CURRENTDATE := $(shell date --iso=seconds)
 
 # Windows OS variables & settings
 DEL = rm
-EXE = .exe
-WIN = 1
+EXE = .out
+WIN = 0
 
 # Compiler settings
 # -cpp: activates compiler pre processing
@@ -14,9 +14,14 @@ WIN = 1
 
 CC = gfortran
 CPP = gfortran -cpp
+# -g for gdb, -O0 zero optimization or -Og
+### for debug ###
 GFFLAGS = -cpp -DGIT_VERSION=\"$(COMMIT)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -g -Wall  -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all -ffpe-trap=zero,overflow,underflow -finit-real=nan -c
 #GFFLAGS = -g -O0 -Wall -Wextra -Wshadow -pedantic -static -c
 #GFFLAGS =  -cpp -DMY_VERSION=\"$(COMMIT)\" -g -Wall -c
+### for release ###
+# -ffree-line-length-512 manage long commands in the code
+#GFFLAGS = -cpp -DGIT_VERSION=\"$(COMMIT)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -ffast-math  -O3 -ffree-line-length-512 -c
 LDFLAGS = 
 
 APPNAME = idragra
@@ -78,7 +83,7 @@ all:
 cleanall:
 	$(DEL) $(wildcard ./$(OBJDIR)/*.mod)
 	$(DEL) $(wildcard ./$(OBJDIR)/*.o)
-	$(DEL) $(wildcard ./$(RELDIR)/*.exe)
+	$(DEL) $(wildcard ./$(RELDIR)/*.out)
 
 .PHONY: cleanmain
 cleanmain:

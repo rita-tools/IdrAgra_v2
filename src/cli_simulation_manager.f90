@@ -29,7 +29,7 @@ module cli_simulation_manager!
 ! Contains functions:
 ! calc_interception              <- interception calculation
 ! Pioggia_Efficace          <- effective rainfall calculation
-    !
+!
     use mod_utility, only: sp, dp, get_value_index, make_numbered_name, get_uniform_sample, days_x_month, calc_date, day_of_week
     use mod_parameters
     use mod_grid, only: read_grid, write_grid, print_mat_as_grid, overlay_domain, &
@@ -157,15 +157,17 @@ module cli_simulation_manager!
         
         ! spread irrigation start and end days
         info_spat%irr_starts = info_spat%domain
-        info_spat%irr_starts%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_starts)
-        
         info_spat%irr_ends = info_spat%domain
-        info_spat%irr_ends%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_ends)
         
         ! init maximum pond
         h_maxpond=info_spat%cell_area
         h_maxpond%mat = 10000.0D0
-        h_maxpond%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_maxpond)
+        
+        if (pars%sim%mode>0) then
+            info_spat%irr_starts%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_starts)
+            info_spat%irr_ends%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_ends)
+            h_maxpond%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_maxpond)
+        end if
         
         ! Variables allocation
         call allocate_all (stp_map, yr_map, deb_map, yr_deb_map, wat_bal1, wat_bal1_old, wat_bal2, wat_bal2_old, wat_bal_hour, meteo, wat, pheno, &
@@ -928,7 +930,7 @@ module cli_simulation_manager!
                             if(info_spat%domain%mat(i,j)/=info_spat%domain%header%nan)then!
                                 ! %RR%: add k_r
                                 ! water balance for the evaporative layer
-                                call water_balance_evap_lay(h_irr(i,j,info_spat%irr_meth_id%mat(i,j)) * &
+                                call water_balance_evap_lay(h_irr(i,j, info_spat%irr_meth_id%mat(i,j)) * &
                                     & pars%irr%met(info_spat%irr_meth_id%mat(i,j))%freq(hour)  &
                                     & * (1-pars%irr%met(info_spat%irr_meth_id%mat(i,j))%f_interception), &
                                     & wat_bal_hour%inten%h_soil1(i,j), wat_bal_hour%esten%h_inf(i,j), &
@@ -967,19 +969,19 @@ module cli_simulation_manager!
                     
                     ! TODO: %AB% move to subroutine
                     ! update the soil water content of the evaporative layer according to the rise from the transpirative layer
-                    ! where (wat_bal_hour%esten%h_rise > 0)
-                    !     wat_bal_hour%inten%h_soil1 = wat_bal_hour%inten%h_soil1 + wat_bal_hour%esten%h_rise
-                    !     wat_bal_hour%esten%h_pond = merge (wat_bal_hour%esten%h_pond + wat_bal_hour%inten%h_soil1 - wat%layer(1)%h_sat, &
-                    !         & wat_bal_hour%esten%h_pond, wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
-                    !     wat_bal_hour%inten%h_soil1 = merge (wat%layer(1)%h_sat, wat_bal_hour%inten%h_soil1, &
-                    !         & wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
-                    ! end where
+                    where (wat_bal_hour%esten%h_rise > 0)
+                        wat_bal_hour%inten%h_soil1 = wat_bal_hour%inten%h_soil1 + wat_bal_hour%esten%h_rise
+                        wat_bal_hour%esten%h_pond = merge (wat_bal_hour%esten%h_pond + (wat_bal_hour%inten%h_soil1 - wat%layer(1)%h_sat), &
+                            & wat_bal_hour%esten%h_pond, wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
+                        wat_bal_hour%inten%h_soil1 = merge (wat%layer(1)%h_sat, wat_bal_hour%inten%h_soil1, &
+                            & wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
+                    end where
 
-                    wat_bal_hour%inten%h_soil1 = wat_bal_hour%inten%h_soil1 + wat_bal_hour%esten%h_rise
-                    wat_bal_hour%esten%h_pond = merge (wat_bal_hour%inten%h_soil1 - wat%layer(1)%h_sat, &
-                             & 0.0D0, wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
-                    wat_bal_hour%inten%h_soil1 = merge (wat%layer(1)%h_sat, wat_bal_hour%inten%h_soil1, &
-                             & wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
+                    ! wat_bal_hour%inten%h_soil1 = wat_bal_hour%inten%h_soil1 + wat_bal_hour%esten%h_rise
+                    ! wat_bal_hour%esten%h_pond = merge (wat_bal_hour%inten%h_soil1 - wat%layer(1)%h_sat, &
+                    !          & 0.0D0, wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
+                    ! wat_bal_hour%inten%h_soil1 = merge (wat%layer(1)%h_sat, wat_bal_hour%inten%h_soil1, &
+                    !          & wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
 
                     ! update water balance variables
                     wat_bal1%h_soil = wat_bal_hour%inten%h_soil1!
@@ -1030,7 +1032,7 @@ module cli_simulation_manager!
                 end where!
 
                 ! update the ponding variable for each day
-                wat_bal1%h_runoff = max(wat_bal_hour%esten%h_pond-h_maxpond%mat,0.0D0)
+                wat_bal1%h_runoff = wat_bal1%h_runoff+ max(wat_bal_hour%esten%h_pond-h_maxpond%mat,0.0D0)
                 wat_bal1%h_pond = min(wat_bal_hour%esten%h_pond,h_maxpond%mat)
                 !wat_bal1%h_pond = wat_bal_hour%esten%h_pond
 

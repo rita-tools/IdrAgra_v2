@@ -382,5 +382,35 @@ module mod_utility!
         allocate(a(n_sep+1))
         read(str,*) a
     end function string_to_reals
+
+    pure recursive function replace_str(string,search,substitute) result(modifiedString)
+        ! https://stackoverflow.com/questions/58938347/how-do-i-replace-a-character-in-the-string-with-another-charater-in-fortran
+        implicit none
+        character(len=*), intent(in)  :: string, search, substitute
+        character(len=:), allocatable :: modifiedString
+        integer                       :: i, stringLen, searchLen
+        stringLen = len(string)
+        searchLen = len(search)
+        if (stringLen==0 .or. searchLen==0) then
+            modifiedString = ""
+            return
+        elseif (stringLen<searchLen) then
+            modifiedString = string
+            return
+        end if
+        i = 1
+        do
+            if (string(i:i+searchLen-1)==search) then
+                modifiedString = string(1:i-1) // substitute // replace_str(string(i+searchLen:stringLen),search,substitute)
+                exit
+            end if
+            if (i+searchLen>stringLen) then
+                modifiedString = string
+                exit
+            end if
+            i = i + 1
+            cycle
+        end do
+    end function replace_str
 !
 end module mod_utility!

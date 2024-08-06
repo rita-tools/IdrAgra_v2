@@ -1,0 +1,16 @@
+##### Main Cropcoef file #####
+
+# Part 1: Inputs
+
+WeathStatFilename	= weather_stations.dat	# name of file with information about weather stations
+MeteoDataFolder		= meteodata		# name of the folder with meteo data files
+CropInputsFolder	= landuses		# name of the folder with crop inputs files
+
+# Part 2: Outputs
+OutputFolder		= pheno	# name of the folder with output files
+
+# Part 3: Simulation Options
+CanopyResMod            = 1 # value of canopy resistance printed in output [0 = def value (70 s/m), 1 = calculated as function of CO2]
+
+# end of main cropcoef files
+

@@ -1,0 +1,7 @@
+# paddy soil parameters for rice
+ksat_II = 0.04
+N_II = 10.15
+tetaII_FC = 0.35
+tetaII_R = 0.08
+tetaII_SAT = 0.43
+tetaII_WP = 0.18

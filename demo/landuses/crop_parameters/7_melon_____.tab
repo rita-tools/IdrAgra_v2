@@ -1,0 +1,46 @@
+# melon
+SowingDate_min	= 128	# minimum sowing date (1-366)
+SowingDelay_max	= 14	# maximum number of days allowed for sowing after SowingDate_min
+HarvestDate_max	= 300	# maximum harvest date (1-366)
+HarvNum_max	= 1	# maximum number of harvest/cuts per the year
+CropsOverlap	= 7 	# minimum number of days between two subsequent crops in case of double cropping
+Tsowing		= 12.0 	# minimum sowing temperature [°C]
+Tdaybase	= 12.0     # minimum temperature for crop growth [°C]
+Tcutoff		= 30.0 	# maximum temperature for crop growth [°C]
+Vern		= 0 	# response to vernalization [1=Yes, 0=No]
+Tv_min		= 3.0 	# minimum temperature for optimal vernalization [°C]
+Tv_max		= 10.0 	# maximum temperature for optimal vernalization [°C]
+VFmin		= 0.0 	# vernalization factor at the beginning of the vernalization process [-]
+Vstart		= 10 	# number of days required for vernalization to start
+Vend		= 50 	# number of days required for vernalization to end
+Vslope		= 7.0 	# vernalization curve parameter
+ph_r		= 1 	# photoperiod impact [0=Day-neutral plants, 1=Long-day plants, 2=Short-day plants]
+daylength_if	= 8 	# day length threshold below (above) which no accumulation of physiological time occurs for long-day (short-day) crops
+daylength_ins	= 14 	#  day length threshold above (below) which maximum accumulation of physiological time occurs for long-day (short-day) crops
+WP              = 0.15  # biomass water productivity [t/ha] (C4 crops = 0.30 - 0.35, C3 crops = 0.15 - 0.20, some leguminous crops < 0.15 t/ha)
+fsink           = 0.4   # crop sink strength coefficient
+Tcrit_HS        = 35.0   # critical temperature threshold for heat stress [°C] 
+Tlim_HS         = 45.0    # limit temperature threshold for heat stress[°C] 
+HI              = 0.8  # harvest index
+kyT		= 1.05 	# water stress coefficient for the overall crop growth cycle 
+ky1		= 0.4 	# water stress coefficient for the ini stage 
+ky2		= 0.4 	# water stress coefficient for the dev stage 
+ky3		= 1.1 	# water stress coefficient for the mid stage
+ky4		= 0.4 	# water stress coefficient for the end stage
+pRAW		= 0.4 	# parameter to compute RAW
+aInterception	= 2.5 	# parameter to calculate interception
+cl_CN		= 2 	# CN class
+Irrigation	= 1     # irrigation (1 = Yes, 0 = No)
+
+# Add here extra option(s)
+
+
+# table of GDD [°C], Kcb [-], LAI [-], crop height [m], root depth [m]; missing values are entered as * 
+GDD	Kcb LAI	Hc	Sr
+0 0 0 0 0.0
+1 0.4 0.06 0.1 0.5
+120 0.4 0.1 0.1 0.5
+350 1.0 2.8 0.4 0.8
+850 1.0 3.2 0.4 0.8
+950 0.7 2.6 0.4 0.8
+endTable
