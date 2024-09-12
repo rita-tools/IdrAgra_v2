@@ -251,7 +251,7 @@ module mod_crop_soil_water
             n = 0 ! store the number of cycles inside the convergence loop
             
             do k=1, k_max
-                print*, 'k:',k
+                !print*, 'k:',k
                 call water_balance_evap_lay(h_net_irr/k_max, h_soil1, h_inf/k_max, h_eva_act_m, h_eva_pot_m, h_perc1_m, h_pond_i, h_pond, &
                     & h_transp_act_m, h_transp_pot_m, k_cb, p_day, h_et0/k_max, k_e, k_r,k_s_dry_m,k_s_sat_m, hks_m, kc_max, few, rf_e, & ! RR: add k_r
                     & h_rew, h_sat, h_fc, h_wp, h_r, k_sat/k_max , fatt_n, n_iter1, adj_perc_par, mmax)
@@ -359,7 +359,7 @@ module mod_crop_soil_water
 
             ! %CG% add control to limit percolation to the available saturation volume
             ! below the second layer (note that we use the same parameters set from layer 2)
-            h_perc2_max = (theta2_SAT-theta2_FC)*depth_under_rz*1000.0 ! maximum water storage between root zone and water table
+            h_perc2_max = ((h_sat-h_fc)/zr)*depth_under_rz ! maximum water storage between root zone and water table
             h_perc2 = min(h_perc2,h_perc2_max)
             
             ! water balance equation
@@ -407,7 +407,7 @@ module mod_crop_soil_water
                 h_transp_pot = h_transp_pot + h_transp_pot_m
                 h_perc2 = h_perc2 + h_perc2_m
                 h_rise = h_rise + h_rise_m
-                print*,'k:',k,'h_rise:',h_rise
+                !print*,'k:',k,'h_rise:',h_rise
                 hks = hks_m ! consistent with those externally calculated
                 n = max(n_iter2,n)
             end do
