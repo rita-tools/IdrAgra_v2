@@ -321,7 +321,7 @@ module mod_crop_soil_water
         integer, parameter::nmax=20!
         integer, parameter::kmax = 2
         real(dp),parameter::converg=0.0001!
-        real(dp)::h_soil0,h_soil_old,h_soil_mean,h_soil_new,h_delta!
+        real(dp)::h_soil0,h_soil_old,h_soil_mean,h_soil_new,h_delta,h_perc2_max
         integer::n, m, k!
         real(dp)::h_caprise_m, h_transp_act_m, h_transp_pot_m,k_s_dry_m,k_s_sat_m, hks_m, h_perc2_m, h_rise_m
         !
@@ -356,6 +356,11 @@ module mod_crop_soil_water
             else
                 h_perc2 = percolation(adj_perc_par,h_soil_mean,h_r,h_sat, k_sat, fatt_n)
             end if
+
+            ! %CG% add control to limit percolation to the available saturation volume
+            ! below the second layer (note that we use the same parameters set from layer 2)
+            h_perc2_max = (theta2_SAT-theta2_FC)*depth_under_rz*1000.0 ! maximum water storage between root zone and water table
+            h_perc2 = min(h_perc2,h_perc2_max)
             
             ! water balance equation
             h_soil_new = h_soil0 + h_perc1 - h_transp_act - h_perc2 + h_caprise
