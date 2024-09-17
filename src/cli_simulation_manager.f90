@@ -151,11 +151,10 @@ module cli_simulation_manager!
         real(dp):: value
         !CHARACTER(LEN=20)::fc_name
         TYPE(grid_r)::pheno_grd 
-        TYPE(grid_r)::h_maxpond ! a grid object that store the maximum ponding depth TODO: set as spatial map
         
         pheno_grd = info_spat%domain
         
-        ! spread irrigation start and end days
+        ! init irrigation time limits
         info_spat%irr_starts = info_spat%domain
         info_spat%irr_ends = info_spat%domain
         
@@ -168,7 +167,15 @@ module cli_simulation_manager!
             info_spat%irr_ends%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_ends)
             h_maxpond%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_maxpond)
         end if
+
         
+        ! spread irrigation variables
+        if (pars%sim%mode>0) then
+            info_spat%irr_ends%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_ends)
+            info_spat%irr_starts%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_starts)
+            info_spat%h_maxpond%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_maxpond)
+        end if
+
         ! Variables allocation
         call allocate_all (stp_map, yr_map, deb_map, yr_deb_map, wat_bal1, wat_bal1_old, wat_bal2, wat_bal2_old, wat_bal_hour, meteo, wat, pheno, &
             & info_spat%domain%header%imax,info_spat%domain%header%jmax, info_spat%domain%mat, debug)
@@ -603,7 +610,7 @@ module cli_simulation_manager!
 
                 print*,'Simulation day', achar(9), trim(adjustl(s_doy)), achar(9), 'year', achar(9), trim(adjustl(s_year))
 
-               
+              
                 ! Updating daily data matrix for water table depth
                 if(pars%sim%f_cap_rise .eqv. .true.)then!
                     upfilename = trim(pars%sim%input_path)//trim(pars%sim%wat_table_fn)//"_"//trim(adjustl(s_year))//"_"&
@@ -999,7 +1006,8 @@ module cli_simulation_manager!
                     wat_bal2%h_caprise = wat_bal2%h_caprise + wat_bal_hour%esten%h_caprise!
                     wat_bal2%h_rise = wat_bal2%h_rise + wat_bal_hour%esten%h_rise!
                     wat_bal_hour%inten%h_pond0 = wat_bal_hour%esten%h_pond
-                    
+                  
+
                     ! update the number of iterations
                     iter1 = merge(iter1,wat_bal_hour%n_iter1,iter1>wat_bal_hour%n_iter1)
                     iter2 = merge(iter2,wat_bal_hour%n_iter2,iter2>wat_bal_hour%n_iter2)
@@ -1032,8 +1040,8 @@ module cli_simulation_manager!
                 end where!
 
                 ! update the ponding variable for each day
-                wat_bal1%h_runoff = wat_bal1%h_runoff+ max(wat_bal_hour%esten%h_pond-h_maxpond%mat,0.0D0)
-                wat_bal1%h_pond = min(wat_bal_hour%esten%h_pond,h_maxpond%mat)
+                wat_bal1%h_runoff = wat_bal1%h_runoff+ max(wat_bal_hour%esten%h_pond-info_spat%h_maxpond%mat,0.0D0)
+                wat_bal1%h_pond = min(wat_bal_hour%esten%h_pond,info_spat%h_maxpond%mat)
                 !wat_bal1%h_pond = wat_bal_hour%esten%h_pond
 
                 ! Calculate the crop production
