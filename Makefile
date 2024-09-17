@@ -4,8 +4,8 @@ CURRENTDATE := $(shell date --iso=seconds)
 
 # Windows OS variables & settings
 DEL = rm
-EXE = .exe
-WIN = 1
+EXE = .out
+WIN = 0
 
 # Compiler settings
 # -cpp: activates compiler pre processing
@@ -83,7 +83,7 @@ all:
 cleanall:
 	$(DEL) $(wildcard ./$(OBJDIR)/*.mod)
 	$(DEL) $(wildcard ./$(OBJDIR)/*.o)
-	$(DEL) $(wildcard ./$(RELDIR)/*.exe)
+	$(DEL) $(wildcard ./$(RELDIR)/*.out)
 
 .PHONY: cleanmain
 cleanmain:

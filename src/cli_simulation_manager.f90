@@ -159,8 +159,15 @@ module cli_simulation_manager!
         info_spat%irr_ends = info_spat%domain
         
         ! init maximum pond
-        info_spat%h_maxpond=info_spat%cell_area
-        info_spat%h_maxpond%mat = 10000.0D0
+        h_maxpond=info_spat%cell_area
+        h_maxpond%mat = 10000.0D0
+        
+        if (pars%sim%mode>0) then
+            info_spat%irr_starts%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_starts)
+            info_spat%irr_ends%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_ends)
+            h_maxpond%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_maxpond)
+        end if
+
         
         ! spread irrigation variables
         if (pars%sim%mode>0) then
@@ -603,8 +610,7 @@ module cli_simulation_manager!
 
                 print*,'Simulation day', achar(9), trim(adjustl(s_doy)), achar(9), 'year', achar(9), trim(adjustl(s_year))
 
-                
-               
+              
                 ! Updating daily data matrix for water table depth
                 if(pars%sim%f_cap_rise .eqv. .true.)then!
                     upfilename = trim(pars%sim%input_path)//trim(pars%sim%wat_table_fn)//"_"//trim(adjustl(s_year))//"_"&
@@ -1000,8 +1006,8 @@ module cli_simulation_manager!
                     wat_bal2%h_caprise = wat_bal2%h_caprise + wat_bal_hour%esten%h_caprise!
                     wat_bal2%h_rise = wat_bal2%h_rise + wat_bal_hour%esten%h_rise!
                     wat_bal_hour%inten%h_pond0 = wat_bal_hour%esten%h_pond
-                    
-                    
+                  
+
                     ! update the number of iterations
                     iter1 = merge(iter1,wat_bal_hour%n_iter1,iter1>wat_bal_hour%n_iter1)
                     iter2 = merge(iter2,wat_bal_hour%n_iter2,iter2>wat_bal_hour%n_iter2)
