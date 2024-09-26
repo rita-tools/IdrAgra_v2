@@ -16,12 +16,13 @@ CC = gfortran
 CPP = gfortran -cpp
 # -g for gdb, -O0 zero optimization or -Og
 ### for debug ###
-GFFLAGS = -cpp -DGIT_VERSION=\"$(COMMIT)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -g -Wall  -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all -ffpe-trap=zero,overflow,underflow -finit-real=nan -c
+#GFFLAGS = -cpp -DGIT_VERSION=\"$(COMMIT)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -g -Wall  -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all -ffpe-trap=zero,overflow,underflow -finit-real=nan -c 
+# nnnooo  GFFLAGS = -cpp -DGIT_VERSION=\"$(COMMIT)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -g -Wall  -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all -ffpe-trap=denorm -funsafe-math-optimizations -finit-real=nan -c 
 #GFFLAGS = -g -O0 -Wall -Wextra -Wshadow -pedantic -static -c
 #GFFLAGS =  -cpp -DMY_VERSION=\"$(COMMIT)\" -g -Wall -c
 ### for release ###
 # -ffree-line-length-512 manage long commands in the code
-#GFFLAGS = -cpp -DGIT_VERSION=\"$(COMMIT)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -ffast-math  -O3 -ffree-line-length-512 -c
+GFFLAGS = -cpp -DGIT_VERSION=\"$(COMMIT)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -ffast-math  -O3 -ffree-line-length-0 -c
 LDFLAGS = 
 
 APPNAME = idragra

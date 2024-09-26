@@ -9,14 +9,14 @@
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/release/idragra.exe",
+            "program": "${workspaceFolder}/release/idragra.exe",//"${workspaceFolder}/release/idragra.out",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/demo/",
+            "cwd": "C:\\enricodata\\progetto_MidasPo\\idragra\\midaspo_idragra_v0_SIM_small_ws\\",//"${workspaceFolder}/demo/",//"D:\\midaspo_idragra_v0_SIM\\"
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
-            "miDebuggerPath": "C:\\msys64\\mingw64\\bin\\gdb.exe",
+            "miDebuggerPath": "C:\\msys64\\mingw64\\bin\\gdb.exe",//"gdb",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
