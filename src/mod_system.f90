@@ -9,6 +9,7 @@ module mod_system
     ! default is unix
     character(len = 10), private :: mkdir_cmd = 'mkdir'
     character :: delimiter = '/'
+#endif
     
     contains
 
