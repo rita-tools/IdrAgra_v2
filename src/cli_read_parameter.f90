@@ -6,6 +6,7 @@ module cli_read_parameter!
     use cli_watsources
     use mod_TDx_index
     use mod_system
+    use mod_utility
 
     use cli_save_outputs
     implicit none!
@@ -140,6 +141,10 @@ module cli_read_parameter!
                     select case (label)
                         case ('outputpath')
                             read(buffer, *, iostat=ios) xml%sim%path
+                            xml%sim%path = replace_str( string = xml%sim%path &
+                                                , search = "\\" &
+                                                , substitute = delimiter &
+                                                )
                             inquire(file=trim(xml%sim%path), exist=dir_exists)   ! dir_exists will be TRUE if the directory exists
                             if (dir_exists .eqv. .true.) then
                                 print *,'The directory ', trim(xml%sim%path), ' already exists and will be updated'
@@ -153,20 +158,40 @@ module cli_read_parameter!
                             end if
                         case ('inputpath') ! path to spazialized input files !
                             read(buffer, *, iostat=ios) xml%sim%input_path
+                            xml%sim%input_path = replace_str( string = xml%sim%input_path &
+                                                , search = "\\" &
+                                                , substitute = delimiter &
+                                                )
                         case ('meteopath') ! path to meteo files !
                             read(buffer, *, iostat=ios) xml%sim%meteo_path
+                            xml%sim%meteo_path = replace_str( string = xml%sim%meteo_path &
+                                                , search = "\\" &
+                                                , substitute = delimiter &
+                                                )
                         case ('meteofilename') ! name of the file with the list of weather station !
                             read(buffer, *, iostat=ios) xml%sim%ws_list_fn
                         case ('phenopath') ! path to the phenophase files !
                             read(buffer, *, iostat=ios) xml%sim%pheno_path
+                            xml%sim%pheno_path = replace_str( string = xml%sim%pheno_path &
+                                                , search = "\\" &
+                                                , substitute = delimiter &
+                                                )
                         case ('phenofileroot') ! the sub string to use as root of phenophase subfolder !
                             read(buffer, *, iostat=ios) xml%sim%pheno_root
                         case ('irrmethpath') ! path to meteo files !
                             read(buffer, *, iostat=ios) xml%sim%irr_met_path
+                            xml%sim%irr_met_path = replace_str( string = xml%sim%irr_met_path &
+                                                , search = "\\" &
+                                                , substitute = delimiter &
+                                                )
                         case ('irrmethfilename') ! name of the file with the list of weather station !
                             read(buffer, *, iostat=ios) xml%sim%irr_met_list_fn
                         case ('watsourpath') ! path to water sources subfolder
                             read(buffer, *, iostat=ios) xml%sim%watsour_path
+                            xml%sim%watsour_path = replace_str( string = xml%sim%watsour_path &
+                                                , search = "\\" &
+                                                , substitute = delimiter &
+                                                )
                         case ('mode') ! running mode: 0 - no irrigation; 1 - consumption; 2 - water needs to field capacity; 3 - water needs with fixed volume
                             read(buffer, *, iostat=ios) xml%sim%mode
                             ! if no irrigation set startIrrSeason and endIrrSeason to -1
@@ -190,6 +215,10 @@ module cli_read_parameter!
                                 & xml%sim%end_simulation%year)
                         case ('initialconditionpath') ! path to initial condition input files !
                             read(buffer, *, iostat=ios) xml%sim%initial_condition
+                            xml%sim%initial_condition = replace_str( string = xml%sim%initial_condition &
+                                                , search = "\\" &
+                                                , substitute = delimiter &
+                                                )
                             inquire(FILE=trim(xml%sim%initial_condition), EXIST=dir_exists)   ! dir_exists will be TRUE if the directory exists
                             if (dir_exists .eqv. .false.) then
                                 print *,'The directory ', trim(xml%sim%initial_condition),&
@@ -204,6 +233,10 @@ module cli_read_parameter!
                             xml%sim%thetaII_0_fn = trim(xml%sim%thetaII_0_fn)//'II'
                         case ('finalconditionpath') ! path to final condition input files !
                             read(buffer, *, iostat=ios) xml%sim%final_condition
+                            xml%sim%final_condition = replace_str( string = xml%sim%final_condition &
+                                                , search = "\\" &
+                                                , substitute = delimiter &
+                                                )
                             inquire(FILE=trim(xml%sim%final_condition), EXIST=dir_exists)   ! dir_exists will be TRUE if the directory exists
                             if (dir_exists .eqv. .true.) then
                                 print *,'The directory ', trim(xml%sim%final_condition), ' already exists and will be updated'

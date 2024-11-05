@@ -4,6 +4,7 @@ module cli_crop_parameters!
     use mod_parameters, only: simulation
     use mod_meteo, only: meteo_info
     use mod_crop_phenology
+    use mod_system
     
     implicit none!
 
@@ -328,21 +329,21 @@ module cli_crop_parameters!
         sim%res_canopy=0!
         ! init from crop parameters file (actually produced by cropcoeff)
         dir_name = info_meteo(1)%filename(1:(index(trim(info_meteo(1)%filename),"."))-1)  ! directory has the same name as the weather station dataset
-        call init_crop_par_from_file(trim(dir)//trim(froot)//trim(dir_name)//"\cropparam.dat", &
+        call init_crop_par_from_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropParam.dat", &
             & sim%n_lus, sim%n_crops, string_elements, n_crops_by_year, ErrorFlag)
             
-        call read_canopy_resistance_file(trim(dir)//'\CanopyRes.dat', sim%res_canopy, string_elements, ErrorFlag)
+        call read_canopy_resistance_file(trim(dir)//delimiter//'CanopyRes.dat', sim%res_canopy, string_elements, ErrorFlag)
         
         do i=1,size(info_pheno)!
             dir_name = info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)
-            call open_daily_crop_par_file(info_pheno(i)%k_cb%unit,trim(dir)//trim(froot)//trim(dir_name)//"\kcb.dat",errorflag)!
-            call open_daily_crop_par_file(info_pheno(i)%h%unit,trim(dir)//trim(froot)//trim(dir_name)//"\h.dat",errorflag)!         
-            call open_daily_crop_par_file(info_pheno(i)%d_r%unit,trim(dir)//trim(froot)//trim(dir_name)//"\sr.dat",errorflag)!
-            call open_daily_crop_par_file(info_pheno(i)%lai%unit,trim(dir)//trim(froot)//trim(dir_name)//"\lai.dat",errorflag)!
-            call open_daily_crop_par_file(info_pheno(i)%cn_day%unit,trim(dir)//trim(froot)//trim(dir_name)//"\cnvalue.dat",errorflag)!
-            call open_daily_crop_par_file(info_pheno(i)%f_c%unit,trim(dir)//trim(froot)//trim(dir_name)//"\fc.dat",errorflag)
+            call open_daily_crop_par_file(info_pheno(i)%k_cb%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"Kcb.dat",errorflag)!
+            call open_daily_crop_par_file(info_pheno(i)%h%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"H.dat",errorflag)!         
+            call open_daily_crop_par_file(info_pheno(i)%d_r%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"Sr.dat",errorflag)!
+            call open_daily_crop_par_file(info_pheno(i)%lai%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"LAI.dat",errorflag)!
+            call open_daily_crop_par_file(info_pheno(i)%cn_day%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CNvalue.dat",errorflag)!
+            call open_daily_crop_par_file(info_pheno(i)%f_c%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"fc.dat",errorflag)
             ! EDIT: add support for seasonal p_raw
-            call open_daily_crop_par_file(info_pheno(i)%r_stress%unit,trim(dir)//trim(froot)//trim(dir_name)//"\r_stress.dat",errorflag)
+            call open_daily_crop_par_file(info_pheno(i)%r_stress%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"r_stress.dat",errorflag)
             !
             ! TODO - add tabulated ky
             
@@ -366,7 +367,7 @@ module cli_crop_parameters!
             allocate(info_pheno(i)%ii0            (sim%n_lus, sim%n_crops))
             allocate(info_pheno(i)%iie            (sim%n_lus, sim%n_crops))
             allocate(info_pheno(i)%iid            (sim%n_lus, sim%n_crops))
-            info_pheno(i)%n_crops_by_year     = n_crops_by_year ! cult_switch � calcolato una volta sola
+            info_pheno(i)%n_crops_by_year     = n_crops_by_year
             info_pheno(i)%irrigation_class  = int(nan)
             info_pheno(i)%cn_class              = int(nan)
             info_pheno(i)%p_raw_const               = nan
@@ -385,9 +386,9 @@ module cli_crop_parameters!
             info_pheno(i)%ii0             = 0!
             info_pheno(i)%iie             = 0!
             info_pheno(i)%iid             = 0!
-            call read_water_prod_file(trim(dir)//trim(froot)//trim(dir_name)//"\WPadj.dat", &
+            call read_water_prod_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"WPadj.dat", &
                 & string_elements, n_crops_by_year, info_pheno(i)%wp_adj, ErrorFlag)
-            call read_crop_par_file(trim(dir)//trim(froot)//trim(dir_name)//"\cropparam.dat", &
+            call read_crop_par_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropParam.dat", &
                 & string_elements, info_pheno(i), ErrorFlag)
             
             ! TODO
@@ -605,6 +606,8 @@ module cli_crop_parameters!
             if(associated(info_pheno(i)%d_r%tab)) deallocate(info_pheno(i)%d_r%tab)!
             if(associated(info_pheno(i)%lai%tab)) deallocate(info_pheno(i)%lai%tab)!
             if(associated(info_pheno(i)%cn_day%tab)) deallocate(info_pheno(i)%cn_day%tab)!
+            if(associated(info_pheno(i)%f_c%tab)) deallocate(info_pheno(i)%f_c%tab)!
+            if(associated(info_pheno(i)%r_stress%tab)) deallocate(info_pheno(i)%r_stress%tab)!
         end do!
         
     end subroutine destroy_infofeno_tab!
@@ -621,6 +624,7 @@ module cli_crop_parameters!
             close(info_pheno(i)%lai%unit)!
             close(info_pheno(i)%cn_day%unit)!
             close(info_pheno(i)%f_c%unit)!
+            close(info_pheno(i)%r_stress%unit)!
         end do!
         deallocate(info_pheno)!
     end subroutine close_pheno_file!
