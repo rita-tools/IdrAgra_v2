@@ -159,7 +159,7 @@ module cli_simulation_manager!
         info_spat%irr_ends = info_spat%domain
         
         ! init maximum pond
-        info_spat%h_maxpond=info_spat%cell_area
+        info_spat%h_maxpond=info_spat%slope
         info_spat%h_maxpond%mat = 10000.0D0
                 
         ! spread irrigation variables
@@ -517,7 +517,7 @@ module cli_simulation_manager!
             
             ! Inizialization of kcb_low, cult_switch and phase_switch
             pheno%k_cb_low = info_spat%domain%header%nan
-            pheno%n_crops_by_year = 1
+            pheno%n_crop_in_year = 1
             pheno%pheno_idx = 1
 
             ! Allocation of yield variables
@@ -1046,14 +1046,14 @@ module cli_simulation_manager!
                     do j=1,size(info_spat%domain%mat,2)
                         do i=1,size(info_spat%domain%mat,1)
                             if(info_spat%domain%mat(i,j) /= info_spat%domain%header%nan) then
-                                if (doy >= crop_map%TSP_low(i,j,pheno%n_crops_by_year(i,j)) .and. &
-                                    & doy < crop_map%TSP_high(i,j,pheno%n_crops_by_year(i,j))) then
+                                if (doy >= crop_map%TSP_low(i,j,pheno%n_crop_in_year(i,j)) .and. &
+                                    & doy < crop_map%TSP_high(i,j,pheno%n_crop_in_year(i,j))) then
                                     if (meteo%T_ave(i,j) < pheno%T_crit(i,j)) then
-                                        yield%f_HS_sum%mat(i,j,pheno%n_crops_by_year(i,j)) = &
-                                            & yield%f_HS_sum%mat(i,j,pheno%n_crops_by_year(i,j)) + 1
+                                        yield%f_HS_sum%mat(i,j,pheno%n_crop_in_year(i,j)) = &
+                                            & yield%f_HS_sum%mat(i,j,pheno%n_crop_in_year(i,j)) + 1
                                     else if (meteo%T_ave(i,j) >= pheno%T_crit(i,j) .and. meteo%T_ave(i,j) < pheno%T_lim(i,j)) then
-                                        yield%f_HS_sum%mat(i,j,pheno%n_crops_by_year(i,j)) = &
-                                            & yield%f_HS_sum%mat (i,j,pheno%n_crops_by_year(i,j)) + 1 - &
+                                        yield%f_HS_sum%mat(i,j,pheno%n_crop_in_year(i,j)) = &
+                                            & yield%f_HS_sum%mat (i,j,pheno%n_crop_in_year(i,j)) + 1 - &
                                             & (meteo%T_ave(i,j) - pheno%T_crit(i,j))/ (pheno%T_lim(i,j) - pheno%T_crit(i,j))
                                     end if
                                 end if
@@ -1096,20 +1096,20 @@ module cli_simulation_manager!
                                 
                                 ! update the parameters for the calculation of the water stress
                                 if (pheno%pheno_idx(i,j) > 0) then
-                                    yield%T_act_sum%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crops_by_year(i,j)) = &
-                                        & yield%T_act_sum%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crops_by_year(i,j)) + &
+                                    yield%T_act_sum%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) = &
+                                        & yield%T_act_sum%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) + &
                                         & wat_bal1%h_transp_act(i,j) + wat_bal2%h_transp_act(i,j)
-                                    yield%T_pot_sum%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crops_by_year(i,j)) = &
-                                        & yield%T_pot_sum%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crops_by_year(i,j)) + &
+                                    yield%T_pot_sum%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) = &
+                                        & yield%T_pot_sum%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) + &
                                         & wat_bal1%h_transp_pot(i,j) + wat_bal2%h_transp_pot(i,j)
-                                    yield%dev_stage%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crops_by_year(i,j)) = &
-                                        & yield%dev_stage%mat(i,j,pheno%pheno_idx(i,j), pheno%n_crops_by_year(i,j)) + 1
+                                    yield%dev_stage%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) = &
+                                        & yield%dev_stage%mat(i,j,pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) + 1
                                 end if
                                 
                                 ! Update transpiration ratio
                                 if ( meteo%et0(i,j)>0) then
-                                    yield%transp_ratio_sum%mat(i,j,pheno%n_crops_by_year(i,j)) = &
-                                        &  yield%transp_ratio_sum%mat(i,j,pheno%n_crops_by_year(i,j)) + &
+                                    yield%transp_ratio_sum%mat(i,j,pheno%n_crop_in_year(i,j)) = &
+                                        &  yield%transp_ratio_sum%mat(i,j,pheno%n_crop_in_year(i,j)) + &
                                         & (wat_bal1%h_transp_pot(i,j) + wat_bal2%h_transp_pot(i,j)) / meteo%et0(i,j)
                                 end if    
                             end if
@@ -1812,7 +1812,7 @@ module cli_simulation_manager!
                                        meteo%lat, meteo%alt, res_canopy, doy, domain%header%imax, domain%header%jmax)!
     end subroutine create_meteo_matrices!
     
-        function calc_interception(p,pheno)!
+    function calc_interception(p,pheno)!
         ! Calculate the interception according to Von Hoyningen-Hune (1983) and Braden (1985)
         implicit none!
         real(dp),dimension(:,:),intent(in)::p       ! precipitation and any other above canopy irrigation [mm]
@@ -2260,7 +2260,7 @@ module cli_simulation_manager!
             allocate(pheno%k_cb_high       (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%wp_adj          (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%p_day           (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
-            allocate(pheno%n_crops_by_year    (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
+            allocate(pheno%n_crop_in_year    (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%pheno_idx   (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%Ky_pheno            (imax,jmax,phases),stat=checkstat) ; if(checkstat/=0) print*,errormessage! 3d matrix
             allocate(pheno%r_stress           (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
@@ -2291,7 +2291,7 @@ module cli_simulation_manager!
             deallocate(pheno%k_cb_high       )!
             deallocate(pheno%wp_adj          )!
             deallocate(pheno%p_day           )!
-            deallocate(pheno%n_crops_by_year    )!
+            deallocate(pheno%n_crop_in_year    )!
             deallocate(pheno%pheno_idx   )!
             deallocate(pheno%r_stress   )!
         end if!
