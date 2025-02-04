@@ -412,5 +412,12 @@ module mod_utility!
             cycle
         end do
     end function replace_str
+
+    function round(val, n)
+        implicit none
+        real(dp) :: val, round
+        integer :: n
+        round = anint(val*10.0**n)/10.0**n
+    end function round
 !
 end module mod_utility!
