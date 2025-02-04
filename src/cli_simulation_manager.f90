@@ -751,17 +751,32 @@ module cli_simulation_manager!
 !~                     bil2%RAW =      wat%layer(2)%fc - (wat%layer(2)%fc-wat%layer(2)%wp)*pheno%pday
 !~                     bil2%RAWinf =   wat%layer(2)%fc - (wat%layer(2)%fc-wat%layer(2)%wp)*((pheno%pday+1)/2)
 !~                     bil2%RAWaz =    wat%layer(2)%fc - (wat%layer(2)%fc-wat%layer(2)%wp)*pheno%pday*mkpraw
-                    wat_bal2%h_raw_sup =   wat%layer(1)%h_fc + wat%layer(2)%h_fc - &
-                        & (wat%layer(1)%h_fc - wat%layer(1)%h_wp + wat%layer(2)%h_fc - wat%layer(2)%h_wp)*pheno%p_day*(alpha_ms_map+pheno%r_stress)
+                    ! wat_bal2%h_raw_sup =   wat%layer(1)%h_fc + wat%layer(2)%h_fc - &
+                    !     & (wat%layer(1)%h_fc - wat%layer(1)%h_wp + wat%layer(2)%h_fc - wat%layer(2)%h_wp)*pheno%p_day*(alpha_ms_map+pheno%r_stress)
 
-                    wat_bal2%h_raw    =   wat%layer(1)%h_fc + wat%layer(2)%h_fc - &
-                        & (wat%layer(1)%h_fc - wat%layer(1)%h_wp + wat%layer(2)%h_fc - wat%layer(2)%h_wp)*pheno%p_day
+                    ! wat_bal2%h_raw    =   wat%layer(1)%h_fc + wat%layer(2)%h_fc - &
+                    !     & (wat%layer(1)%h_fc - wat%layer(1)%h_wp + wat%layer(2)%h_fc - wat%layer(2)%h_wp)*pheno%p_day
 
-                    wat_bal2%h_raw_inf    =   wat%layer(1)%h_fc + wat%layer(2)%h_fc - &
-                        & (wat%layer(1)%h_fc - wat%layer(1)%h_wp + wat%layer(2)%h_fc - wat%layer(2)%h_wp)*((pheno%p_day+1)/2)
+                    ! wat_bal2%h_raw_inf    =   wat%layer(1)%h_fc + wat%layer(2)%h_fc - &
+                    !     & (wat%layer(1)%h_fc - wat%layer(1)%h_wp + wat%layer(2)%h_fc - wat%layer(2)%h_wp)*((pheno%p_day+1)/2)
                         
-                    wat_bal2%h_raw_priv    =   wat%layer(1)%h_fc + wat%layer(2)%h_fc - &
-                        & (wat%layer(1)%h_fc - wat%layer(1)%h_wp + wat%layer(2)%h_fc - wat%layer(2)%h_wp)*pheno%p_day*(alpha_unm_map+pheno%r_stress)
+                    ! wat_bal2%h_raw_priv    =   wat%layer(1)%h_fc + wat%layer(2)%h_fc - &
+                    !     & (wat%layer(1)%h_fc - wat%layer(1)%h_wp + wat%layer(2)%h_fc - wat%layer(2)%h_wp)*pheno%p_day*(alpha_unm_map+pheno%r_stress)
+                
+                
+                    wat_bal2%h_raw_sup =  (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*pheno%p_day*(alpha_ms_map+pheno%r_stress))*pheno%RF_e + &
+                                          (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*pheno%p_day*(alpha_ms_map+pheno%r_stress))*pheno%RF_t 
+                    
+                    wat_bal2%h_raw     =  (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*pheno%p_day)*pheno%RF_e + &
+                                          (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*pheno%p_day)*pheno%RF_t 
+
+                    wat_bal2%h_raw_inf =  (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*((pheno%p_day+1)/2))*pheno%RF_e + &
+                                          (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*((pheno%p_day+1)/2))*pheno%RF_t 
+                        
+                    wat_bal2%h_raw_priv    =   (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*pheno%p_day*(alpha_unm_map+pheno%r_stress))*pheno%RF_e + &
+                                               (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*pheno%p_day*(alpha_unm_map+pheno%r_stress))*pheno%RF_t 
+
+                
                 end where
                 !!
                 ! read weather daily data and calculate ET0 for each weather stations 
