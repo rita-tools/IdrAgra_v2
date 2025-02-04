@@ -884,7 +884,7 @@ module cli_read_parameter!
             ! TODO: check what happen if the depth is not set
             ! TODO: check the minimum value of water table
             ! TODO: check when root goes into water table or cut roots!
-            ! %EAC%: moved in the watre balance module
+            ! %EAC%: moved in the water balance module
             !where(info_spat%wattab%mat<1.d0 .and. info_spat%wattab%mat/=info_spat%wattab%intest%nan)info_spat%wattab%mat=1.d0!
         end if!
         !
