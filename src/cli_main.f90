@@ -20,7 +20,7 @@ program main!
     type(bound)::boundaries                                     ! stores domain extension (rectangle)
     type(spatial_info)::info_spat                               ! stores spatial inputs
     type(water_sources_table),dimension(:),allocatable::watsour ! stores parameters of "<watsources>.txt" file
-    real(dp), dimension(9,3,4):: tab_CN2, tab_CN3               ! CN implementation
+    real(dp), dimension(10,3,4):: tab_CN2, tab_CN3               ! CN implementation
     type(source_info)::info_sources                             ! stores water sources series
     type(meteo_info),dimension(:),allocatable::info_meteo       ! stores meteorological series data
     type(crop_pheno_info),dimension(:),allocatable::info_pheno  ! stores phenological parameters series
