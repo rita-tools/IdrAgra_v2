@@ -360,6 +360,21 @@ module cli_read_parameter!
                             read(buffer, *, iostat=ios)xml_dtx%temp%delay
                         case ('dtxmincard') ! Number of values to obtain meaningfull statistics
                             read(buffer, *, iostat=ios)xml_dtx%n
+                        
+                            ! add new case to edit input files for irrigation
+                        case ('mon_sources_i_div_fn') ! dicharges series from superficial diversion
+                            read(buffer, *, iostat=ios) xml%sim%mon_sources_i_div_fn
+                        case ('mon_sources_ii_div_fn') ! dicharges series from superficial sources
+                            read(buffer, *, iostat=ios) xml%sim%mon_sources_ii_div_fn
+                        case ('int_reuse_div_fn') ! dicharges series from internal reuse
+                            read(buffer, *, iostat=ios) xml%sim%int_reuse_div_fn
+                        case ('cr_sources_list_fn') ! dicharges series from collective runtime sources
+                            read(buffer, *, iostat=ios) xml%sim%cr_sources_list_fn
+                        case ('irrdistr_list_fn') ! discharges distribution in irrigation units
+                            read(buffer, *, iostat=ios) xml%sim%irrdistr_list_fn
+                        case ('sched_irr_fn') ! distribution rules for scheduled irrigation
+                            read(buffer, *, iostat=ios) xml%sim%sched_irr_fn
+
                         case default ! all other cases ... !
                             print *, 'Skipping invalid or obsolete label <',trim(label),'> at line', line, &
                                 & ' of file: ', trim(file_xml)
