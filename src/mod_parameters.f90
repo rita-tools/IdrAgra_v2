@@ -57,6 +57,7 @@ module mod_parameters!
         character(len=255) :: soiluse_fn
         character(len=255) :: meteoweight_fn
         character(len=255) :: shapearea_fn
+        
 
         integer :: step_out                         ! monthly output = 0, weekly output = 1, user defined = 2
         integer :: mode                             ! type of simulation:

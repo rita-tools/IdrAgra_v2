@@ -362,7 +362,7 @@ module cli_read_parameter!
                             read(buffer, *, iostat=ios)xml_dtx%n
                         
                         ! add new case to edit input files for irrigation
-                        case ('watsources_fn') ! dicharges series from superficial diversion
+                        case ('watsources_fn') ! list of water sources for each irrigation units
                             read(buffer, *, iostat=ios) xml%sim%watsources_fn
                         case ('mon_sources_i_div_fn') ! dicharges series from superficial diversion
                             read(buffer, *, iostat=ios) xml%sim%mon_sources_i_div_fn

@@ -378,7 +378,7 @@ module cli_watsources
             call lower_case(wat_sour_tbl(i)%id_wat_src)
         end do!
         close(free_unit)!
-
+        
     end subroutine read_water_sources_table!
 
     subroutine init_water_sources_duty(pars,wat_src_tbl,src_info,weather_info)!
@@ -457,6 +457,7 @@ module cli_watsources
         
         ! Assign column index to each water sources
         do i=1,size(wat_src_tbl)!
+            !print*,i,wat_src_tbl(i)%id_irr_unit,wat_src_tbl(i)%id_wat_src,wat_src_tbl(i)%type_id
             select case(wat_src_tbl(i)%type_id)!
                 case(1)
                     wat_src_tbl(i)%wat_src_idx = get_value_index(src_info%mn_src_tbl1%wat_src_id,wat_src_tbl(i)%id_wat_src)!
