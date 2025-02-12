@@ -95,9 +95,17 @@ module mod_irrigation
         end where
 
         ! espeperc --> H_(x,irr)=(1+a_x e^(-t⋅b_x ))H_x
-        adj_perc_par(:,:,1)=merge(1.0D0,1+info_spat%a_perc(1)%mat*exp(-1.0*day_from_irr*info_spat%b_perc(1)%mat),day_from_irr==-9999)!
-        adj_perc_par(:,:,2)=merge(1.0D0,1+info_spat%a_perc(2)%mat*exp(-1.0*day_from_irr*info_spat%b_perc(2)%mat),day_from_irr==-9999)!
-    
+        ! the following causes exception
+        ! adj_perc_par(:,:,1)=merge(1.0D0,1+info_spat%a_perc(1)%mat*exp(-1.0*day_from_irr*info_spat%b_perc(1)%mat),day_from_irr==-9999)!
+        ! adj_perc_par(:,:,2)=merge(1.0D0,1+info_spat%a_perc(2)%mat*exp(-1.0*day_from_irr*info_spat%b_perc(2)%mat),day_from_irr==-9999)!
+        where(day_from_irr==-9999)
+            adj_perc_par(:,:,1)=1.0D0
+            adj_perc_par(:,:,2)=1.0D0
+        else where
+            adj_perc_par(:,:,1)=1+info_spat%a_perc(1)%mat*exp(-1.0*day_from_irr*info_spat%b_perc(1)%mat)
+            adj_perc_par(:,:,2)=1+info_spat%a_perc(2)%mat*exp(-1.0*day_from_irr*info_spat%b_perc(2)%mat)
+        end where
+
     end subroutine
 
 
