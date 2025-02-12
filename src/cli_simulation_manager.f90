@@ -34,7 +34,7 @@ module cli_simulation_manager!
     use mod_parameters
     use mod_grid, only: read_grid, write_grid, print_mat_as_grid, overlay_domain, &
                         & bound, id_to_par
-    use mod_evapotranspiration, only: ET_reference 
+    use mod_evapotranspiration, only: ET_reference, calculateDLH
     use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data
     use mod_runoff
     use mod_crop_soil_water
@@ -150,7 +150,12 @@ module cli_simulation_manager!
         integer:: s_meteostat, s_step
         real(dp):: value
         !CHARACTER(LEN=20)::fc_name
-        TYPE(grid_r)::pheno_grd 
+        TYPE(grid_r)::pheno_grd
+        !
+        real(dp)::lat_sum = 0.0D0
+        integer::lat_num = 0
+        real(dp)::lat_mean
+        real(dp)::DLH
         
         pheno_grd = info_spat%domain
         
@@ -791,7 +796,21 @@ module cli_simulation_manager!
                 else
                     call create_meteo_matrices(info_meteo,dir_meteo,meteo_weight,meteo,info_spat%domain,doy,pars%sim%res_canopy(y))
                 end if
-                !!
+
+                ! calculate average latitude
+                if (doy == 1) then 
+                    forall (i=1:size(meteo%lat,1), j=1:size(meteo%lat,2), meteo%lat(i,j)/=nan_r)!
+                        lat_sum = lat_sum + meteo%lat(i,j)
+                        lat_num = lat_num + 1
+                    end forall!
+                    lat_mean = lat_sum/lat_num
+                end if
+
+                ! calculate day length
+                call calculateDLH(doy, lat_mean, DLH)
+                ! calculate radiation distribution along day and update params
+                pars%fet0 = pdf_normal(cost_hrs, 12.5D0, DLH/5)
+                
                 ! calculate the effective precipitation for the rice (only precipitation is considered)
                 wat_bal1%h_interc=calc_interception(meteo%p,pheno)
                 wat_bal1%h_eff_rain = net_precipitation(meteo%p,wat_bal1%h_interc)

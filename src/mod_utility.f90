@@ -1,6 +1,6 @@
 module mod_utility!
 
-    use mod_constants, only: sp, dp
+    use mod_constants, only: sp, dp, pi
     
     ! type that stores date
     type date!
@@ -419,5 +419,13 @@ module mod_utility!
         integer :: n
         round = anint(val*10.0**n)/10.0**n
     end function round
+
+    pure elemental function pdf_normal(x, x_mean, x_std) result(pdf)
+        implicit none
+        real(dp), intent(in):: x, x_mean, x_std
+        real(dp):: pdf
+        
+        pdf = (1/((2*pi*x_std**2)**0.5))*exp(-((x-x_mean)**2)/(2*x_std**2))
+    end function
 !
 end module mod_utility!

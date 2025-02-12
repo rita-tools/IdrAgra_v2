@@ -1,5 +1,5 @@
 module mod_evapotranspiration
-    use mod_constants, only: sp, dp
+    use mod_constants, only: sp, dp, pi
     
     implicit none
     
@@ -101,7 +101,7 @@ module mod_evapotranspiration
         integer,intent(in)::doy ! day of the year
         real(dp),intent(in)::T_max, T_min, HUM_max, HUM_min, Wind_vel, Rad_sol, lat_ws, alt_ws
         real(dp),intent(in):: res_surf
-        real(sp),parameter::pi = 3.141592653589793238462643383279502884197_sp
+        !real(sp),parameter::pi = 3.141592653589793238462643383279502884197_sp
         real(dp),parameter::cost_sol = 0.0820 ! solar contant [MJ m-2 min-1]
         real(dp),parameter::a_s = 0.25, b_s = 0.50    ! Other constants
         real(dp),parameter::albedo = 0.23  ! albedo [-] = 0.23 for grass reference crop!
@@ -165,7 +165,7 @@ module mod_evapotranspiration
         integer,intent(in)::imax,jmax!
         real(dp),dimension(:,:),intent(in)::T_max,T_min,HUM_max,HUM_min,Wind_vel,Rad_sol,lat_ws,alt_ws
         real(dp), intent(in)::res_surf
-        real(dp),parameter::pi=3.141592653589793238462643383279502884197_sp!
+        ! real(dp),parameter::pi=3.141592653589793238462643383279502884197_sp!
         real(dp),parameter::cost_solare=0.0820 ! solar contant [MJ m-2 min-1]
         real(dp),parameter::as=0.25, bs=0.50   ! Other constants
         real(dp),parameter::alpha=0.23  ! albedo [-] = 0.23 for grass reference crop!
@@ -220,6 +220,20 @@ module mod_evapotranspiration
 
         return
     end function ET_reference_mat!
+
+    subroutine calculateDLH(DoY, wsLat,DLH)
+        integer, intent(in) :: DoY
+        real(dp),intent(in) :: wsLat 
+        real(dp) :: phi, delta, omega_s
+        real(dp), intent(out) :: DLH
+        
+        !Computes daylight hours
+        phi = pi / 180 * wsLat  ! latitude [rad], FAO56: eq. 22 pag 46
+        delta = 0.409 * sin(2 * pi / 365 * DoY - 1.39)  ! solar declination, FAO56: eq. 24 pag 46
+        omega_s = acos(-tan(phi) * tan(delta))  ! sunset hour angle [rad], FAO56: eq. 25 pag 46
+        DLH = 24 / pi * omega_s  ! daylight hours,  FAO56: eq. 34 pag 48
+    end subroutine
+    
 
 
 end module
