@@ -129,7 +129,7 @@ module cli_save_outputs!
         module procedure assign_step_map!
         module procedure assign_step_debug_map!
         module procedure assign_annual_map
-        module procedure assign_annula_debug_map
+        module procedure assign_annual_debug_map
         module procedure assign_yield_map
     end interface!
     !
@@ -1297,7 +1297,7 @@ module cli_save_outputs!
         yield_map%dev_stage%mat = a!
     end subroutine assign_yield_map!
     !
-    subroutine assign_annula_debug_map(yr_debug_map,a)!
+    subroutine assign_annual_debug_map(yr_debug_map,a)!
         type(annual_debug_map),intent(out)::yr_debug_map!
         real(dp),intent(in)::a!
         !!
@@ -1305,7 +1305,7 @@ module cli_save_outputs!
         yr_debug_map%rain_eff%mat = a!
         yr_debug_map%iter1%mat = a
         yr_debug_map%iter2%mat = a
-    end subroutine assign_annula_debug_map!
+    end subroutine assign_annual_debug_map!
 
     subroutine save_irr_unit_data(doy,out_tables,irr_units)
         integer, intent(in):: doy
@@ -1318,6 +1318,7 @@ module cli_save_outputs!
         write(out_tables%q_rem%unit,*)doy,'; ',(irr_units(i)%q_surplus,'; ',i=1,size(irr_units))
         write(out_tables%q_nm_priv%unit,*)doy,'; ',(irr_units(i)%q_un_priv,'; ',i=1,size(irr_units))
         write(out_tables%n_inv_cells%unit,*)doy,'; ',(irr_units(i)%n_irrigated_cells,'; ',i=1,size(irr_units))
+        write(out_tables%q_nm_col%unit,*)doy,'; ',(irr_units(i)%q_un_coll,'; ',i=1,size(irr_units))
         
     end subroutine save_irr_unit_data
 
