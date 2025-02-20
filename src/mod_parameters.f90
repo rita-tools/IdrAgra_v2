@@ -230,6 +230,7 @@ module mod_parameters!
         real(dp)::q_trashed                     ! discharge lost at the end of the rotation or the end of the irrigation season
         real(dp)::q_surplus                     ! discharge available the following day
         real(dp)::q_un_priv                     ! discharge extracted from unmonitored private sources (e.g. farm wells)
+        real(dp)::q_un_coll                     ! discharge extracted from unmonitored collective sources (e.g. public wells)    
         integer::n_irrigated_cells              ! number of cell irrigated in the current day
         integer::f_un_priv                      ! flag for activate irrigation from unmonitored private sources (e.g. farm wells)
         real(dp)::n_irrigable_cells             ! number of cell potentially irrigable calculated as v_nom/SUM(v_irr_cells)

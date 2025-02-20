@@ -666,7 +666,7 @@ module mod_irrigation
         real(dp)::frac_rel_un_coll                              ! fraction of water released respect to the maximum water available
         integer:: n_cells_irr_un_coll                           ! number of cells irrigated by unmonitored collective water sources
         integer:: n_cells_un_coll                               ! number of cells irrigable by unmonitored collective water sources
-        real(dp),dimension(par%cr%n_withdrawals)::q_un_coll!
+        !real(dp),dimension(par%cr%n_withdrawals)::q_un_coll!
         integer::i,j,k!
         !!
         ! estimate the daily duty for each irrigation units
@@ -675,8 +675,9 @@ module mod_irrigation
         irr_units%q_trashed=0.
         irr_units%n_irrigated_cells=0.
         irr_units%q_un_priv=0.
+        irr_units%q_un_coll=0.
         frac_rel_un_coll = 0.
-        q_un_coll=0.!
+        !q_un_coll=0.!
         !
         if(.not.(allocated(cells_un_coll))) allocate(cells_un_coll(domain_map%header%imax, domain_map%header%jmax))
         cells_un_coll = 0
@@ -695,7 +696,7 @@ module mod_irrigation
         do i=1,size(wat_sources)!
             j=wat_sources(i)%irr_unit_idx;
             if (j==0) then
-                print*,'WARNING: water source ',wat_sources(i)%id_wat_src,' returns zero index'
+                print*,'WARNING: water source ',wat_sources(i)%id_wat_src,' is not connected to any irrigation unit.'
                 cycle
             end if
             k=wat_sources(i)%wat_src_idx!
@@ -716,9 +717,9 @@ module mod_irrigation
                         & frac_rel_un_coll*wat_sources(i)%duty_frc * sources_info%unm_src_tbl%q_max(k) * irr_units(j)%int_distr_eff * (real(n_cells_irr_un_coll)/real(n_cells_un_coll)) + &
                         & irr_units(j)%q_act_fld(4)!
                     
-                    q_un_coll(k) = &
+                    irr_units(j)%q_un_coll = &
                         & frac_rel_un_coll*wat_sources(i)%duty_frc * sources_info%unm_src_tbl%q_max(k)*(real(n_cells_irr_un_coll)/real(n_cells_un_coll))+&
-                        & q_un_coll(k)   ! only for printing %AB% gross used water
+                        & irr_units(j)%q_un_coll   ! only for printing %AB% gross used water
                 case default!
             end select!
         end do!
