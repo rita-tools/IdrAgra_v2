@@ -31,11 +31,11 @@ module cli_save_outputs!
         type(output)::q_irr_units                               ! daily discharge for each irrigation units [m3/s]
         type(output)::q_surplus                                 ! daily discharge not used for irrigation for each irrigation units [m3/s]
         type(output)::q_irr                                     ! daily discharge used for irrigation for each irrigation units [m3/s]
-        type(output)::q_rem                                     ! daily discharge transfered to the following day for each irrigation units [m3/s]
+        type(output)::q_rem                                     ! daily discharge transferred to the following day for each irrigation units [m3/s]
                                                                 ! only volume not used for irrigation and less than the water depth required for a single cell are considered
-        type(output)::q_nm_priv                                 ! daily discharge estimated for private non-monitored sources [m3/s]
+        type(output)::q_un_priv                                 ! daily discharge estimated for private non-monitored sources [m3/s]
         type(output)::n_inv_cells                               ! number of investigated cells in one day
-        type(output)::q_nm_col                                  ! daily discharge estimated for collective non-monitored sources [m3/s]
+        type(output)::q_un_col                                  ! daily discharge estimated for collective non-monitored sources [m3/s]
         type(cell_output),dimension(:),pointer::cell_info       ! pedo-hydrological parameters of the sampled cell
         type(cell_output),dimension(:),pointer::cell_conv       ! model resolution convergence
         type(cell_output),dimension(:),pointer::prod_info       ! productivity and crop parameters
@@ -373,12 +373,16 @@ module cli_save_outputs!
 
             ! daily series of irrigation water supply from collective runtime sources
             if (n_nm_pub >=1) then
-                out_tbl_list%q_nm_col%fn =trim(adjustl(yr))//'_Qcrs.csv'!
+                out_tbl_list%q_un_col%fn =trim(adjustl(yr))//'_Qcrs.csv'!
                 title=""!
-                allocate(w_str(n_nm_pub+1))!
+                do i=1,size(id_irr_unit_list)!
+                    write(id_irr_unit_str(i),*)id_irr_unit_list(i)!
+                    id_irr_unit_str(i)="SubDistr_"//trim(adjustl(id_irr_unit_str(i)))!
+                end do!
+                allocate(w_str(size(id_irr_unit_str)+1)) !allocate(w_str(n_nm_pub+1))!
                 w_str(1)="DoY"!
-                w_str(2:size(w_str))=id_nm_pub_list(:)!
-                call init_cell_output_file(out_tbl_list%q_nm_col%unit,trim(path)//trim(adjustl(out_tbl_list%q_nm_col%fn)),trim(title),w_str)!
+                w_str(2:size(w_str))=id_irr_unit_str(:) !w_str(2:size(w_str))=id_nm_pub_list(:)!
+                call init_cell_output_file(out_tbl_list%q_un_col%unit,trim(path)//trim(adjustl(out_tbl_list%q_un_col%fn)),trim(title),w_str)!
                 deallocate(w_str)!
             end if
 
@@ -422,7 +426,7 @@ module cli_save_outputs!
             deallocate(w_str)!        
             
             ! daily series of water withdrawled by private sources for irrigation
-            out_tbl_list%q_nm_priv%fn =trim(adjustl(yr))//'_Qprivate.csv'!
+            out_tbl_list%q_un_priv%fn =trim(adjustl(yr))//'_Qprivate.csv'!
             title=""!
             do i=1,size(id_irr_unit_list)!
                 write(id_irr_unit_str(i),*)id_irr_unit_list(i)!
@@ -431,7 +435,7 @@ module cli_save_outputs!
             allocate(w_str(size(id_irr_unit_str)+1))!
             w_str(1)="DoY"!
             w_str(2:size(w_str))=id_irr_unit_str(:)!
-            call init_cell_output_file(out_tbl_list%q_nm_priv%unit,trim(path)//trim(adjustl(out_tbl_list%q_nm_priv%fn)),trim(title),w_str)!
+            call init_cell_output_file(out_tbl_list%q_un_priv%unit,trim(path)//trim(adjustl(out_tbl_list%q_un_priv%fn)),trim(title),w_str)!
             deallocate(w_str)!		
 	
             ! water shift
@@ -495,11 +499,11 @@ module cli_save_outputs!
         end if
         if (mode == 1 ) then
             close(out_tbl_list%q_irr_units%unit)!
-            close(out_tbl_list%q_nm_col%unit)!
+            close(out_tbl_list%q_un_col%unit)!
             close(out_tbl_list%q_surplus%unit)!
             close(out_tbl_list%q_irr%unit)!
             close(out_tbl_list%q_rem%unit)!
-            close(out_tbl_list%q_nm_priv%unit)!
+            close(out_tbl_list%q_un_priv%unit)!
             close(out_tbl_list%n_inv_cells%unit)!
         end if
         if (debug .eqv. .true.) then
@@ -1313,13 +1317,13 @@ module cli_save_outputs!
         type(irr_units_table),dimension(:),allocatable, intent(in)::irr_units
         integer:: i
         ! %AB% mettere un check per la stampa
-        write(out_tables%q_surplus%unit,*)doy,'; ',(irr_units(i)%q_trashed,'; ',i=1,size(irr_units))
+        write(out_tables%q_surplus%unit,*)doy,'; ',(irr_units(i)%q_surplus,'; ',i=1,size(irr_units))
         write(out_tables%q_irr%unit,*)doy,'; ',(irr_units(i)%q_day,'; ',i=1,size(irr_units))
-        write(out_tables%q_rem%unit,*)doy,'; ',(irr_units(i)%q_surplus,'; ',i=1,size(irr_units))
-        write(out_tables%q_nm_priv%unit,*)doy,'; ',(irr_units(i)%q_un_priv,'; ',i=1,size(irr_units))
+        write(out_tables%q_rem%unit,*)doy,'; ',(irr_units(i)%q_rem,'; ',i=1,size(irr_units))
+        write(out_tables%q_un_priv%unit,*)doy,'; ',(irr_units(i)%q_un_priv,'; ',i=1,size(irr_units))
         write(out_tables%n_inv_cells%unit,*)doy,'; ',(irr_units(i)%n_irrigated_cells,'; ',i=1,size(irr_units))
-        write(out_tables%q_nm_col%unit,*)doy,'; ',(irr_units(i)%q_un_coll,'; ',i=1,size(irr_units))
-        
+        write(out_tables%q_un_col%unit,*)doy,'; ',(irr_units(i)%q_un_coll,'; ',i=1,size(irr_units))
+        ! q_act_fld(4)
     end subroutine save_irr_unit_data
 
     subroutine save_irr_unit_debug_data(doy,out_tables,irr_units)
@@ -1328,19 +1332,12 @@ module cli_save_outputs!
         type(irr_units_table),dimension(:),allocatable, intent(in)::irr_units
         integer:: i
 
-        !~         if(xml%sim%output_cells .eqv. .true.)then!
         ! print discharges fro each irrigation units
         write(out_tables%q_irr_units%unit,*)doy,'; ','Monitored sources (i)','; ',(irr_units(i)%q_act_fld(1),'; ',i=1,size(irr_units))!
         write(out_tables%q_irr_units%unit,*)doy,'; ','Monitored sources (ii)','; ',(irr_units(i)%q_act_fld(2),'; ',i=1,size(irr_units))!
         write(out_tables%q_irr_units%unit,*)doy,'; ','Internal reuse','; ',(irr_units(i)%q_act_fld(3),'; ',i=1,size(irr_units))!
         write(out_tables%q_irr_units%unit,*)doy,'; ','Collective runtime sources','; ',(irr_units(i)%q_act_fld(4),'; ',i=1,size(irr_units))!
         
-        ! TODO: store Qmacrozona
-        !if (xml%cr%n_withdrawals>=1) then
-        !    ! save the stampa serie di PORTATE ESTRATTE dai pozzi consortili!
-        !    write(out_tables%q_nm_col%unit,*)doy,'; ',(Qmacrozona(i),'; ',i=1,size(Qmacrozona))
-        !end if
-        !~         end if
     end subroutine save_irr_unit_debug_data
 
 end module cli_save_outputs!

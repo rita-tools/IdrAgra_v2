@@ -227,8 +227,8 @@ module mod_parameters!
         real(dp),dimension(4)::q_pot_fld        ! potential discharge available at cell
         real(dp)::q_nom                         ! potential discharge
         real(dp)::q_day                         ! actual daily discharge
-        real(dp)::q_trashed                     ! discharge lost at the end of the rotation or the end of the irrigation season
-        real(dp)::q_surplus                     ! discharge available the following day
+        real(dp)::q_surplus                     ! discharge lost at the end of the rotation or the end of the irrigation season
+        real(dp)::q_rem                     ! discharge available the following day
         real(dp)::q_un_priv                     ! discharge extracted from unmonitored private sources (e.g. farm wells)
         real(dp)::q_un_coll                     ! discharge extracted from unmonitored collective sources (e.g. public wells)    
         integer::n_irrigated_cells              ! number of cell irrigated in the current day

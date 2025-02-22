@@ -382,7 +382,8 @@ module mod_irrigation
         integer,dimension(:,:),intent(in)::irr_ends
         logical,intent(in)::f_shape_area
         
-        integer::i,j,k,shift,n,p!
+        integer::i,j,k,shift,p!
+        integer::n_cells_tobe_irr
         integer,parameter::sec_to_day=24*60*60
         real(dp),dimension(domain%header%imax,domain%header%jmax)::v_irr_cell   ! irrigation volumes [m^3]
         logical,dimension(domain%header%imax,domain%header%jmax)::irr_mask      ! a mask to get all the irrigable cells
@@ -438,70 +439,70 @@ module mod_irrigation
             ! the mask includes also the rice cells
             !irr_mask=(irr_units_map%mat==irr_units(k)%id .and. irr_class==1) ! OLD CONTROL
             ! %EAC% add control for the local irrigation season
+            Q_tot_act=0. ! total discharge actually delivered for irrigation
+            Q_tot_pot=0. ! total discharge potentially delivered for irrigation
+        
             irr_mask=(irr_units_map%mat==irr_units(k)%id &
                      .and. irr_class==1 &
                      .and. irr_starts<=doy &
                      .and. irr_ends>=doy)
 
-            n=count(irr_mask)!
+            n_cells_tobe_irr = count(irr_mask)!
             
-            if (n==0) then
-                !%AB% skyp the cycle if count(mask) == 0, no irrigable cells
-                irr_units(k)%q_trashed = irr_units(k)%q_day
+            if (n_cells_tobe_irr == 0) then
+                !%AB% skip the cycle if count(mask) == 0, no irrigable cells
+                irr_units(k)%q_surplus = irr_units(k)%q_day
                 irr_units(k)%q_day = 0
             else 
                 ! %AB% in case of irrigable cells
                 ! %AB% vi(n) e vj(n) are the coordinates of the irrigable cells
-                allocate(vi(n));vi=pack(i_mat,irr_mask)!
-                allocate(vj(n));vj=pack(j_mat,irr_mask)!
-                allocate(vid(n));vid=pack(id_cell,irr_mask)!
+                allocate(vi(n_cells_tobe_irr)); vi=pack(i_mat,irr_mask)!
+                allocate(vj(n_cells_tobe_irr)); vj=pack(j_mat,irr_mask)!
+                allocate(vid(n_cells_tobe_irr)); vid=pack(id_cell,irr_mask)!
                 ! the following are all the required parameters
-                allocate(s_h_old(n));s_h_old=pack(h_old,irr_mask)!
-                allocate(s_h_raw_coll(n));s_h_raw_coll=pack(h_raw_coll,irr_mask)!
-                allocate(s_h_raw(n));s_h_raw=pack(h_raw,irr_mask)!
-                allocate(s_h_raw_half(n));s_h_raw_half=pack(h_raw_half,irr_mask)!
-                allocate(s_h_raw_priv(n));s_h_raw_priv=pack(h_raw_priv,irr_mask)!
-                allocate(s_h_transp_pot(n));s_h_transp_pot=pack(transp_pot,irr_mask)!
-                allocate(vcells(n));vcells=0
-                allocate(s_v_irr_cell(n));s_v_irr_cell=pack(v_irr_cell,irr_mask)!
-                allocate(s_h_met(n));s_h_met=pack(h_met,irr_mask)!
+                allocate(s_h_old(n_cells_tobe_irr)); s_h_old=pack(h_old,irr_mask)!
+                allocate(s_h_raw_coll(n_cells_tobe_irr)); s_h_raw_coll=pack(h_raw_coll,irr_mask)!
+                allocate(s_h_raw(n_cells_tobe_irr)); s_h_raw=pack(h_raw,irr_mask)!
+                allocate(s_h_raw_half(n_cells_tobe_irr)); s_h_raw_half=pack(h_raw_half,irr_mask)!
+                allocate(s_h_raw_priv(n_cells_tobe_irr)); s_h_raw_priv=pack(h_raw_priv,irr_mask)!
+                allocate(s_h_transp_pot(n_cells_tobe_irr)); s_h_transp_pot=pack(transp_pot,irr_mask)!
+                allocate(vcells(n_cells_tobe_irr)); vcells=0
+                allocate(s_v_irr_cell(n_cells_tobe_irr)); s_v_irr_cell=pack(v_irr_cell,irr_mask)!
+                allocate(s_h_met(n_cells_tobe_irr)); s_h_met=pack(h_met,irr_mask)!
                 
                 ! find the index of the latest irrigated cell (the day before)
                 ! get_value_index returns shift=0 by default
-                if (any(vid==irr_units(k)%last_cell_id)) then
-                    shift=get_value_index(vid,irr_units(k)%last_cell_id)!
+                if (any(vid == irr_units(k)%last_cell_id)) then
+                    shift = get_value_index(vid,irr_units(k)%last_cell_id)!
                 end if!
                 
                 ! shift the vectors
-                vi=cshift(vi,shift)!
-                vj=cshift(vj,shift)!
-                vid=cshift(vid,shift)    !
-                s_h_old=cshift(s_h_old,shift)!
-                s_h_raw_coll=cshift(s_h_raw_coll,shift)!
-                s_h_raw=cshift(s_h_raw,shift)!
-                s_h_raw_half=cshift(s_h_raw_half,shift)!
-                s_h_raw_priv=cshift(s_h_raw_priv,shift)    !
-                s_h_transp_pot=cshift(s_h_transp_pot,shift)!
-                s_v_irr_cell=cshift(s_v_irr_cell,shift)!
-                s_h_met=cshift(s_h_met,shift)!
-                
-                Q_tot_act=0. ! total discharge actually delivered for irrigation
-                Q_tot_pot=0. ! total discharge potentially delivered for irrigation
+                vi = cshift(vi,shift)!
+                vj = cshift(vj,shift)!
+                vid = cshift(vid,shift)    !
+                s_h_old = cshift(s_h_old,shift)!
+                s_h_raw_coll = cshift(s_h_raw_coll,shift)!
+                s_h_raw = cshift(s_h_raw,shift)!
+                s_h_raw_half = cshift(s_h_raw_half,shift)!
+                s_h_raw_priv = cshift(s_h_raw_priv,shift)    !
+                s_h_transp_pot = cshift(s_h_transp_pot,shift)!
+                s_v_irr_cell = cshift(s_v_irr_cell,shift)!
+                s_h_met = cshift(s_h_met,shift)!
                 
                 ! TODO: discharge at cell not in irrigation unit
                 ! average net discharge required by the irrigation unit
                 ! it doesn't consider the field efficiency
                 ! it is estimated from the water depth from the irrigation method
                 ! TODO: not used q_mean!
-                q_mean = sum(s_v_irr_cell)/(n*sec_to_day) 
+                q_mean = sum(s_v_irr_cell)/(n_cells_tobe_irr*sec_to_day) 
                 
                 ! TODOs:
                 ! %AB% check irrigation when k_cb > 0
                 ! %AB% check condition when the number of irrigable cells is very
                 ! low respect the total number of cell in the irrigation unit
                 
-                cell_loop: do p=1,n !%AB% loop in irrigable cells where mask = 1
-                    n_day_to_deficit=9999. !default (>0) x transp_pot=0!
+                cell_loop: do p=1, n_cells_tobe_irr !%AB% loop in irrigable cells where mask = 1
+                    n_day_to_deficit = 9999. !default (>0) x transp_pot=0!
                     
                     if(s_h_transp_pot(p)/=0.) n_day_to_deficit = (s_h_old(p)-s_h_raw_half(p))/s_h_transp_pot(p)
                     
@@ -511,8 +512,8 @@ module mod_irrigation
                     ! check if the water is enough for irrigation                    
                     ! %AB% if there is enough water to irrigate the current cell
                     ! %AB% and the delivered can irrigate the current cell
-                    if((Q_tot_pot+q_cell) < (irr_units(k)%q_day * irr_units(k)%f_explore) .and. & 
-                        & (Q_tot_act+q_cell) <= irr_units(k)%q_day) then                           
+                    if((Q_tot_pot + q_cell) < (irr_units(k)%q_day * irr_units(k)%f_explore) .and. & 
+                        & (Q_tot_act + q_cell) <= irr_units(k)%q_day) then                           
                 
                         ! %AB% record the index of the current cell.
                         ! It could be the latest irrigated in the current day and the first in the following 
@@ -534,46 +535,47 @@ module mod_irrigation
                 end do cell_loop
                 !
                 ! %AB% update the irrigation period
-                if (n /=0 .and. p<=n .and. Q_tot_act /= 0) then
+                if (n_cells_tobe_irr /=0 .and. p<=n_cells_tobe_irr .and. Q_tot_act /= 0) then
                     irr_units(k)%n_irrigated_cells = p
-                else if (p>n) then ! all the cells are verified
+                else if (p>n_cells_tobe_irr) then ! all the cells are verified
                     irr_units(k)%n_irrigated_cells = p-1
                 else ! irrigation units with no irrigable cells
                     irr_units(k)%n_irrigated_cells = 0
                 end if
             
                 ! mass conservation: how much water remains
-                irr_units(k)%q_trashed = irr_units(k)%q_day - Q_tot_act
+                irr_units(k)%q_surplus = irr_units(k)%q_day - Q_tot_act
                 
                 ! %AB% store the amount of water surplus for the next day if:
                 ! 1 - the irrigation unit has irrigable cells
                 ! 2 - not all the cells are evaluated for irrigation requirements
                 ! 3 - current day is in the irrigation season
                 !if (n/=0 .and. irr_units(k)%n_irrigated_cells /= n .and. doy < end_irr_season) then
-                if (n/=0 .and. irr_units(k)%n_irrigated_cells /= n) then
-                    irr_units(k)%q_surplus = irr_units(k)%q_trashed
-                    irr_units(k)%q_trashed = 0.  ! %AB% re-init the surplus
+                if (n_cells_tobe_irr/=0 .and. irr_units(k)%n_irrigated_cells /= 0 .and. & ! %EAC% also the number of irrigated cells must be zero
+                    & irr_units(k)%n_irrigated_cells /= n_cells_tobe_irr) then
+                    irr_units(k)%q_rem = irr_units(k)%q_surplus
+                    irr_units(k)%q_surplus = 0.  ! %AB% re-init the surplus
                 else
-                    irr_units(k)%q_surplus = 0.
+                    irr_units(k)%q_rem = 0.
                 end if
 
                 !%AB% store the water actually used
-                irr_units(k)%q_day=Q_tot_act
+                irr_units(k)%q_day = Q_tot_act
                                 
                 ! UNMONITORED PRIVATE ONLY
-                ! %AB% restart n 
-                n = count(irr_mask)!
+                ! %AB% recalculate n 
+                ! n_cells_tobe_irr = count(irr_mask)! %EAC% no more required
                 
                 if (irr_units(k)%f_un_priv==1) then!
-                    allocate(s_transp_ratio(n)); s_transp_ratio = s_h_transp_pot/sum(s_h_transp_pot)!
-                    allocate(s_def_day(n)); s_def_day = 0.!
+                    allocate(s_transp_ratio(n_cells_tobe_irr)); s_transp_ratio = s_h_transp_pot/sum(s_h_transp_pot)!
+                    allocate(s_def_day(n_cells_tobe_irr)); s_def_day = 0.!
                     where(s_h_transp_pot/=0.) s_def_day=(s_h_old-s_h_raw)/s_h_transp_pot!
                     ! %AB% skip at least one cell that could be irrigated by monitored sources
                     ! dist = int(sum(vtmm-vRaw)/sum(vTrasp_pot))*IU(k)%n_irrigable_cells ! OLD version
                     dist = 1 + nint((sum(s_transp_ratio*s_def_day)/sum(s_transp_ratio))*irr_units(k)%n_irrigable_cells) 
                     
                     
-                    if(dist>n) dist=n!
+                    if(dist>n_cells_tobe_irr) dist=n_cells_tobe_irr!
                     ! TODO: check shift is the same as before
                     ! vector shift
                     vi=cshift(vi,shift)!
@@ -588,12 +590,12 @@ module mod_irrigation
                     s_v_irr_cell=cshift(s_v_irr_cell,shift)!
                     s_h_met=cshift(s_h_met,shift)
                     
-                    do p=1,n!
+                    do p=1,n_cells_tobe_irr!
                         if((p>=dist).and.(.not.(any(vcells==vid(p)))))then!
                             if(s_h_old(p) <= s_h_raw_priv(p)) then!
                                 ! %AB% irrigation volume is equal to the irrigation depth of the method
-                                priv_irr(vi(p),vj(p))=s_h_met(p)                    
-                                irr_units(k)%q_un_priv=irr_units(k)%q_un_priv+s_v_irr_cell(p)/sec_to_day
+                                priv_irr(vi(p),vj(p)) = s_h_met(p)                    
+                                irr_units(k)%q_un_priv = irr_units(k)%q_un_priv + s_v_irr_cell(p)/sec_to_day
                             end if!
                         end if!
                     end do!
@@ -672,7 +674,7 @@ module mod_irrigation
         ! estimate the daily duty for each irrigation units
         irr_units%q_act_fld(1)=0.;irr_units%q_act_fld(2)=0.;irr_units%q_act_fld(3)=0.;irr_units%q_act_fld(4)=0.;!
         irr_units%q_day=0.!
-        irr_units%q_trashed=0.
+        irr_units%q_surplus=0.
         irr_units%n_irrigated_cells=0.
         irr_units%q_un_priv=0.
         irr_units%q_un_coll=0.
@@ -717,15 +719,21 @@ module mod_irrigation
                         & frac_rel_un_coll*wat_sources(i)%duty_frc * sources_info%unm_src_tbl%q_max(k) * irr_units(j)%int_distr_eff * (real(n_cells_irr_un_coll)/real(n_cells_un_coll)) + &
                         & irr_units(j)%q_act_fld(4)!
                     
-                    irr_units(j)%q_un_coll = &
-                        & frac_rel_un_coll*wat_sources(i)%duty_frc * sources_info%unm_src_tbl%q_max(k)*(real(n_cells_irr_un_coll)/real(n_cells_un_coll))+&
-                        & irr_units(j)%q_un_coll   ! only for printing %AB% gross used water
+                    ! irr_units(j)%q_un_coll = &
+                    !     & frac_rel_un_coll*wat_sources(i)%duty_frc * sources_info%unm_src_tbl%q_max(k)*(real(n_cells_irr_un_coll)/real(n_cells_un_coll))+&
+                    !     & irr_units(j)%q_un_coll   ! only for printing %AB% gross used water
+                    
+                    ! at irrigation unit, alway consider the 
+                    irr_units(j)%q_un_coll = irr_units(j)%q_act_fld(4)
                 case default!
             end select!
         end do!
 
         ! compute the water duty of each irrigation unit
-        irr_units%q_day=irr_units%q_act_fld(1)+irr_units%q_act_fld(2)+irr_units%q_act_fld(3)+irr_units%q_act_fld(4)+irr_units%q_surplus ! %AB% consider also the water surplus of the previous day
+        irr_units%q_day=irr_units%q_act_fld(1)+irr_units%q_act_fld(2)+irr_units%q_act_fld(3)+irr_units%q_act_fld(4)+irr_units%q_rem ! %AB% consider also the water surplus of the previous day
+        ! reset q_rem to zero
+        irr_units%q_rem = 0.0D0
+
     end subroutine calc_daily_duty!
 
     function deliverable_ratio_unm_coll(cells_un_coll, h_soil, h_transp_pot, h_raw, theta_fc, &

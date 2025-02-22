@@ -838,7 +838,7 @@ module cli_simulation_manager!
                         ! %EAC%: as the irrigation season can change with the irrigation methods,
                         ! q_surplus is updated at the beginning of the year
                         ! TODO: manage condition when irrigation season is in winter
-                        if (doy==1) irr_units(:)%q_surplus = 0
+                        if (doy==1) irr_units(:)%q_rem = 0
                         ! calculate the daily water duty for each irrigation units, considering the water distribution efficiency 
                         call calc_daily_duty(doy, irr_units, info_sources, wat_src_tbl, info_spat%irr_unit_id, &
                             & info_spat%domain, pars, pheno%irrigation_class, &
