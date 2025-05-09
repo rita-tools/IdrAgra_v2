@@ -646,6 +646,12 @@ module mod_irrigation
         else where!
             day_from_irr=0!
         end where!
+        
+        ! %EAC%: limit day_from_irr whene day_from_irr= 20 to prevent calculation error, TODO: to be fixed with a better solution
+        ! 20 should be safe for all OS and CPU
+        where(day_from_irr>20)
+            day_from_irr=20
+        end where
 
         esp_perc(:,:,1)=merge(1.0D0,1+am_perc(1)%mat*exp(-1.0*day_from_irr*bm_perc(1)%mat),day_from_irr==-9999)!
         esp_perc(:,:,2)=merge(1.0D0,1+am_perc(2)%mat*exp(-1.0*day_from_irr*bm_perc(2)%mat),day_from_irr==-9999)!
