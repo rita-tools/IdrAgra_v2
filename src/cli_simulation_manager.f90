@@ -129,6 +129,7 @@ module cli_simulation_manager!
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::fc ! cover fraction - %RR%
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::a_loss, b_loss, c_loss, f_interception ! application losses model
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::h_irr_sum, h_bypass
+        
         !! TDx
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,pars_TDx%temp%n_ind)::tot_deficit      ! TDx sum
         integer,dimension(2)::unit_deficit
@@ -174,6 +175,11 @@ module cli_simulation_manager!
             info_spat%h_maxpond%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_maxpond)
         end if
 
+        ! init to zero irrigation related outputs
+        irr_loss = 0.0D0
+        h_irr_sum = 0.0D0
+        h_bypass  = 0.0D0
+        
         ! Variables allocation
         call allocate_all (stp_map, yr_map, deb_map, yr_deb_map, wat_bal1, wat_bal1_old, wat_bal2, wat_bal2_old, wat_bal_hour, meteo, wat, pheno, &
             & info_spat%domain%header%imax,info_spat%domain%header%jmax, info_spat%domain%mat, debug)
