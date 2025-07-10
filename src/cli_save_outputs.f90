@@ -282,7 +282,8 @@ module cli_save_outputs!
                     & 'rawbig'//'; '//'rawinf'//'; '// &!
                     & 'wat_table_depth_m'//'; '//&!
                     & 'distr_irr_mm'//'; '//'priv_well_irr_mm'//'; '//&!
-                    & 'espperc1'//'; '//'espperc2'//'; '//'irr_loss_mm')
+                    & 'espperc1'//'; '//'espperc2'//'; '//'irr_loss_mm'//'; '//&
+                    & 'RF_e'//'; '//'RF_t'//'; '//'r_stress')
             end do!
                 
             ! cell info
@@ -327,7 +328,7 @@ module cli_save_outputs!
                         & 'fw'//'; '//'few'//'; '//'fc'//';'//'Kcmax'//'; '//&          ! Wetted soil fraction, cover fraction & Kcmax
                         & 'wat_REW_mm'//';'//'theta1_wp_mm'//';'//'theta1_mm'//'; '//&  ! 1st layer water content
                         & 'Ke'//'; '//&                                                 ! Evaporation coefficient
-                        & 'eva_pot_mm'//'; '//'eva_mm'//';'//'kr'//';'//'fw_old')       ! Evaporation ! %RR% test kr fw_old
+                        & 'eva_pot_mm'//'; '//'eva_mm'//'; '//'kr'//'; '//'fw_old')     ! Evaporation ! %RR% test kr fw_old
                 end do!
                 ! CN & runoff terms
                 do i=1, size(out_tbl_list%cell_cn)!

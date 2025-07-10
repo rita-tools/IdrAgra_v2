@@ -257,7 +257,8 @@ module mod_irrigation
             if (sch_irr(i)%year == year_cur .and. sch_irr(i)%doy == doy_cur) then
                 if (debug .eqv. .true.) then
                     print *,'current year = ',  year_cur, '; current day = ', doy_cur, &
-                        & '; irr.unit.id= ', sch_irr(i)%irr_unit_id, '; water depth = ', sch_irr(i)%h_irr
+                        & '; irr.unit.id= ', sch_irr(i)%irr_unit_id, '; water depth = ', sch_irr(i)%h_irr, &
+                        & '; h_irr_max= ', maxval(h_irr), '; h_irr_temp_max= ', maxval(h_irr_temp)
                 end if
                 if (sch_irr(i)%h_irr > 0) then
                     ! add water quantity  as scheduled 
@@ -322,17 +323,15 @@ module mod_irrigation
                 end if
             end if
         end do!
-
+        
         call irrigate_rice(h_irr_temp,pheno,eff_rain,xrice_ksat)!
-
+        
         ! split the irrigation matrix for each irrigation method 
         ! n is the number of irrigation methods
         forall(i=1:size(info_spat%domain%mat,1),j=1:size(info_spat%domain%mat,2),&
             & info_spat%irr_meth_id%mat(i,j)/=info_spat%irr_meth_id%header%nan) &
             & h_irr(i,j,info_spat%irr_meth_id%mat(i,j)) = h_irr_temp(i,j)!
 
-        !print*,'max h_irr',maxval(h_irr)
-        
         call update_adj_perco_parameters(info_spat, h_irr_temp, day_from_irr, adj_perc_par)
         
     end subroutine irrigation_scheduled
