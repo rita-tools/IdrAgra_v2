@@ -191,17 +191,22 @@ module mod_utility!
         num_name=trim(adjustl(num_name))//trim(adjustl(ext))!
     end function make_numbered_name!
     
-    subroutine get_uniform_sample(irandom, amplitude, rand_symmetry)!
+    subroutine get_uniform_sample(irandom, amplitude, rand_symmetry,repeatable)!
         ! Get a matrix of random number from a matrix of integer values
         ! values are included between [-amplitude, +amplitude]
         implicit none!
         integer,dimension(:,:),intent(out)::irandom!
         integer,intent(in)::amplitude!
         logical,intent(in)::rand_symmetry
+        logical, intent(in) :: repeatable
         real(dp),dimension(size(irandom,1),size(irandom,2))::rrandom!
-        !
+
+        ! note about "random_init(repeatable ,image_distinct)"
+        ! repeatable : is true, use the same initialization values
+        ! image_distinct - mostly for coarray parallel programs, if true, each image has its random setup
+        call random_init(repeatable, .false.)
         call random_number(rrandom)             ! generate a range [0-1]!
-        
+
         if (rand_symmetry .eqv. .true.) then
             ! TODO: check
             irandom=int(amplitude*(2*rrandom-1)) ! transform R[0,1] in iR [-n,+n] with n = amplitude (e.g. amplitude = 4, iR = 0,-9)
@@ -313,7 +318,7 @@ module mod_utility!
     END SUBROUTINE split_date_c
     !
     subroutine split_date_d(instring, outdate)
-        ! return the date from a string where are separated by delimeter in the order day/month/year
+        ! return the date from a string where are separated by delimiter in the order day/month/year
         ! TODO: general format
         character(len=*), intent(in) :: instring
         type(date), intent(out):: outdate

@@ -322,6 +322,12 @@ module cli_read_parameter!
                             end select
                         case ('randsowdayswind') ! range of sowinf!
                             read(buffer, *, iostat=ios) xml%sim%sowing_range
+                        case ('repeatable') ! set simulation with random seeding repeatible
+                            If ((trim(adjustl(buffer)) == 'true') .or. (trim(adjustl(buffer))== 't') .or. (trim(adjustl(buffer)) == '1'))  then
+                                xml%sim%repeatable = .true.
+                            else
+                                xml%sim%repeatable = .false.
+                            end if
                         case ('forecast_day') ! Number days to consider for cumulative precipitation
                             read(buffer, *, iostat=ios)xml%sim%forecast_day
                         ! parameter for percolation booster

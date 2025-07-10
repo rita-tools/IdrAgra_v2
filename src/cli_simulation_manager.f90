@@ -499,7 +499,7 @@ module cli_simulation_manager!
             end if
 
             ! Randomization and spatial distribution of crop emergence
-            call get_uniform_sample(irandom,pars%sim%sowing_range,pars%sim%rand_symmetry)!
+            call get_uniform_sample(irandom,pars%sim%sowing_range,pars%sim%rand_symmetry,pars%sim%repeatable)!
             call allocate_crop_map (crop_map,info_spat%domain%mat,pars%sim%n_crops,info_spat%domain%header%nan)
             ! make_random_emergence calculates reference data to estimate crop emergence date
             ! which will be calculated in populate_crop_pars_matrices
@@ -1303,7 +1303,10 @@ module cli_simulation_manager!
                 call save_yield_data(yield,info_spat%domain)
                
                 if (debug .eqv. .true.) then
-                    yr_deb_map%rain_eff%mat = (yr_map%eva_act_crop_season%mat + yr_map%transp_act%mat) / yr_map%rain_crop_season%mat
+                    where (yr_map%rain_crop_season%mat>0)
+                        yr_deb_map%rain_eff%mat = (yr_map%eva_act_crop_season%mat + yr_map%transp_act%mat) / yr_map%rain_crop_season%mat
+                    end where
+
                     call save_annual_debug_data(yr_deb_map, info_spat%domain)
                     call save_yield_debug_data(yield, info_spat%domain)
                 end if
@@ -1408,7 +1411,9 @@ module cli_simulation_manager!
                             & ';', wat_bal2%h_raw_sup(xx,yy), ';',wat_bal2%h_raw_inf(xx,yy), &!
                             & ';', info_spat%wat_tab%mat(xx,yy), &!
                             & ';', 0,';',0, & ! add dummy variables to maintain file structure
-                            & ';', esp_perc(xx,yy,1),';',esp_perc(xx,yy,2),';',h_bypass(xx,yy)
+                            & ';', esp_perc(xx,yy,1),';',esp_perc(xx,yy,2),';',h_bypass(xx,yy), &
+                            ! new variables
+                            & ';', pheno%RF_e(xx,yy),';',pheno%RF_t(xx,yy),';',pheno%r_stress(xx,yy)
                     case (1)
                         write(out_tbl%sample_cells(i)%file%unit,*)doy, &!
                             & ';', meteo%p(xx,yy), ';', meteo%T_max(xx,yy), &!
@@ -1427,7 +1432,9 @@ module cli_simulation_manager!
                             & ';', wat_bal2%h_raw_sup(xx,yy), ';',wat_bal2%h_raw_inf(xx,yy), &!
                             & ';', info_spat%wat_tab%mat(xx,yy), &!
                             & ';', coll_irr(xx,yy),';',priv_irr(xx,yy),';',esp_perc(xx,yy,1),&
-                            & ';', esp_perc(xx,yy,2),';',h_bypass(xx,yy)
+                            & ';', esp_perc(xx,yy,2),';',h_bypass(xx,yy),&
+                            ! new variables
+                            & ';', pheno%RF_e(xx,yy),';',pheno%RF_t(xx,yy),';',pheno%r_stress(xx,yy)
                     case default
                 end select
             end do!

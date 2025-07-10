@@ -75,6 +75,7 @@ module mod_parameters!
         integer :: rand_seed                        ! seed to initialize the random number generator
         logical :: rand_symmetry                    ! states if the randomization of emergence date is symmetric [-n,+n] or asymmetric [0, 2n]
         integer :: sowing_range                     ! range of variability of the sowing day [days]
+        logical :: repeatable                       ! if true, al random generated are repeated over times
         integer :: imax                             ! maximum number of rows in the raster map
         integer :: jmax                             ! maximum number of columns in the raster map
         real(dp) :: cell_size                       ! lateral dimension of the square cell of the raster map

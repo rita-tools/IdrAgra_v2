@@ -290,6 +290,7 @@ subroutine make_default(xml, xml_dtx)
     xml%sim%rand_seed =             -999 ! Blank
     xml%sim%rand_symmetry =         .true.
     xml%sim%sowing_range =                0
+    xml%sim%repeatable =            .true.
     xml%sim%imax =                    1
     xml%sim%jmax =                    1
     xml%sim%cell_size =                  250
