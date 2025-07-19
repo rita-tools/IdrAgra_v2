@@ -145,6 +145,7 @@ module mod_common
         type(grid_r):: h_maxpond                    ! maximum ponding depth [mm]
         type(grid_i)::irr_starts                    ! doy of the year when irrigation period starts
         type(grid_i)::irr_ends                      ! doy of the year when irrigation period ends
+        type(grid_i)::sowing_shift                  ! a map with the shifting days to apply to the cropcoef sowing period
     end type spatial_info!
 
     ! Store the water content in mm

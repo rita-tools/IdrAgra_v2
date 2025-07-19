@@ -602,6 +602,7 @@ module cli_simulation_manager!
             ! Daily simulation cycle
             day_cycle: do doy=1, min(pars%sim%year_step(y), pars%sim%year_step(y) - &
                     & (pars%sim%start_simulation%doy - (info_meteo(1)%start%doy + sum(pars%sim%year_step(1:(y-1))))))
+                !if (doy == 100) stop
                 n_day=n_day+1        ! Counter updating
                 coll_irr=0           ! Irrigation matrix for collective water sources
                 priv_irr=0           ! Irrigation matrix for private water sources
@@ -727,8 +728,8 @@ module cli_simulation_manager!
                     else where!
                         wat_bal2%d_t = pars%depth%zr_fix!
                     end where!
-                    ! Water table depth inizialization under root zone
-                    wat_bal2%depth_under_rz = info_spat%wat_tab%mat - pheno%d_r!
+                    ! Water table depth inizialization under root zone (referred to the sum of layer depth to be consistent)
+                    wat_bal2%depth_under_rz = info_spat%wat_tab%mat - wat_bal1%d_e - wat_bal2%d_t!
                     ! Soil water content update
                     where(wat_bal2%d_t == wat_bal2_old%d_t)!
                         wat_bal2_old%h_soil = wat_bal2_old%t_soil*1000*wat_bal2_old%d_t!
@@ -755,7 +756,9 @@ module cli_simulation_manager!
                 call calculate_RF_t(wat_bal2%d_t, pars%depth%ze_fix, pheno, info_spat%domain)
                 !!
                 ! Soil water thresholds update (wat variable)
-                call x_wat(info_spat%domain,info_spat%theta,wat_bal1%d_e,wat_bal2%d_t,wat,theta2_rice,pheno%cn_class,pheno%k_cb)!
+                call update_soil_pars(info_spat%domain, info_spat%theta, &
+                                      wat_bal1%d_e, wat_bal2%d_t, wat, theta2_rice, &
+                                      pheno%cn_class, pheno%k_cb)!
                 ! Irrigation application thresholds update
                 where(info_spat%domain%mat /= info_spat%domain%header%nan)!
 !~                     bil2%RAWbig =   wat%layer(2)%fc - (wat%layer(2)%fc-wat%layer(2)%wp)*pheno%pday*mkraw
@@ -907,6 +910,9 @@ module cli_simulation_manager!
                 
                 h_irr_sum = sum(h_irr,dim=3)
                 
+                ! update percolation booster
+                call update_adj_perco_parameters(info_spat, h_irr_sum, day_from_irr, esp_perc)
+
                 ! irrigation losses due to the irrigation method
                 h_bypass = h_irr_sum * irr_loss / (100 - irr_loss)
                 where (h_irr_sum/=0) yr_map%n_irr_events%mat = yr_map%n_irr_events%mat +1
@@ -983,7 +989,7 @@ module cli_simulation_manager!
                                     & wat%wat1_rew(i,j), wat%layer(1)%h_sat(i,j), wat%layer(1)%h_fc(i,j), &
                                     & wat%layer(1)%h_wp(i,j), wat%layer(1)%h_r(i,j), &
                                     & info_spat%k_sat(1)%mat(i,j), info_spat%fact_n(1)%mat(i,j), &
-                                    & wat_bal_hour%n_iter1(i,j), esp_perc(i,j,1), wat_bal_hour%n_max1(i,j))
+                                    & wat_bal_hour%n_iter1(i,j), esp_perc(i,j,1), wat_bal_hour%n_max1(i,j),doy)
                                     
                                 ! water balance for the transpirative layer
                                 call water_balance_transp_lay(wat_bal_hour%inten%h_soil2(i,j), wat_bal_hour%esten%h_transp_act2(i,j), &!
@@ -1001,7 +1007,11 @@ module cli_simulation_manager!
                                     & info_spat%b1%mat(i,j), info_spat%b2%mat(i,j), &!
                                     & info_spat%b3%mat(i,j), info_spat%b4%mat(i,j), &!
                                     & wat_bal2%depth_under_rz(i,j), wat_bal_hour%n_iter2(i,j), &!
-                                    & esp_perc(i,j,2),pars%sim%f_cap_rise, wat_bal_hour%n_max2(i,j))!
+                                    & esp_perc(i,j,2),pars%sim%f_cap_rise, wat_bal_hour%n_max2(i,j),doy)!
+
+                                    if ((doy==100) .and. (i==1)) then
+                                        print*,doy,hour,wat_bal_hour%esten%h_perc2(i,j)
+                                    end if
                             end if
                             
                         end do
@@ -1285,13 +1295,17 @@ module cli_simulation_manager!
             
             if (out_yearly .eqv. .true.) then
                 ! Calculate the annual efficiency for the use of the water inputs (rain and irrigation)
-                yr_map%total_eff%mat = (yr_map%eva_act_crop_season%mat + yr_map%transp_act%mat) &
-                    & / (yr_map%rain_crop_season%mat + yr_map%irr%mat)
+                where ((yr_map%rain_crop_season%mat + yr_map%irr%mat) > 0) 
+                    yr_map%total_eff%mat = (yr_map%eva_act_crop_season%mat + yr_map%transp_act%mat) &
+                        & / (yr_map%rain_crop_season%mat + yr_map%irr%mat)
+                elsewhere
+                    yr_map%total_eff%mat = nan_r
+                end where
                 
-                yr_map%h_irr_mean%mat = yr_map%irr%mat /  yr_map%n_irr_events%mat
-                
-                where (yr_map%n_irr_events%mat == 0)
-                    yr_map%h_irr_mean%mat = info_spat%domain%header%nan
+                where (yr_map%n_irr_events%mat>0)
+                    yr_map%h_irr_mean%mat = yr_map%irr%mat /  yr_map%n_irr_events%mat
+                elsewhere
+                    yr_map%h_irr_mean%mat = nan_r
                 end where
                 
                 if (summary .eqv. .false.) then
@@ -1305,6 +1319,8 @@ module cli_simulation_manager!
                 if (debug .eqv. .true.) then
                     where (yr_map%rain_crop_season%mat>0)
                         yr_deb_map%rain_eff%mat = (yr_map%eva_act_crop_season%mat + yr_map%transp_act%mat) / yr_map%rain_crop_season%mat
+                    elsewhere
+                        yr_deb_map%rain_eff%mat = nan_r
                     end where
 
                     call save_annual_debug_data(yr_deb_map, info_spat%domain)
@@ -1413,7 +1429,9 @@ module cli_simulation_manager!
                             & ';', 0,';',0, & ! add dummy variables to maintain file structure
                             & ';', esp_perc(xx,yy,1),';',esp_perc(xx,yy,2),';',h_bypass(xx,yy), &
                             ! new variables
-                            & ';', pheno%RF_e(xx,yy),';',pheno%RF_t(xx,yy),';',pheno%r_stress(xx,yy)
+                            & ';', pheno%RF_e(xx,yy),';',pheno%RF_t(xx,yy),';',pheno%r_stress(xx,yy), &
+                            & ';', wat%layer(2)%h_r(xx,yy),';',wat%layer(2)%h_wp(xx,yy),';',wat%layer(2)%h_fc(xx,yy),';',wat%layer(2)%h_sat(xx,yy)
+                             
                     case (1)
                         write(out_tbl%sample_cells(i)%file%unit,*)doy, &!
                             & ';', meteo%p(xx,yy), ';', meteo%T_max(xx,yy), &!
@@ -1434,7 +1452,8 @@ module cli_simulation_manager!
                             & ';', coll_irr(xx,yy),';',priv_irr(xx,yy),';',esp_perc(xx,yy,1),&
                             & ';', esp_perc(xx,yy,2),';',h_bypass(xx,yy),&
                             ! new variables
-                            & ';', pheno%RF_e(xx,yy),';',pheno%RF_t(xx,yy),';',pheno%r_stress(xx,yy)
+                            & ';', pheno%RF_e(xx,yy),';',pheno%RF_t(xx,yy),';',pheno%r_stress(xx,yy), &
+                            & ';', wat%layer(2)%h_r(xx,yy),';',wat%layer(2)%h_wp(xx,yy),';',wat%layer(2)%h_fc(xx,yy),';',wat%layer(2)%h_sat(xx,yy)
                     case default
                 end select
             end do!
@@ -2032,36 +2051,36 @@ module cli_simulation_manager!
 
     end subroutine init_water_balance_variables!
     !
-    subroutine x_wat(domain,teta,ze,zr,wat,theta2_rice,k_CN,Kcb)
+    subroutine update_soil_pars(domain,theta,d_e,d_t,wat,theta2_rice,cn_class,k_cb)
         ! update water matrix that change with only the thikness of the soil layer
         implicit none!
         type(grid_i),intent(in)::domain!
-        type(moisture),dimension(:),intent(in)::teta!
-        real(dp),dimension(:,:),intent(in)::ze,zr!
+        type(moisture),dimension(:),intent(in)::theta!
+        real(dp),dimension(:,:),intent(in)::d_e,d_t!
         type(wat_matrix),intent(out)::wat!
         type(soil2_rice),intent(in)::theta2_rice
-        integer,dimension(:,:),intent(in)::k_CN
-        real(dp),dimension(:,:),intent(in)::Kcb
+        integer,dimension(:,:),intent(in)::cn_class
+        real(dp),dimension(:,:),intent(in)::k_cb
         !!
         where(domain%mat/=domain%header%nan)!
-            wat%layer(1)%h_wp  = 1000*teta(1)%wp%mat*ze             ! water soil content at WP [mm]
-            wat%layer(1)%h_fc  = 1000*teta(1)%fc%mat*ze             ! water soil content at FC [mm]
-            wat%layer(1)%h_sat = 1000*teta(1)%sat%mat*ze            ! water soil content at saturation [mm] %AB%
-            wat%layer(1)%h_r   = 1000*teta(1)%r%mat*ze              ! water soil content at residual humidity [mm]
-            wat%layer(1)%rew = ((teta(1)%fc%mat - 0.5*teta(1)%wp%mat)*0.4)*1000*ze!
-            where (k_CN ==7 .and. Kcb>0) ! %AB% rice in crop season
-                wat%layer(2)%h_wp=1000*theta2_rice%theta2_WP*zr     ! water soil content at WP [mm]
-                wat%layer(2)%h_fc=1000*theta2_rice%theta2_FC*zr     ! water soil content at FC [mm]
-                wat%layer(2)%h_sat=1000*theta2_rice%theta2_SAT*zr   ! water soil content at saturation [mm] %AB%
-                wat%layer(2)%h_r=1000*theta2_rice%theta2_R*zr       ! water soil content at residual humidity [mm]
+            wat%layer(1)%h_wp  = 1000*theta(1)%wp%mat*d_e             ! water soil content at WP [mm]
+            wat%layer(1)%h_fc  = 1000*theta(1)%fc%mat*d_e             ! water soil content at FC [mm]
+            wat%layer(1)%h_sat = 1000*theta(1)%sat%mat*d_e            ! water soil content at saturation [mm] %AB%
+            wat%layer(1)%h_r   = 1000*theta(1)%r%mat*d_e              ! water soil content at residual humidity [mm]
+            wat%layer(1)%rew = ((theta(1)%fc%mat - 0.5*theta(1)%wp%mat)*0.4)*1000*d_e!
+            where (cn_class ==7 .and. k_cb>0) ! %AB% rice in crop season
+                wat%layer(2)%h_wp=1000*theta2_rice%theta2_WP*d_t     ! water soil content at WP [mm]
+                wat%layer(2)%h_fc=1000*theta2_rice%theta2_FC*d_t     ! water soil content at FC [mm]
+                wat%layer(2)%h_sat=1000*theta2_rice%theta2_SAT*d_t   ! water soil content at saturation [mm] %AB%
+                wat%layer(2)%h_r=1000*theta2_rice%theta2_R*d_t       ! water soil content at residual humidity [mm]
             else where
-                wat%layer(2)%h_wp=1000*teta(2)%wp%mat*zr            ! water soil content at WP [mm]
-                wat%layer(2)%h_fc=1000*teta(2)%fc%mat*zr            ! water soil content at FC [mm]
-                wat%layer(2)%h_sat=1000*teta(2)%sat%mat*zr          ! water soil content at saturation [mm] %AB%
-                wat%layer(2)%h_r=1000*teta(2)%r%mat*zr              ! water soil content at residual humidity [mm]
+                wat%layer(2)%h_wp=1000*theta(2)%wp%mat*d_t            ! water soil content at WP [mm]
+                wat%layer(2)%h_fc=1000*theta(2)%fc%mat*d_t            ! water soil content at FC [mm]
+                wat%layer(2)%h_sat=1000*theta(2)%sat%mat*d_t          ! water soil content at saturation [mm] %AB%
+                wat%layer(2)%h_r=1000*theta(2)%r%mat*d_t              ! water soil content at residual humidity [mm]
             end where
         end where!
-    end subroutine x_wat!
+    end subroutine update_soil_pars!
     !
     subroutine init_wat_bal1_matrices(wat_bal1,imax,jmax,f_allocate)!
         ! init/destroy water balance variable

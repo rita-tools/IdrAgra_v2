@@ -109,7 +109,7 @@ module mod_crop_soil_water
         percolation_first_layer=percolation_first_layer!*adj_perc_par! TODO: %CG% not consider adj_perc_par
     end function percolation_first_layer
 
-    function percolation(adj_perc_par,theta_act,theta_r,theta_sat,k_sat, fatt_n)
+    function percolation(adj_perc_par,theta_act,theta_r,theta_sat,k_sat, fatt_n, doy)
         ! Percolation model
         ! Reference:
         ! Brooks, Corey, 1966
@@ -124,6 +124,7 @@ module mod_crop_soil_water
         real(dp),intent(in)::k_sat              ! saturated hydraulic conductivity [cm/h]
         real(dp),intent(in)::fatt_n             ! Brooks & Corey curve fitting parameter [-]
         real(dp),intent(in)::adj_perc_par       ! factor that takes into account irrigation method and days spent from last irrigation [-]
+        integer,intent(in)::doy                 ! current day for debug
         !
         real(dp)::percolation                   ! percolation in selected time frame - (sub)hourly [mm/h]
         !
@@ -143,7 +144,7 @@ module mod_crop_soil_water
     recursive subroutine water_balance_evap_lay(h_net_irr, h_soil1, & !
         & h_inf, h_eva_act, h_eva_pot, h_perc1, h_pond0, h_pond, h_transp_act, h_transp_pot, k_cb, p_day, h_et0, &
         & k_e, k_r,k_stress_dry, k_stress_sat, hks, kc_max, few, rf_e, h_rew, h_sat, h_fc, h_wp, h_r, & !RR: add kr
-        & k_sat, fatt_n, n_iter1, adj_perc_par, mmax)
+        & k_sat, fatt_n, n_iter1, adj_perc_par, mmax, doy)
         ! water balance of the evapotranspirative layer
         ! recursive: time is divided by 2 in case solution not found
         
@@ -163,6 +164,7 @@ module mod_crop_soil_water
         real(dp), intent(in)::adj_perc_par ! factor that takes into account irrigation method and days spent from last irrigation [-]
         real(dp), intent(in)::p_day        ! deplection fraction adjusted for meteorological conditions [-]
         real(dp), intent(in)::rf_e         ! fraction of active roots in evaporative layer [mm]
+        integer,intent(in)::doy            ! doy for debug 
         !
         real(dp), intent(inout)::h_soil1   ! soil water content of the layer [mm] - (sub)hourly
         real(dp), intent(inout)::h_pond0   ! ponding height at the beginning of the step [mm]
@@ -200,7 +202,7 @@ module mod_crop_soil_water
             ! TODO: check order and update h_soil_mean
             call evaporation(h_soil_mean, h_rew, h_wp, kc_max, few, k_e, k_cb,h_et0,h_eva_act,h_eva_pot,k_r)!
             
-            h_perc1 = percolation(adj_perc_par,h_soil_mean, h_r, h_sat, k_sat, fatt_n)!
+            h_perc1 = percolation(adj_perc_par,h_soil_mean, h_r, h_sat, k_sat, fatt_n,doy)!
             !h_perc1 = percolation_first_layer(adj_perc_par,h_soil_mean, h_r, h_fc, h_sat, k_sat, fatt_n)!
 
             call calculate_water_stresses(h_soil_mean,h_fc,h_wp,h_sat,p_day,k_stress_dry,k_stress_sat)
@@ -243,7 +245,7 @@ module mod_crop_soil_water
             do k=1, k_max
                 call water_balance_evap_lay(h_net_irr/k_max, h_soil1, h_inf/k_max, h_eva_act_m, h_eva_pot_m, h_perc1_m, h_pond_i, h_pond, &
                     & h_transp_act_m, h_transp_pot_m, k_cb, p_day, h_et0/k_max, k_e, k_r,k_s_dry_m,k_s_sat_m, hks_m, kc_max, few, rf_e, & ! RR: add k_r
-                    & h_rew, h_sat, h_fc, h_wp, h_r, k_sat/k_max , fatt_n, n_iter1, adj_perc_par, mmax)
+                    & h_rew, h_sat, h_fc, h_wp, h_r, k_sat/k_max , fatt_n, n_iter1, adj_perc_par, mmax,doy)
 
                 h_pond_i = h_pond
                 h_eva_act = h_eva_act + h_eva_act_m
@@ -264,7 +266,7 @@ module mod_crop_soil_water
     recursive subroutine water_balance_transp_lay(h_soil2, h_transp_act, h_transp_pot, h_perc2, &!
         & h_perc1, k_stress_dry, k_stress_sat, hks, h_eva_pot, h_caprise, h_rise, sr, zr, rf_t, k_cb, p_day, cn_group, h_et0,h_sat,h_fc,h_wp,h_r, k_sat, &!
         & fatt_n, a3 , a4 , b1 , b2, b3, b4, depth_under_rz, &!
-        & n_iter2, adj_perc_par,caprise_flag,mmax)!
+        & n_iter2, adj_perc_par,caprise_flag,mmax,doy)!
         ! water balance of the evapotranspirative layer
         ! recursive: time is divided by 2 in case solution not found
         real(dp), intent(in)::zr            ! depth of the transpirative layer [m]
@@ -291,6 +293,7 @@ module mod_crop_soil_water
         real(dp), intent(in)::depth_under_rz! water table depth under the root zone 
         real(dp), intent(in)::adj_perc_par  ! factor that takes into account irrigation method and days spent from last irrigation [-]
         logical, intent(in)::caprise_flag   ! activate (true) capillary rise calculation
+        integer, intent(in)::doy            ! current day for debug
         !
         real(dp), intent(inout)::h_soil2    ! soil water content of the layer [mm] - (sub)hourly
         integer, intent(inout)::n_iter2     ! final number of iteration [-]
@@ -343,14 +346,13 @@ module mod_crop_soil_water
             if(h_caprise > 0.) then
                 h_perc2 = 0.
             else
-                h_perc2 = percolation(adj_perc_par,h_soil_mean,h_r,h_sat, k_sat, fatt_n)
+                h_perc2 = percolation(adj_perc_par,h_soil_mean,h_r,h_sat, k_sat, fatt_n,doy)
             end if
-
+            
             ! %CG% add control to limit percolation to the available saturation volume
             ! below the second layer (note that we use the same parameters set from layer 2)
             h_perc2_max = ((h_sat-h_fc)/zr)*depth_under_rz ! maximum water storage between root zone and water table
             h_perc2 = min(h_perc2,h_perc2_max)
-            
             ! water balance equation
             h_soil_new = h_soil0 + h_perc1 - h_transp_act - h_perc2 + h_caprise
                 
@@ -359,7 +361,7 @@ module mod_crop_soil_water
                 h_rise = h_soil_new - h_sat   ! excess water moves upward
                 h_soil_new = h_sat  
             else if (h_soil_new <= h_wp)then!
-                ! limit percolation in order to not go under wilting point 
+                ! limit percolation in order to not go under wilting point
                 h_perc2 = h_perc2 + (h_soil_new-h_wp)!
                 h_soil_new = h_wp
             end if
@@ -389,7 +391,7 @@ module mod_crop_soil_water
             do k = 1, kmax
                 call water_balance_transp_lay(h_soil2, h_transp_act_m, h_transp_pot_m, h_perc2_m, h_perc1/kmax,k_s_dry_m,k_s_sat_m, hks_m, h_eva_pot/kmax, h_caprise_m, &
                     & h_rise_m, sr, zr, rf_t, k_cb, p_day, cn_group, h_et0/kmax, h_sat,h_fc,h_wp,h_r, k_sat/kmax, fatt_n, &
-                    & a3 , a4 , b1 , b2 , b3, b4 , depth_under_rz, n_iter2, adj_perc_par,caprise_flag,mmax)
+                    & a3 , a4 , b1 , b2 , b3, b4 , depth_under_rz, n_iter2, adj_perc_par,caprise_flag,mmax,doy)
                 ! %AB%: save all the variable
                 h_caprise = h_caprise + h_caprise_m
                 h_transp_act = h_transp_act + h_transp_act_m

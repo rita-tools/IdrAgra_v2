@@ -29,12 +29,15 @@ program main!
     integer,dimension(8)::t_start,t_stop!
     integer :: errorflag!
     character(len = 255) :: filename = 'idragra_parameters.txt'
+    character(len = 255) :: temp_path
+    
     character(len=50) :: arg
     integer :: i
-    ! default seettings
+    ! default settings
     logical :: debug = .false.
     logical :: summary = .false.
     logical :: showpreview = .false.
+    logical :: file_exists
     
     ! get options
     do i = 1, iargc()
@@ -141,7 +144,15 @@ program main!
         call write_init_grids(info_spat,xml%sim%mode,xml%sim%path,xml%sim)!
         print*,"Input maps have been printed"!
     end if
-    
+
+    ! %EAC%: init sowing shift
+    temp_path = trim(xml%sim%input_path)//trim(xml%sim%sowing_shift_fn)//".asc" 
+    inquire(file=trim(temp_path), exist=file_exists)   ! file_exists will be TRUE if the file exists
+    if (file_exists .eqv. .true.) then
+        print *,'Init sowing shift: ', temp_path
+        call read_grid(trim(temp_path), info_spat%sowing_shift,xml%sim,boundaries)
+    end if
+
     ! %EAC%: add filter to limit water table to evaporative layer
     where(info_spat%wat_tab%mat<xml%depth%ze_fix .and. &
         info_spat%wat_tab%mat/=info_spat%wat_tab%header%nan)
@@ -253,6 +264,7 @@ subroutine make_default(xml, xml_dtx)
     xml%sim%soiluse_fn =             'soiluse'
     xml%sim%meteoweight_fn =         'meteo'
     xml%sim%shapearea_fn =           'shapearea'
+    xml%sim%sowing_shift_fn =        'sowing_shift'
 
     xml%sim%meteo_path =             '.\\meteo_data\\'
     xml%sim%ws_list_fn =         'weather_stations.dat'
@@ -349,47 +361,48 @@ subroutine print_parameters(xml,xml_dtx)
     print *, 'tetaII_rFileName = ', xml%sim%thetaII_r_fn
     print *, 'tetaI_SATFileName = ', xml%sim%thetaI_SAT_fn
     print *, 'tetaII_SATFileName = ', xml%sim%thetaII_SAT_fn
-    print *, 'pendenzaFileName = ', xml%sim%slope_fn
+    print *, 'slopeFileName = ', xml%sim%slope_fn
     print *, 'drenFileName = ', xml%sim%dren_fn
     print *, 'hydr_grFileName = ', xml%sim%hydr_group_fn
     print *, 'ksat_IFileName = ', xml%sim%ksat_I_fn
     print *, 'ksat_IIFileName = ', xml%sim%ksat_II_fn
     print *, 'n_IFileName = ', xml%sim%n_I_fn
     print *, 'n_IIFileName = ', xml%sim%n_II_fn
-    print *, 'tetaI_0FileName = ', xml%sim%thetaI_0_fn
-    print *, 'tetaII_0FileName = ', xml%sim%thetaII_0_fn
-    print *, 'pedologica_x_risoFileName = ', xml%sim%soil_prop_x_rice_fn
+    print *, 'thetaI_0FileName = ', xml%sim%thetaI_0_fn
+    print *, 'thetaII_0FileName = ', xml%sim%thetaII_0_fn
+    print *, 'paddy_soil_FileName = ', xml%sim%soil_prop_x_rice_fn
     print *, 'eff_metodoFileName = ', xml%sim%eff_irr_fn
     print *, 'eff_reteFileName = ', xml%sim%eff_net_fn
     print *, 'irr_unitsFileName = ', xml%sim%irr_units_fn
-    print *, 'codice_metodoFileName = ', xml%sim%id_irr_meth_fn
-    print *, 'soggiacenzaFileName = ', xml%sim%wat_table_fn
+    print *, 'irr_methFileName = ', xml%sim%id_irr_meth_fn
+    print *, 'water_table_depth_FileName = ' , xml%sim%wat_table_fn
     print *, 'ParRisCap_a3FileName = ', xml%sim%ParRisCap_a3_fn
     print *, 'ParRisCap_a4FileName = ', xml%sim%ParRisCap_a4_fn
     print *, 'ParRisCap_b1FileName = ', xml%sim%ParRisCap_b1_fn
     print *, 'ParRisCap_b2FileName = ', xml%sim%ParRisCap_b2_fn
     print *, 'ParRisCap_b3FileName = ', xml%sim%ParRisCap_b3_fn
     print *, 'ParRisCap_b4FileName = ', xml%sim%ParRisCap_b4_fn
-    print *, 'ShapeAreaFlag = ', xml%sim%f_shapearea
-    print *, 'ShapeAreaFileName = ', xml%sim%shapearea_fn
+    print *, 'ShapeAreaFlag = '       , xml%sim%f_shapearea
+    print *, 'ShapeAreaFileName = '   , xml%sim%shapearea_fn
+    print *, 'SowingShiftFileName = ' , xml%sim%sowing_shift_fn
 
-    print *,'mode = ',  xml%sim%mode
-    print *,'mflag = ',  xml%sim%step_out
-    print *,'time = ', xml%sim%clock
-    print *,'InitialThetaFlag = ',  xml%sim%f_init_wc
-    print *,'FinalThetaFlag = ',  xml%sim%f_theta_out
-    print *,'RadnSowDaysWind = ',  xml%sim%sowing_range
-    print *,'SoilUsesNum = ', xml%sim%n_lus
-    print *,'CapillaryFlag = ', xml%sim%f_cap_rise
-    print *,'SoilUseVarFlag = ', xml%sim%f_soiluse
-    print *,'MeteoStatWeightNum = ', xml%sim%n_ws
-    print *,'MeteoStatTotNum = ', xml%sim%n_voronoi
-    print *,'forecast_day = ', xml%sim%forecast_day
-    print *,'zEvap = ', xml%depth%ze_fix
-    print *,'zRoot = ', xml%depth%zr_fix
-    print *,'LambdaCN = ', xml%sim%lambda_cn
-    print *,'StartIrrSeason = ', xml%sim%start_irr_season
-    print *,'EndIrrSeason = ', xml%sim%end_irr_season
+    print *, 'mode = ',  xml%sim%mode
+    print *, 'mflag = ',  xml%sim%step_out
+    print *, 'time = ', xml%sim%clock
+    print *, 'InitialThetaFlag = ',  xml%sim%f_init_wc
+    print *, 'FinalThetaFlag = ',  xml%sim%f_theta_out
+    print *, 'RadnSowDaysWind = ',  xml%sim%sowing_range
+    print *, 'SoilUsesNum = ', xml%sim%n_lus
+    print *, 'CapillaryFlag = ', xml%sim%f_cap_rise
+    print *, 'SoilUseVarFlag = ', xml%sim%f_soiluse
+    print *, 'MeteoStatWeightNum = ', xml%sim%n_ws
+    print *, 'MeteoStatTotNum = ', xml%sim%n_voronoi
+    print *, 'forecast_day = ', xml%sim%forecast_day
+    print *, 'zEvap = ', xml%depth%ze_fix
+    print *, 'zRoot = ', xml%depth%zr_fix
+    print *, 'LambdaCN = ', xml%sim%lambda_cn
+    print *, 'StartIrrSeason = ', xml%sim%start_irr_season
+    print *, 'EndIrrSeason = ', xml%sim%end_irr_season
     print *, 'DTxMode =',xml_dtx%mode
     print *, 'DTxNumXs=',xml_dtx%temp%n_ind
     print *, 'DTx_X=',xml_dtx%temp%x

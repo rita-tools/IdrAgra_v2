@@ -88,10 +88,10 @@ module mod_irrigation
             day_from_irr=0!
         end where!
 
-        ! %EAC%: limit day_from_irr whene day_from_irr= 20 to prevent calculation error, TODO: to be fixed with a better solution
+        ! %EAC%: limit day_from_irr where day_from_irr= 20 to prevent calculation error, TODO: to be fixed with a better solution
         ! 20 should be safe for all OS and CPU
         where(day_from_irr>20)
-            day_from_irr=20
+            day_from_irr=-9999 ! reset after 20 days from irrigation
         end where
 
         ! espeperc --> H_(x,irr)=(1+a_x e^(-t⋅b_x ))H_x
@@ -157,7 +157,7 @@ module mod_irrigation
             & info_spat%irr_meth_id%mat(i,j)/=info_spat%irr_meth_id%header%nan) &!
             & h_irr(i,j,info_spat%irr_meth_id%mat(i,j)) = h_irr_temp(i,j)!
         
-        call update_adj_perco_parameters(info_spat, h_irr_temp, day_from_irr, adj_perc_par)
+        !call update_adj_perco_parameters(info_spat, h_irr_temp, day_from_irr, adj_perc_par)
         
     end subroutine irrigation_need_fix!
 
@@ -213,7 +213,7 @@ module mod_irrigation
             & info_spat%irr_meth_id%mat(i,j)/=info_spat%irr_meth_id%header%nan) &!
             & h_irr(i,j,info_spat%irr_meth_id%mat(i,j)) = h_irr_temp(i,j)!
         
-        call update_adj_perco_parameters(info_spat, h_irr_temp, day_from_irr, adj_perc_par)
+        !call update_adj_perco_parameters(info_spat, h_irr_temp, day_from_irr, adj_perc_par)
         
     end subroutine irrigation_need_fc!
 
@@ -332,7 +332,7 @@ module mod_irrigation
             & info_spat%irr_meth_id%mat(i,j)/=info_spat%irr_meth_id%header%nan) &
             & h_irr(i,j,info_spat%irr_meth_id%mat(i,j)) = h_irr_temp(i,j)!
 
-        call update_adj_perco_parameters(info_spat, h_irr_temp, day_from_irr, adj_perc_par)
+        !call update_adj_perco_parameters(info_spat, h_irr_temp, day_from_irr, adj_perc_par)
         
     end subroutine irrigation_scheduled
     
@@ -634,26 +634,26 @@ module mod_irrigation
         end do!
         !!
         
-        ! TODO: replace with update_perco_parameters subroutine
-        ! calculate the exponential param from the number of days from the latest irrigation event day
-        where(priv_irr+coll_irr==0)!
-            where(day_from_irr==-9999)!
-                day_from_irr=-9999!
-            else where!
-                day_from_irr=day_from_irr+1!
-            end where!
-        else where!
-            day_from_irr=0!
-        end where!
+        ! ! TODO: replace with update_perco_parameters subroutine
+        ! ! calculate the exponential param from the number of days from the latest irrigation event day
+        ! where(priv_irr+coll_irr==0)!
+        !     where(day_from_irr==-9999)!
+        !         day_from_irr=-9999!
+        !     else where!
+        !         day_from_irr=day_from_irr+1!
+        !     end where!
+        ! else where!
+        !     day_from_irr=0!
+        ! end where!
         
-        ! %EAC%: limit day_from_irr whene day_from_irr= 20 to prevent calculation error, TODO: to be fixed with a better solution
-        ! 20 should be safe for all OS and CPU
-        where(day_from_irr>20)
-            day_from_irr=20
-        end where
+        ! ! %EAC%: limit day_from_irr whene day_from_irr= 20 to prevent calculation error, TODO: to be fixed with a better solution
+        ! ! 20 should be safe for all OS and CPU
+        ! where(day_from_irr>20)
+        !     day_from_irr=20
+        ! end where
 
-        esp_perc(:,:,1)=merge(1.0D0,1+am_perc(1)%mat*exp(-1.0*day_from_irr*bm_perc(1)%mat),day_from_irr==-9999)!
-        esp_perc(:,:,2)=merge(1.0D0,1+am_perc(2)%mat*exp(-1.0*day_from_irr*bm_perc(2)%mat),day_from_irr==-9999)!
+        ! esp_perc(:,:,1)=merge(1.0D0,1+am_perc(1)%mat*exp(-1.0*day_from_irr*bm_perc(1)%mat),day_from_irr==-9999)!
+        ! esp_perc(:,:,2)=merge(1.0D0,1+am_perc(2)%mat*exp(-1.0*day_from_irr*bm_perc(2)%mat),day_from_irr==-9999)!
         
     end subroutine irrigation_use!
 
