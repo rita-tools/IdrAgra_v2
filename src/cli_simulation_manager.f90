@@ -731,7 +731,7 @@ module cli_simulation_manager!
                 where ((info_spat%domain%mat /= info_spat%domain%header%nan) &
                             .and. (info_spat%wat_tab%mat<pheno%d_r))
                     pheno%d_r = info_spat%wat_tab%mat
-                END where
+                end where
 
                 where(info_spat%domain%mat /= info_spat%domain%header%nan)!
                     ! Layer depths update as a function of d_r (phenological parameter - root depth)
@@ -923,8 +923,12 @@ module cli_simulation_manager!
                 h_irr_sum = sum(h_irr,dim=3)
                 
                 ! update percolation booster
-                call update_adj_perco_parameters(info_spat, h_irr_sum, day_from_irr, esp_perc)
-
+                select case(pars%sim%mode)
+                    case (1,2,3,4)
+                        call update_adj_perco_parameters(info_spat, h_irr_sum, day_from_irr, esp_perc)
+                    case default
+                end select
+                
                 ! irrigation losses due to the irrigation method
                 h_bypass = h_irr_sum * irr_loss / (100 - irr_loss)
                 where (h_irr_sum/=0) yr_map%n_irr_events%mat = yr_map%n_irr_events%mat +1
