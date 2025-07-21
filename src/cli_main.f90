@@ -29,7 +29,6 @@ program main!
     integer,dimension(8)::t_start,t_stop!
     integer :: errorflag!
     character(len = 255) :: filename = 'idragra_parameters.txt'
-    character(len = 255) :: temp_path
     
     character(len=50) :: arg
     integer :: i
@@ -145,14 +144,6 @@ program main!
         print*,"Input maps have been printed"!
     end if
 
-    ! %EAC%: init sowing shift
-    temp_path = trim(xml%sim%input_path)//trim(xml%sim%sowing_shift_fn)//".asc" 
-    inquire(file=trim(temp_path), exist=file_exists)   ! file_exists will be TRUE if the file exists
-    if (file_exists .eqv. .true.) then
-        print *,'Init sowing shift: ', temp_path
-        call read_grid(trim(temp_path), info_spat%sowing_shift,xml%sim,boundaries)
-    end if
-
     ! %EAC%: add filter to limit water table to evaporative layer
     where(info_spat%wat_tab%mat<xml%depth%ze_fix .and. &
         info_spat%wat_tab%mat/=info_spat%wat_tab%header%nan)
@@ -264,7 +255,7 @@ subroutine make_default(xml, xml_dtx)
     xml%sim%soiluse_fn =             'soiluse'
     xml%sim%meteoweight_fn =         'meteo'
     xml%sim%shapearea_fn =           'shapearea'
-    xml%sim%sowing_shift_fn =        'sowing_shift'
+    xml%sim%irandom_fn =             'irandom'
 
     xml%sim%meteo_path =             '.\\meteo_data\\'
     xml%sim%ws_list_fn =         'weather_stations.dat'
@@ -384,7 +375,7 @@ subroutine print_parameters(xml,xml_dtx)
     print *, 'ParRisCap_b4FileName = ', xml%sim%ParRisCap_b4_fn
     print *, 'ShapeAreaFlag = '       , xml%sim%f_shapearea
     print *, 'ShapeAreaFileName = '   , xml%sim%shapearea_fn
-    print *, 'SowingShiftFileName = ' , xml%sim%sowing_shift_fn
+    print *, 'iRandomFileName = '     , xml%sim%irandom_fn
 
     print *, 'mode = ',  xml%sim%mode
     print *, 'mflag = ',  xml%sim%step_out

@@ -72,7 +72,7 @@ module cli_simulation_manager!
         & theta2_rice, sim_years,boundaries, debug, summary) !
         implicit none!
 
-        type(parameters),intent(in)::pars!
+        type(parameters),intent(inout)::pars!
         type(TDx_index),intent(in)::pars_TDx!
         real(dp),dimension(:,:,:),intent(in):: tab_CN2, tab_CN3!
         integer,intent(in)::sim_years!
@@ -106,7 +106,7 @@ module cli_simulation_manager!
         !!
         integer:: unit_crop
         integer::i,j,k,y,current_year,doy,hour,z,w                           ! for cycles
-        integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::irandom
+        !integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::irandom ! %EAC% use irandom map instead
         integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::dir_phenofases
         integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::dir_meteo
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::meteo_weight
@@ -322,6 +322,15 @@ module cli_simulation_manager!
                 write (s_year,*) current_year
                 write (s_years,*) current_year
             end if
+
+            ! Yearly irandom: change irandom map each year at the beginning, if the file exists
+            ! if not, it will be generated in the following step
+            inquire (file=trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//trim(adjustl(s_years))//'.asc', exist=pars%sim%f_irandom)
+            if (pars%sim%f_irandom .eqv. .true.) then
+                print *,'Init irandom: ', trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//trim(adjustl(s_years))//'.asc'
+                call read_grid(trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//trim(adjustl(s_years))//'.asc', info_spat%irandom,pars%sim,boundaries)
+            end if
+
             
             ! Yearly soil use: change soil use map each year at the beginning
             if (pars%sim%f_soiluse .eqv. .true.) then
@@ -499,17 +508,20 @@ module cli_simulation_manager!
             end if
 
             ! Randomization and spatial distribution of crop emergence
-            call get_uniform_sample(irandom,pars%sim%sowing_range,pars%sim%rand_symmetry,pars%sim%repeatable)!
+            if (pars%sim%f_irandom .eqv. .false.) then
+                call get_uniform_sample(info_spat%irandom%mat,pars%sim%sowing_range,pars%sim%rand_symmetry,pars%sim%repeatable)!
+            end if
+
             call allocate_crop_map (crop_map,info_spat%domain%mat,pars%sim%n_crops,info_spat%domain%header%nan)
             ! make_random_emergence calculates reference data to estimate crop emergence date
             ! which will be calculated in populate_crop_pars_matrices
             call make_random_emergence(info_pheno,meteo_weight,dir_meteo,info_spat%domain,info_spat%soil_use_id%mat, &
-                & crop_map, irandom, pars%sim%year_step(y))!
+                & crop_map, info_spat%irandom%mat, pars%sim%year_step(y))!
             
             if (debug .eqv. .true.) then
                 ! write debug files of reference data for crop randomization
                 call print_mat_as_grid(trim(pars%sim%path)//trim(adjustl(s_years))//"_irandom.asc", &
-                    & info_spat%domain%header,irandom,error_flag)!
+                    & info_spat%irandom%header,info_spat%irandom%mat,error_flag)!
                 do i=1,size(crop_map%ii0,3)
                     write(str,*)i
                     call print_mat_as_grid(trim(pars%sim%path)//trim(adjustl(s_years))//"_ii0_" & 
@@ -660,12 +672,12 @@ module cli_simulation_manager!
                 pheno%k_cb_old = pheno%k_cb
                 if (y==pars%sim%start_simulation%year - info_meteo(1)%start%year + 1 &
                     & .and. (pars%sim%start_simulation%day > 1 .or. pars%sim%start_simulation%month > 1)) then
-                    call populate_crop_pars_matrices(pheno,info_pheno, irandom, &
+                    call populate_crop_pars_matrices(pheno,info_pheno, info_spat%irandom%mat, &
                         & doy + pars%sim%start_simulation%doy - calc_doy(1, 1, pars%sim%start_simulation%year), &
                         & dir_phenofases,info_spat%domain,info_spat%soil_use_id, &
                         & y, pars%sim%year_step(y), crop_map)!
                 else
-                    call populate_crop_pars_matrices(pheno,info_pheno,irandom,doy,dir_phenofases,info_spat%domain,info_spat%soil_use_id, &
+                    call populate_crop_pars_matrices(pheno,info_pheno,info_spat%irandom%mat,doy,dir_phenofases,info_spat%domain,info_spat%soil_use_id, &
                     & y, pars%sim%year_step(y), crop_map)!
                 end if
                 
@@ -679,7 +691,7 @@ module cli_simulation_manager!
                     
                 ! Creating cell parameters output on first day of simulation
                 if (doy == 1 .and. (pars%sim%f_out_cells .eqv. .true.))then!
-                    call write_cell_prod(out_tbl_list%prod_info, crop_map, irandom)
+                    call write_cell_prod(out_tbl_list%prod_info, crop_map, info_spat%irandom%mat)
                 end if
                 
                 ! Inizialization on first day of simulation

@@ -57,7 +57,7 @@ module mod_parameters!
         character(len=255) :: soiluse_fn
         character(len=255) :: meteoweight_fn
         character(len=255) :: shapearea_fn
-        character(len=255) :: sowing_shift_fn
+        character(len=255) :: irandom_fn
         
 
         integer :: step_out                         ! monthly output = 0, weekly output = 1, user defined = 2
@@ -89,6 +89,7 @@ module mod_parameters!
         integer,dimension(:),pointer :: no_lu_list  ! list of ids if the NOT simulated land uses
         logical :: f_cap_rise                       ! if true, capillary rise is calculated
         logical :: f_shapearea                      ! if true, use shapes area (for vectorialization)
+        logical :: f_irandom                        ! if true, use user defined random values
         integer :: n_ws                             ! maximum number of weather station
         integer :: start_irr_season                 ! start irrigation season [doy]
         integer :: end_irr_season                   ! end irrigation season [doy]

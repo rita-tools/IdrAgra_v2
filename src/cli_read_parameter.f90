@@ -781,6 +781,17 @@ module cli_read_parameter!
         if(sim%f_shapearea .eqv. .true.) then
             call read_grid(trim(dir)//trim(sim%shapearea_fn)//'.asc', info_spat%cell_area,sim,extent)
         end if
+
+        ! %EAC%: init irandom if exists
+        inquire (file=trim(dir)//trim(sim%irandom_fn)//'.asc', exist=sim%f_irandom)
+        if (sim%f_irandom .eqv. .true.) then
+            print *,'Init irandom: ', trim(dir)//trim(sim%irandom_fn)//'.asc'
+            call read_grid(trim(dir)//trim(sim%irandom_fn)//'.asc', info_spat%irandom,sim,extent)
+        else
+            ! init irandom matrix
+            info_spat%irandom = info_spat%domain
+        end if
+
         
     end subroutine read_grid_files
     !
