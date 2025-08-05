@@ -1,7 +1,7 @@
 module cli_crop_parameters!
     use mod_constants, only: sp, dp
     use mod_utility, only: seek_un, lower_case, string_to_integers, string_to_reals, split_string, count_element
-    use mod_parameters, only: simulation
+    use mod_parameters, only: simulation,parameters
     use mod_meteo, only: meteo_info
     use mod_crop_phenology
     use mod_system
@@ -338,7 +338,7 @@ module cli_crop_parameters!
             dir_name = info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)
             call open_daily_crop_par_file(info_pheno(i)%k_cb%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"Kcb.dat",errorflag)!
             call open_daily_crop_par_file(info_pheno(i)%h%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"H.dat",errorflag)!         
-            call open_daily_crop_par_file(info_pheno(i)%d_r%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"Sr.dat",errorflag)!
+            call open_daily_crop_par_file(info_pheno(i)%z_r%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"Sr.dat",errorflag)!
             call open_daily_crop_par_file(info_pheno(i)%lai%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"LAI.dat",errorflag)!
             call open_daily_crop_par_file(info_pheno(i)%cn_day%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CNvalue.dat",errorflag)!
             call open_daily_crop_par_file(info_pheno(i)%f_c%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"fc.dat",errorflag)
@@ -353,7 +353,7 @@ module cli_crop_parameters!
             allocate(info_pheno(i)%cn_class             (sim%n_lus, sim%n_crops))
             allocate(info_pheno(i)%p_raw_const     (sim%n_lus, sim%n_crops))
             allocate(info_pheno(i)%a              (sim%n_lus, sim%n_crops))
-            allocate(info_pheno(i)%max_d_r          (sim%n_lus, sim%n_crops))
+            allocate(info_pheno(i)%d_r_max          (sim%n_lus, sim%n_crops))
             allocate(info_pheno(i)%max_RF_t         (sim%n_lus, sim%n_crops))
             allocate(info_pheno(i)%T_lim           (sim%n_lus, sim%n_crops))
             allocate(info_pheno(i)%T_crit          (sim%n_lus, sim%n_crops))
@@ -372,7 +372,7 @@ module cli_crop_parameters!
             info_pheno(i)%cn_class              = int(nan)
             info_pheno(i)%p_raw_const               = nan
             info_pheno(i)%a               = nan
-            info_pheno(i)%max_d_r           = nan
+            info_pheno(i)%d_r_max           = nan
             info_pheno(i)%max_RF_t          = nan
             info_pheno(i)%T_lim            = nan
             info_pheno(i)%T_crit           = nan
@@ -405,11 +405,12 @@ module cli_crop_parameters!
         end if
     end subroutine init_crop_phenology_pars!
 
-    subroutine read_all_crop_pars(n_days,n_crop,info_pheno)!
+    subroutine read_all_crop_pars(n_days,n_crop,info_pheno,pars)!
         ! read all daily crop parameters by the number of days over the opened files
         implicit none!
         integer,intent(in)::n_days!
         integer,intent(in)::n_crop!
+        type(parameters),intent(in)::pars!
         type(crop_pheno_info),dimension(:),intent(inout)::info_pheno!
         integer:: i, doy!
         integer:: crop_idx ! current crop index
@@ -419,7 +420,7 @@ module cli_crop_parameters!
         do i=1,size(info_pheno)!
             call read_crop_pars(info_pheno(i)%k_cb,n_days,n_crop)!
             call read_crop_pars(info_pheno(i)%h,n_days,n_crop)!
-            call read_crop_pars(info_pheno(i)%d_r,n_days,n_crop)!
+            call read_crop_pars(info_pheno(i)%z_r,n_days,n_crop)!
             call read_crop_pars(info_pheno(i)%lai,n_days,n_crop)!
             call read_crop_pars(info_pheno(i)%cn_day,n_days,n_crop)!
             call read_crop_pars(info_pheno(i)%f_c,n_days,n_crop)! %RR%
@@ -473,23 +474,23 @@ module cli_crop_parameters!
         end do!
         
         do i=1,size(info_pheno)
-            ! Calculate max rooting depth for annual crops
-            info_pheno(i)%max_d_r(:,1) = maxval(info_pheno(i)%d_r%tab, dim=1)
+            ! Calculate max thickness of the transpirative layer
+            info_pheno(i)%d_r_max(:,1) = maxval(info_pheno(i)%z_r%tab, dim=1)-pars%depth%ze_fix
             
-            do crop_idx = 1, size(info_pheno(i)%d_r%tab, 2)
+            do crop_idx = 1, size(info_pheno(i)%z_r%tab, 2)
                 if (info_pheno(i)%n_crops_by_year(crop_idx) > 1) then
                     ij_idx = 1 ! index initialization
                     do cs = 1, info_pheno(i)%n_crops_by_year(crop_idx)
-                        do ii_idx = ij_idx, size(info_pheno(i)%d_r%tab, 1)
-                            if (info_pheno(i)%d_r%tab(ii_idx,crop_idx) > 0) exit
+                        do ii_idx = ij_idx, size(info_pheno(i)%z_r%tab, 1)
+                            if (info_pheno(i)%z_r%tab(ii_idx,crop_idx) > 0) exit
                         end do
-                        do ij_idx = ii_idx, size(info_pheno(i)%d_r%tab, 1)
-                            if (info_pheno(i)%d_r%tab(ij_idx,crop_idx) == 0) exit
+                        do ij_idx = ii_idx, size(info_pheno(i)%z_r%tab, 1)
+                            if (info_pheno(i)%z_r%tab(ij_idx,crop_idx) == 0) exit
                         end do
                         dummy_array = .false.
                         if (ij_idx > n_days) ij_idx = n_days
                         dummy_array(ii_idx:ij_idx) = .true.
-                        info_pheno(i)%max_d_r(crop_idx,cs) = maxval(info_pheno(i)%d_r%tab(:,crop_idx), dim=1, mask=dummy_array)
+                        info_pheno(i)%d_r_max(crop_idx,cs) = maxval(info_pheno(i)%z_r%tab(:,crop_idx), dim=1, mask=dummy_array)-pars%depth%ze_fix
                     end do
                 end if
             end do
@@ -603,7 +604,7 @@ module cli_crop_parameters!
         do i=1,size(info_pheno)!
             if(associated(info_pheno(i)%k_cb%tab)) deallocate(info_pheno(i)%k_cb%tab)!
             if(associated(info_pheno(i)%h%tab)) deallocate(info_pheno(i)%h%tab)!
-            if(associated(info_pheno(i)%d_r%tab)) deallocate(info_pheno(i)%d_r%tab)!
+            if(associated(info_pheno(i)%z_r%tab)) deallocate(info_pheno(i)%z_r%tab)!
             if(associated(info_pheno(i)%lai%tab)) deallocate(info_pheno(i)%lai%tab)!
             if(associated(info_pheno(i)%cn_day%tab)) deallocate(info_pheno(i)%cn_day%tab)!
             if(associated(info_pheno(i)%f_c%tab)) deallocate(info_pheno(i)%f_c%tab)!
@@ -620,7 +621,7 @@ module cli_crop_parameters!
         do i=1,size(info_pheno)!
             close(info_pheno(i)%k_cb%unit)!
             close(info_pheno(i)%h%unit)!
-            close(info_pheno(i)%d_r%unit)!
+            close(info_pheno(i)%z_r%unit)!
             close(info_pheno(i)%lai%unit)!
             close(info_pheno(i)%cn_day%unit)!
             close(info_pheno(i)%f_c%unit)!
@@ -656,7 +657,7 @@ module cli_crop_parameters!
         do k=1, size(info_pheno%k_cb%tab,2) ! loop over crops
             do d=1,size(info_pheno%k_cb%tab,1)    ! loop over data
                 if(info_pheno%k_cb%tab(d,k).gt.0)then!
-                    if(info_pheno%d_r%tab(d,k).eq.0.) then!
+                    if(info_pheno%z_r%tab(d,k).eq.0.) then!
                         write(*,*)' Warning: Sr null. Day: ',d,' Soil use class: ', k !
                         error_flag = -1!
                     end if!

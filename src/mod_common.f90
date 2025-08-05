@@ -34,7 +34,7 @@ module mod_common
     ! Definition of type balance2_matrices
     ! Stores in distributed form all 2nd layer (transpirative layer) balance terms
     ! The variable is modified each day
-        real(dp),dimension(:,:),pointer::d_t            ! depth of the transpirative layer  [m]!
+        real(dp),dimension(:,:),pointer::d_t            ! thickness of the transpirative layer  [m]!
         real(dp),dimension(:,:),pointer::h_soil         ! water content [mm]!
         real(dp),dimension(:,:),pointer::t_soil         ! volumetric water content of the evaporative layer  [m3/m3]!
         real(dp),dimension(:,:),pointer::h_transp_act   ! actual transpiration [mm]!

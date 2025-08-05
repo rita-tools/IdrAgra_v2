@@ -474,7 +474,7 @@ module cli_simulation_manager!
             end if ! end change soil use map condition
 
             ! Read all phenological tables and allocation of info_pheno%prm%tab(:,:)!
-            call read_all_crop_pars(pars%sim%year_step(y),pars%sim%n_lus,info_pheno)!
+            call read_all_crop_pars(pars%sim%year_step(y),pars%sim%n_lus,info_pheno,pars)!
             if (debug .eqv. .true.) then
                 call check_pheno_parameters(info_pheno,info_meteo)!
                 call seek_un(error_flag,unit_crop)!
@@ -765,7 +765,7 @@ module cli_simulation_manager!
                     where (pheno%p_day >0.8) pheno%p_day=0.8 ! TODO: larger values will be permitted in order to consider stress irrigation
                 end where!
                 ! 
-                call calculate_RF_t(wat_bal2%d_t, pars%depth%ze_fix, pheno, info_spat%domain)
+                call calculate_RF_t(wat_bal2%d_t, pheno, info_spat%domain)
                 !!
                 ! Soil water thresholds update (wat variable)
                 call update_soil_pars(info_spat%domain, info_spat%theta, &
@@ -817,7 +817,7 @@ module cli_simulation_manager!
                 else
                     call create_meteo_matrices(info_meteo,dir_meteo,meteo_weight,meteo,info_spat%domain,doy,pars%sim%res_canopy(y))
                 end if
-
+                
                 ! calculate average latitude
                 if (doy == 1) then 
                     forall (i=1:size(meteo%lat,1), j=1:size(meteo%lat,2), meteo%lat(i,j)/=nan_r)!
@@ -945,7 +945,7 @@ module cli_simulation_manager!
                     & out_cn_day,info_spat%domain,info_spat%hydr_gr, &!
                     & info_spat%slope%mat, out_cn,info_spat%theta, &
                     & wat_bal1%t_soil,wat_bal2%t_soil)
-
+                
                 ! init water balance variables
                 call init_water_balance_variables(wat_bal1,wat_bal2)
                 
@@ -967,7 +967,6 @@ module cli_simulation_manager!
                     & wat_bal1%h_runoff, out_cn_day, pars%sim%lambda_cn)
                 
                 ! HOURLY LOOP OF THE SIMULATION
-                            
                 
                 hr_loop: do hour = 1,24
                     ! init the variables to zero (except for f_eff_rain, h_net_av_water)
@@ -1084,7 +1083,7 @@ module cli_simulation_manager!
                         end if
                     end if
                 end do hr_loop
-                
+                    
                 ! update the soil water content (dimensionless)
                 if(doy == pars%sim%year_step(y)) then
                     where(info_spat%domain%mat /= info_spat%domain%header%nan)!
@@ -1183,6 +1182,7 @@ module cli_simulation_manager!
                     end do
                 end if
                 
+                    
                 ! calculate transpiration deficit index
                 if (trim(pars_TDx%mode)/="none") then
                     call sum_TD(wat_bal1%h_transp_act+wat_bal2%h_transp_act,wat_bal1%h_transp_pot+wat_bal2%h_transp_pot,pheno%k_cb,n_day,y,TD)
@@ -1205,8 +1205,9 @@ module cli_simulation_manager!
                 call write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal1, wat_bal2, wat_bal2_old, &
                     & info_spat, pars, wat, wat_bal_hour, fw_day, fw_old, esp_perc, out_cn, out_cn_day, h_bypass, coll_irr, priv_irr, out_tbl_list, &
                     & pars%sim%mode,pars%sim%f_out_cells,debug) !! %RR% fw_old
-
+                    
                 ! save output files by step
+                
                 if(out_asc .eqv. .true.)then!
                     if (pars%sim%step_out == 0) then
                         call write_outputs_by_step (doy, meteo, h_irr_sum, wat_bal1, wat_bal2, &
@@ -1220,7 +1221,7 @@ module cli_simulation_manager!
                             & debug,summary)    ! scheduled outputs
                     end if
                 end if
-                
+
                 ! save to file the output bu year
                 if (out_yearly .eqv. .true.) then
                     yr_map%rain%mat = yr_map%rain%mat + meteo%p
@@ -1343,7 +1344,7 @@ module cli_simulation_manager!
                     call save_yield_debug_data(yield, info_spat%domain)
                 end if
             end if
-
+                    
             ! close the csv files for cell outputs
             call close_cell_output_by_year(out_tbl_list,pars%sim%mode,pars%sim%f_out_cells,debug)
             ! destroy annual variables
@@ -1827,7 +1828,7 @@ module cli_simulation_manager!
         pheno%cn_class = int(a)!
         pheno%p = a!
         pheno%a = a!
-        pheno%max_RF_t = a!
+        pheno%RF_t_max = a!
         pheno%RF_e = a!
         pheno%RF_t = a!
         pheno%T_lim = a!
@@ -2025,7 +2026,7 @@ module cli_simulation_manager!
             where(pheno%f_c<0.)!
                 ! fc calculated with equation 76 [FAO56 p.149] unless it isn't an input %RR%
                 WHERE(pheno%k_cb<=kc_min)
-                    fc=0.!
+                    fc=0.0! %EAC% TODO: limit the exposed surface
                 ELSE WHERE
                     fc = ((pheno%k_cb-kc_min)/(wat%kc_max-kc_min))**(1+0.5*pheno%h)
                 END WHERE
@@ -2329,8 +2330,8 @@ module cli_simulation_manager!
             allocate(pheno%cn_class             (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%p              (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%a              (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
-            allocate(pheno%max_d_r          (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
-            allocate(pheno%max_RF_t         (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
+            allocate(pheno%d_t_max          (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
+            allocate(pheno%RF_t_max         (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%RF_e            (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%RF_t            (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%T_lim           (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
@@ -2359,8 +2360,8 @@ module cli_simulation_manager!
             deallocate(pheno%cn_class             )!
             deallocate(pheno%p              )!
             deallocate(pheno%a              )!
-            deallocate(pheno%max_d_r          )!
-            deallocate(pheno%max_RF_t         )!
+            deallocate(pheno%d_t_max          )!
+            deallocate(pheno%RF_t_max         )!
             deallocate(pheno%RF_e            )!
             deallocate(pheno%RF_t            )!
             deallocate(pheno%T_lim           )!

@@ -27,7 +27,7 @@ module mod_crop_phenology
         integer,dimension(:),pointer::n_crops_by_year       ! number of crop in a year
         type(file_phenology_r)::k_cb                        ! base crop coefficient
         type(file_phenology_r)::h                           ! crop height
-        type(file_phenology_r)::d_r                         ! root depth
+        type(file_phenology_r)::z_r                         ! root depth
         type(file_phenology_r)::lai                         ! leaf area index
         type(file_phenology_r)::f_c                         ! cover fraction
         type(file_phenology_r)::r_stress                    ! plant resistance to water stress
@@ -35,7 +35,7 @@ module mod_crop_phenology
         type(k_cb_matrices)::kcb_phases                     ! k_cb change points during phenology
         real(dp),dimension(:,:),pointer::p_raw_const        ! readily available water factor [-]
         real(dp),dimension(:,:),pointer::a                  ! interception coefficient according to the Von Hoyningen-Hune & Braden method [-]
-        real(dp),dimension(:,:),pointer::max_d_r            ! maximum root depth [m]
+        real(dp),dimension(:,:),pointer::d_r_max            ! maximum root depth [m]
         real(dp),dimension(:,:),pointer::max_RF_t           ! maximum fraction of active roots in transpirative layer [-]
         real(dp),dimension(:,:),pointer::T_lim              ! limit temperature threshold - thermic stress [°C]
         real(dp),dimension(:,:),pointer::T_crit             ! critical temperature threshold - thermic stress [°C]
@@ -61,8 +61,8 @@ module mod_crop_phenology
         integer,dimension(:,:),pointer::cn_class
         real(dp),dimension(:,:),pointer::p
         real(dp),dimension(:,:),pointer::a
-        real(dp),dimension(:,:),pointer::max_d_r
-        real(dp),dimension(:,:),pointer::max_RF_t
+        real(dp),dimension(:,:),pointer::d_t_max
+        real(dp),dimension(:,:),pointer::RF_t_max
         real(dp),dimension(:,:),pointer::RF_e
         real(dp),dimension(:,:),pointer::RF_t
         real(dp),dimension(:,:),pointer::T_lim
@@ -291,7 +291,7 @@ module mod_crop_phenology
                             end if
                         end if
                         crop_pars_mat%h(i,j)=info_pheno(ws_idx(i,j))%h%tab(doy_s,soil_use%mat(i,j))
-                        crop_pars_mat%d_r(i,j)=info_pheno(ws_idx(i,j))%d_r%tab(doy_s,soil_use%mat(i,j))
+                        crop_pars_mat%d_r(i,j)=info_pheno(ws_idx(i,j))%z_r%tab(doy_s,soil_use%mat(i,j))
                         crop_pars_mat%lai(i,j)=info_pheno(ws_idx(i,j))%lai%tab(doy_s,soil_use%mat(i,j))
                         crop_pars_mat%cn_day(i,j)=info_pheno(ws_idx(i,j))%cn_day%tab(doy_s,soil_use%mat(i,j))
                         crop_pars_mat%f_c(i,j)=info_pheno(ws_idx(i,j))%f_c%tab(doy_s,soil_use%mat(i,j))
@@ -308,9 +308,9 @@ module mod_crop_phenology
 
                         crop_pars_mat%a(i,j)=&
                             info_pheno(ws_idx(i,j))%a(soil_use%mat(i,j),crop_pars_mat%n_crop_in_year(i,j))
-                        crop_pars_mat%max_d_r(i,j)= &
-                            info_pheno(ws_idx(i,j))%max_d_r(soil_use%mat(i,j),crop_pars_mat%n_crop_in_year(i,j))
-                        crop_pars_mat%max_RF_t(i,j)= &
+                        crop_pars_mat%d_t_max(i,j)= &
+                            info_pheno(ws_idx(i,j))%d_r_max(soil_use%mat(i,j),crop_pars_mat%n_crop_in_year(i,j))
+                        crop_pars_mat%RF_t_max(i,j)= &
                             info_pheno(ws_idx(i,j))%max_RF_t(soil_use%mat(i,j),crop_pars_mat%n_crop_in_year(i,j))
                         crop_pars_mat%T_lim(i,j)= &
                             info_pheno(ws_idx(i,j))%T_lim(soil_use%mat(i,j),crop_pars_mat%n_crop_in_year(i,j))
@@ -336,18 +336,19 @@ module mod_crop_phenology
         end do!
     end subroutine populate_crop_pars_matrices!
     
-    subroutine calculate_RF_t(d_r, d_e_fix, crop_par_mat,domain)!
+    subroutine calculate_RF_t(d_t, crop_par_mat,domain)!
         ! calculate root fraction in both evaporative and transpirative layer 
-        real(dp), dimension(:,:), intent(in)::d_r
-        real(dp), intent(in)::d_e_fix
+        real(dp), dimension(:,:), intent(in)::d_t
         type(grid_i),intent(in)::domain!
         type(crop_pars_matrices),intent(inout)::crop_par_mat
         
         ! populate pheno%RF_t & pheno%RF_e
-        crop_par_mat%RF_t = merge(crop_par_mat%max_RF_t * (d_r / (crop_par_mat%max_d_r-d_e_fix)), &
-                                  crop_par_mat%RF_t, crop_par_mat%max_RF_t /= domain%header%nan)
-        crop_par_mat%RF_e = merge(1- crop_par_mat%RF_t, crop_par_mat%RF_e, crop_par_mat%max_RF_t /= domain%header%nan)
+        crop_par_mat%RF_t = merge(crop_par_mat%RF_t_max * (d_t/crop_par_mat%d_t_max)*&
+                                 (1.0D0 / (crop_par_mat%RF_t_max*(d_t/crop_par_mat%d_t_max)+(1.0D0-crop_par_mat%RF_t_max))), &
+                                  crop_par_mat%RF_t, crop_par_mat%RF_t_max /= domain%header%nan)
+        crop_par_mat%RF_e = merge(1- crop_par_mat%RF_t, crop_par_mat%RF_e, crop_par_mat%RF_t_max /= domain%header%nan)
 
     end subroutine calculate_RF_t!
     
+
 end module mod_crop_phenology
