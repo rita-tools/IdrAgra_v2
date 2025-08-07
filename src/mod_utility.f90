@@ -425,6 +425,15 @@ module mod_utility!
         round = anint(val*10.0**n)/10.0**n
     end function round
 
+    function round_2darray(mat, n) result(res)
+        implicit none
+        real(dp), dimension(:,:)::mat!
+        real(dp), allocatable ::res(:,:)!
+        integer :: n
+        allocate(res(size(mat,1),size(mat,2)))
+        res = anint(mat*10.0**n)/10.0**n
+    end function round_2darray
+
     pure elemental function pdf_normal(x, x_mean, x_std) result(pdf)
         implicit none
         real(dp), intent(in):: x, x_mean, x_std

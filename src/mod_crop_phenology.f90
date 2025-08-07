@@ -1,6 +1,6 @@
 module mod_crop_phenology
     use mod_grid
-    use mod_utility, only: round
+    use mod_utility, only: round, round_2darray
     implicit none
 
     type file_phenology_r!
@@ -261,11 +261,10 @@ module mod_crop_phenology
                     if (doy_s > year_length) doy_s = year_length
 
                     ! %EAC% fix back shifting
-                    ! tested with second crop only
-                    if (crop_pars_mat%n_crop_in_year(i,j) == &
-                                info_pheno(ws_idx(i,j))%n_crops_by_year(soil_use%mat(i,j))) then
-                        if (doy_s < crop_mat%ii0(i,j,crop_pars_mat%n_crop_in_year(i,j)) .or. &
-                            doy_s > crop_mat%iie(i,j,crop_pars_mat%n_crop_in_year(i,j))) then
+                    ! if the second crop, then check if new doy overlap the series of the previous crop
+                    ! if so, delete the overlap
+                    if (crop_pars_mat%n_crop_in_year(i,j) == 2) then !
+                        if (doy_s < crop_mat%iie(i,j,1)) then ! compare with the first crop
                                 doy_s = doy
                         end if
                     end if
@@ -346,7 +345,8 @@ module mod_crop_phenology
         crop_par_mat%RF_t = merge(crop_par_mat%RF_t_max * (d_t/crop_par_mat%d_t_max)*&
                                  (1.0D0 / (crop_par_mat%RF_t_max*(d_t/crop_par_mat%d_t_max)+(1.0D0-crop_par_mat%RF_t_max))), &
                                   crop_par_mat%RF_t, crop_par_mat%RF_t_max /= domain%header%nan)
-        crop_par_mat%RF_e = merge(1- crop_par_mat%RF_t, crop_par_mat%RF_e, crop_par_mat%RF_t_max /= domain%header%nan)
+        crop_par_mat%RF_t = round_2darray(crop_par_mat%RF_t,6)
+        crop_par_mat%RF_e = merge(1-  crop_par_mat%RF_t, crop_par_mat%RF_e, crop_par_mat%RF_t_max /= domain%header%nan)
 
     end subroutine calculate_RF_t!
     
