@@ -742,6 +742,10 @@ module cli_simulation_manager!
                     end where!
                     ! Water table depth inizialization under root zone (referred to the sum of layer depth to be consistent)
                     wat_bal2%depth_under_rz = info_spat%wat_tab%mat - wat_bal1%d_e - wat_bal2%d_t!
+                    ! fix negative depth
+                    where (wat_bal2%depth_under_rz < 0.0D0)
+                        wat_bal2%depth_under_rz = 0.0D0
+                    end where
                     ! Soil water content update
                     where(wat_bal2%d_t == wat_bal2_old%d_t)!
                         wat_bal2_old%h_soil = wat_bal2_old%t_soil*1000*wat_bal2_old%d_t!
