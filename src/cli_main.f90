@@ -394,6 +394,7 @@ subroutine print_parameters(xml,xml_dtx)
     print *, 'LambdaCN = ', xml%sim%lambda_cn
     print *, 'StartIrrSeason = ', xml%sim%start_irr_season
     print *, 'EndIrrSeason = ', xml%sim%end_irr_season
+    print *, 'h_maxpond', xml%sim%h_maxpond
     print *, 'DTxMode =',xml_dtx%mode
     print *, 'DTxNumXs=',xml_dtx%temp%n_ind
     print *, 'DTx_X=',xml_dtx%temp%x

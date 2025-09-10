@@ -166,13 +166,13 @@ module cli_simulation_manager!
         
         ! init maximum pond
         info_spat%h_maxpond=info_spat%slope
-        info_spat%h_maxpond%mat = 10000.0D0
+        info_spat%h_maxpond%mat = pars%sim%h_maxpond!10000.0D0
                 
         ! spread irrigation variables
         if (pars%sim%mode>0) then
             info_spat%irr_ends%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_ends)
             info_spat%irr_starts%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_starts)
-            info_spat%h_maxpond%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_maxpond)
+            !info_spat%h_maxpond%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_maxpond)
         end if
 
         ! init to zero irrigation related outputs
@@ -853,8 +853,19 @@ module cli_simulation_manager!
                 meteo%T_ave = meteo%T_ave / (14-8+1)
 
                 ! TODO: implement separated subroutine for each simulation mode
+                ! TODO: da riverere!!!!
                 !if(doy>=pars%sim%start_irr_season .and. doy<=pars%sim%end_irr_season)then!
-                
+                do z=1, pars%sim%n_irr_meth
+                    where(info_spat%irr_meth_id%mat==z)
+                        info_spat%h_maxpond%mat=pars%irr%met(z)%h_maxpond
+                    end where
+                end do
+
+                ! if outside irrigation season restore default, indipendently from methods
+                where (doy<info_spat%irr_starts%mat .or. doy>info_spat%irr_ends%mat)
+                    info_spat%h_maxpond%mat=pars%sim%h_maxpond
+                end where
+
                 ! define irrigation height base on irrigation period and specific condiction
                 select case (pars%sim%mode)
                     case (1)                        ! use mode
@@ -1451,7 +1462,8 @@ module cli_simulation_manager!
                             & ';', esp_perc(xx,yy,1),';',esp_perc(xx,yy,2),';',h_bypass(xx,yy), &
                             ! new variables
                             & ';', pheno%RF_e(xx,yy),';',pheno%RF_t(xx,yy),';',pheno%r_stress(xx,yy), &
-                            & ';', wat%layer(2)%h_r(xx,yy),';',wat%layer(2)%h_wp(xx,yy),';',wat%layer(2)%h_fc(xx,yy),';',wat%layer(2)%h_sat(xx,yy)
+                            & ';', wat%layer(2)%h_r(xx,yy),';',wat%layer(2)%h_wp(xx,yy),';',wat%layer(2)%h_fc(xx,yy),';',wat%layer(2)%h_sat(xx,yy), &
+                            & ';', info_spat%h_maxpond%mat(xx,yy)
                              
                     case (1)
                         write(out_tbl%sample_cells(i)%file%unit,*)doy, &!
@@ -1474,7 +1486,8 @@ module cli_simulation_manager!
                             & ';', esp_perc(xx,yy,2),';',h_bypass(xx,yy),&
                             ! new variables
                             & ';', pheno%RF_e(xx,yy),';',pheno%RF_t(xx,yy),';',pheno%r_stress(xx,yy), &
-                            & ';', wat%layer(2)%h_r(xx,yy),';',wat%layer(2)%h_wp(xx,yy),';',wat%layer(2)%h_fc(xx,yy),';',wat%layer(2)%h_sat(xx,yy)
+                            & ';', wat%layer(2)%h_r(xx,yy),';',wat%layer(2)%h_wp(xx,yy),';',wat%layer(2)%h_fc(xx,yy),';',wat%layer(2)%h_sat(xx,yy), &
+                            & ';', info_spat%h_maxpond%mat(xx,yy)
                     case default
                 end select
             end do!

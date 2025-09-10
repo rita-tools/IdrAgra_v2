@@ -103,6 +103,7 @@ module mod_parameters!
         type(date) :: start_simulation              ! start simulation date
         type(date) :: end_simulation                ! end simulation date
         integer :: forecast_day = 5                 ! number of days to use to cumulate precipitation
+        real(dp) :: h_maxpond = 0.0D0               ! overall maximum pond (mm). It will replaced by irrigation method
     end type simulation!
 
     type layer_depth!

@@ -382,6 +382,9 @@ module cli_read_parameter!
                             read(buffer, *, iostat=ios) xml%sim%irrdistr_list_fn
                         case ('sched_irr_fn') ! distribution rules for scheduled irrigation
                             read(buffer, *, iostat=ios) xml%sim%sched_irr_fn
+                        
+                        case('h_maxpond')
+                            read(buffer, *, iostat=ios) xml%sim%h_maxpond
 
                         case default ! all other cases ... !
                             print *, 'Skipping invalid or obsolete label <',trim(label),'> at line', line, &

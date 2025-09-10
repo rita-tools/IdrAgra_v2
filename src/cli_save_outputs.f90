@@ -284,7 +284,8 @@ module cli_save_outputs!
                     & 'distr_irr_mm'//'; '//'priv_well_irr_mm'//'; '//&!
                     & 'espperc1'//'; '//'espperc2'//'; '//'irr_loss_mm'//'; '//&
                     & 'RF_e'//'; '//'RF_t'//'; '//'r_stress'//'; '//&
-                    & 'h_r'//'; '//'h_wp'//'; '//'h_fc'//'; '//'h_sat')
+                    & 'h_r'//'; '//'h_wp'//'; '//'h_fc'//'; '//'h_sat'//&
+                    & '; '//'h_maxpond')
             end do!
                 
             ! cell info
