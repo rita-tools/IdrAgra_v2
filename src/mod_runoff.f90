@@ -135,7 +135,13 @@ module mod_runoff
                     ! Soil moisture content adjustment
                     ! CN1 & CN3
                     cn1_day(i,j)=cn2_day(i,j)-((20.*(100.-cn2_day(i,j)))/(100.-cn2_day(i,j)+exp(2.533-0.0636*(100.-cn2_day(i,j)))))!
+                    ! %EAC% limit lower value
+                    cn1_day(i,j) = max(cn1_day(i,j), .4 * cn2_day(i,j))
+                    
                     cn3_day(i,j)=cn2_day(i,j)*exp(0.00673*(100.-cn2_day(i,j)))!
+                    ! %EAC% limit upper value
+                    cn3_day(i,j) = min(cn3_day(i,j), 100.0D0)
+                                        
                     ! Soil moisture content CN
                     call adjust_cn_by_moisture(cn_day_out(i,j),cn1_day(i,j),cn2_day(i,j),cn3_day(i,j), &!
                         & t_wp(i,j),t_fc(i,j),t_sat(i,j),t_amc2(i,j),t_act(i,j))!
