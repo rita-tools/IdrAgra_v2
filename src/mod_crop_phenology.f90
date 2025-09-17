@@ -263,8 +263,8 @@ module mod_crop_phenology
                     ! %EAC% fix back shifting
                     ! if the second crop, then check if new doy overlap the series of the previous crop
                     ! if so, delete the overlap
-                    if (crop_pars_mat%n_crop_in_year(i,j) == 2) then !
-                        if (doy_s < crop_mat%iie(i,j,1)) then ! compare with the first crop
+                    if (crop_pars_mat%n_crop_in_year(i,j) >= 2) then !
+                        if (doy_s < crop_mat%iie(i,j,crop_pars_mat%n_crop_in_year(i,j)-1)) then ! compare with the previous crop
                                 doy_s = doy
                         end if
                     end if
