@@ -140,6 +140,7 @@ module mod_irrigation
                                 (bil1_old%h_eva + bil2_old%h_transp_pot))/ & ! fill ET
                                 1.0 ! don't consider efficiency
             ! TODO: %EAC%: small edit to manage submerged condition
+            ! TODO: temporary implementation for rice paddy
             else where ((info_spat%h_maxpond%mat>10.0D0) .and. (bil1_old%h_pond<(0.9*info_spat%h_maxpond%mat))) ! crop submerged, only if h_maxpond> 10 mm
                 h_irr_temp = info_spat%h_meth%mat
             else where ((bil1_old%h_soil*pheno%RF_e + bil2_old%h_soil*pheno%RF_t) < bil2%h_raw_sup) ! all other crops

@@ -853,7 +853,6 @@ module cli_simulation_manager!
                 meteo%T_ave = meteo%T_ave / (14-8+1)
 
                 ! TODO: implement separated subroutine for each simulation mode
-                ! TODO: da riverere!!!!
                 !if(doy>=pars%sim%start_irr_season .and. doy<=pars%sim%end_irr_season)then!
                 do z=1, pars%sim%n_irr_meth
                     where(info_spat%irr_meth_id%mat==z)

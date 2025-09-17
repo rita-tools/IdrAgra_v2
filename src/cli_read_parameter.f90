@@ -629,7 +629,7 @@ module cli_read_parameter!
                              ! number of irrigation method considered in the simulation
                             read(buffer, *, iostat=ios) xml%sim%n_irr_meth
                             allocate (xml%irr%met(xml%sim%n_irr_meth))!
-                            ! set defualt values for irrigation methods from general setup
+                            ! set default values for irrigation methods from general setup
                             do i = 1, xml%sim%n_irr_meth
                                 xml%irr%met(i)%irr_starts = xml%sim%start_irr_season
                                 xml%irr%met(i)%irr_ends = xml%sim%end_irr_season
