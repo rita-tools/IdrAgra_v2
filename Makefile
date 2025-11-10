@@ -1,6 +1,7 @@
 # commit code/number for versioning
 COMMIT := $(shell git rev-parse --short HEAD)
 CURRENTDATE := $(shell date --iso=seconds)
+LOG_FILE := $(shell git log --format=reference > ./release/git_idragra.log)
 
 # Windows OS variables & settings
 DEL = rm
