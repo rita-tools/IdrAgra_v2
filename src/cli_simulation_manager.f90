@@ -630,6 +630,21 @@ module cli_simulation_manager!
               
                 ! Updating daily data matrix for water table depth
                 if(pars%sim%f_cap_rise .eqv. .true.)then!
+                    ! update cycling water table maps (only doy)
+                    upfilename = trim(pars%sim%input_path)//trim(pars%sim%wat_table_fn)//"_"//"yyyy"//"_"&
+                        & //trim(adjustl(s_doy))//".asc" ! "
+                    inquire(file=trim(upfilename), exist=file_exists)   ! file_exists will be TRUE if the file exists
+                    if (file_exists .eqv. .true.) then
+                        print *,'Water table data are updated: ', upfilename
+                        call read_grid(trim(upfilename), info_spat%wat_tab,pars%sim,boundaries)
+                        ! fix water table depth to ze
+                        where((info_spat%wat_tab%mat<pars%depth%ze_fix) .and. &
+                            (info_spat%wat_tab%mat/=info_spat%wat_tab%header%nan))
+                            info_spat%wat_tab%mat=pars%depth%ze_fix
+                        end where
+                    end if
+
+                    ! update specific water table maps (year/doy)
                     upfilename = trim(pars%sim%input_path)//trim(pars%sim%wat_table_fn)//"_"//trim(adjustl(s_year))//"_"&
                         & //trim(adjustl(s_doy))//".asc" ! "
                     inquire(file=trim(upfilename), exist=file_exists)   ! file_exists will be TRUE if the file exists
