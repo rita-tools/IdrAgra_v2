@@ -163,7 +163,7 @@ module mod_irrigation
     end subroutine irrigation_need_fix!
 
     subroutine irrigation_need_fc(info_spat,h_irr,bil2,bil2_old,bil1_old,pheno,&!
-        & eff_rain,xrice_ksat,day_from_irr,adj_perc_par)!
+        & eff_rain,xrice_ksat,day_from_irr,adj_perc_par, fc_ratio)!
         ! calculate irrigation needs at field capacity
         implicit none!
         real(dp),dimension(:,:,:),intent(out)::h_irr!
@@ -177,7 +177,7 @@ module mod_irrigation
         integer::i,j
         real(dp),intent(in)::xrice_ksat     ! ksat of the transpirative layer for rice
         real(dp),dimension(size(info_spat%domain%mat,1),size(info_spat%domain%mat,2))::h_irr_temp!
-        
+        real(dp),intent(in)::fc_ratio ! fraction of FC to use as target
         ! init
         h_irr = 0.
         h_irr_temp = 0.
@@ -197,10 +197,10 @@ module mod_irrigation
             else where ((bil1_old%h_soil*pheno%RF_e + bil2_old%h_soil*pheno%RF_t) < bil2%h_raw_sup)       !all other crops
                 ! TODO: %AB% why only 2nd layer RAWbig?
                 where(bil1_old%h_soil <= info_spat%theta(1)%FC%mat*bil1_old%d_e*1000)!
-                    h_irr_temp = ((info_spat%theta(1)%FC%mat*bil1_old%d_e*1000-bil1_old%h_soil)+ &!
-                        & (info_spat%theta(2)%FC%mat*bil2%d_t*1000-bil2_old%h_soil))/(info_spat%eff_met%mat)
+                    h_irr_temp = ((fc_ratio * info_spat%theta(1)%FC%mat * bil1_old%d_e * 1000 - bil1_old%h_soil) + &!
+                        & (fc_ratio * info_spat%theta(2)%FC%mat * bil2%d_t * 1000 - bil2_old%h_soil))/(info_spat%eff_met%mat)
                 else where!
-                    h_irr_temp = (info_spat%theta(2)%FC%mat*bil2%d_t*1000-bil2_old%h_soil)/&
+                    h_irr_temp = (fc_ratio * info_spat%theta(2)%FC%mat * bil2%d_t * 1000 - bil2_old%h_soil)/&
                         & (info_spat%eff_met%mat)
                 end where!
             end where!

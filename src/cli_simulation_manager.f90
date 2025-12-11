@@ -918,7 +918,7 @@ module cli_simulation_manager!
                         !if (doy==pars%sim%end_irr_season) irr_units(:)%q_surplus = 0
                     case (2)                        ! need mode at field capacity
                         call irrigation_need_fc(info_spat, h_irr, wat_bal2, wat_bal2_old, wat_bal1_old, pheno, &
-                            & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, day_from_irr, esp_perc)
+                            & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, day_from_irr, esp_perc,pars%sim%fc_ratio)
                         ! if outside the irrigation period, set irrigation height to zero
                         do z=1, pars%sim%n_irr_meth
                             where(doy<info_spat%irr_starts%mat .or. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
@@ -1053,9 +1053,6 @@ module cli_simulation_manager!
                                     & wat_bal2%depth_under_rz(i,j), wat_bal_hour%n_iter2(i,j), &!
                                     & esp_perc(i,j,2),pars%sim%f_cap_rise, wat_bal_hour%n_max2(i,j),doy)!
 
-                                    if ((doy==100) .and. (i==1)) then
-                                        print*,doy,hour,wat_bal_hour%esten%h_perc2(i,j)
-                                    end if
                             end if
                             
                         end do

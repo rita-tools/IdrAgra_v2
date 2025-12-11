@@ -386,6 +386,9 @@ module cli_read_parameter!
                         case('h_maxpond')
                             read(buffer, *, iostat=ios) xml%sim%h_maxpond
 
+                        case('fc_ratio')
+                            read(buffer, *, iostat=ios) xml%sim%fc_ratio
+
                         case default ! all other cases ... !
                             print *, 'Skipping invalid or obsolete label <',trim(label),'> at line', line, &
                                 & ' of file: ', trim(file_xml)
