@@ -15,18 +15,26 @@ WIN = 1
 
 CC = gfortran
 CPP = gfortran -cpp
+IS_RELEASE := false
+
 # -g for gdb, -O0 zero optimization or -Og
 ### for debug ###
-#GFFLAGS = -cpp -DGIT_VERSION=\"$(COMMIT)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -g -Wall  -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all -ffpe-trap=zero,overflow,underflow -finit-real=nan -c 
+TYPE := debug
+GFFLAGS = -cpp -DGIT_VERSION=\"$(COMMIT)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -g -Wall  -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all -ffpe-trap=zero,overflow,underflow -finit-real=nan -c 
 # nnnooo  GFFLAGS = -cpp -DGIT_VERSION=\"$(COMMIT)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -g -Wall  -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all -ffpe-trap=denorm -funsafe-math-optimizations -finit-real=nan -c 
 #GFFLAGS = -g -O0 -Wall -Wextra -Wshadow -pedantic -static -c
 #GFFLAGS =  -cpp -DMY_VERSION=\"$(COMMIT)\" -g -Wall -c
-### for release ###
-# -ffree-line-length-512 manage long commands in the code
-GFFLAGS = -cpp -DGIT_VERSION=\"$(COMMIT)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -ffast-math  -O3 -ffree-line-length-0 -c
+
+ifeq ($(IS_RELEASE),true)
+   ### for release ###
+   # -ffree-line-length-512 manage long commands in the code
+   TYPE := release
+   GFFLAGS = -cpp -DGIT_VERSION=\"$(COMMIT)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -ffast-math  -O3 -ffree-line-length-0 -c
+endif
+
 LDFLAGS = 
 
-APPNAME = idragra
+APPNAME = idragra_$(COMMIT)_$(TYPE)
 EXT = .f90
 SRCDIR = src
 OBJDIR = obj
