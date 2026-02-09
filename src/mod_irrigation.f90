@@ -197,13 +197,17 @@ module mod_irrigation
             else where ((bil1_old%h_soil*pheno%RF_e + bil2_old%h_soil*pheno%RF_t) < bil2%h_raw_sup)       !all other crops
                 ! TODO: %AB% why only 2nd layer RAWbig?
                 where(bil1_old%h_soil <= info_spat%theta(1)%FC%mat*bil1_old%d_e*1000)!
-                    h_irr_temp = ((fc_ratio * info_spat%theta(1)%FC%mat * bil1_old%d_e * 1000 - bil1_old%h_soil) + &!
-                        & (fc_ratio * info_spat%theta(2)%FC%mat * bil2%d_t * 1000 - bil2_old%h_soil))/(info_spat%eff_met%mat)
+                    h_irr_temp = fc_ratio *(( info_spat%theta(1)%FC%mat * bil1_old%d_e * 1000 - bil1_old%h_soil) + &!
+                        & (info_spat%theta(2)%FC%mat * bil2%d_t * 1000 - bil2_old%h_soil))/(info_spat%eff_met%mat)
                 else where!
-                    h_irr_temp = (fc_ratio * info_spat%theta(2)%FC%mat * bil2%d_t * 1000 - bil2_old%h_soil)/&
+                    h_irr_temp = fc_ratio*(info_spat%theta(2)%FC%mat * bil2%d_t * 1000 - bil2_old%h_soil)/&
                         & (info_spat%eff_met%mat)
                 end where!
             end where!
+        end where
+
+        where (h_irr_temp <0.0D0)
+            h_irr_temp = 0.0D0
         end where
 
         call irrigate_rice(h_irr_temp,pheno,eff_rain,xrice_ksat)!
