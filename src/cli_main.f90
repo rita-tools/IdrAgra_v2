@@ -49,6 +49,7 @@ program main!
                 case ('-summary','-s')          ! set if only irrigation is printed
                     summary = .true.
                 case ('-help', '-h')            ! show help string
+                    call print_header()
                     call show_help()
                 case ('-filename', '-f')        ! set filename
                     call getarg(i+1, arg)
@@ -56,12 +57,14 @@ program main!
                 case ('-preview', '-p')         ! show all parameters after reading configuration file
                     showpreview = .true.
                 case ('-default', '-d')         ! print all default value
+                    call print_header()
                     call make_default(xml, xml_TDx)
                     print *, '=== DEFAULT VALUES ==='
                     call print_parameters(xml,xml_TDx)
                     print *, '=== END DEFAULT ==='
                     stop
                 case default                    ! all other cases ... !
+                    call print_header()
                     print *, 'Not supported option <',trim(arg),'>'
                     call show_help()
             end select

@@ -63,9 +63,9 @@ module mod_evapotranspiration
             k_r=0
         end if
     
-        !Original equation!   k_e_act=min(k_r*(k_c_max-k_cb),few*k_c_max)  ! FAO56 eq. 71
-        !Original equation!   k_e_pot=min((k_c_max-k_cb),few*k_c_max) ! Kr = 1 in potential conditions
-    
+        !Original equation    
+        !k_e_act=min(k_r*(k_c_max-k_cb),few*k_c_max) ! FAO56 eq. 71
+        !k_e_pot=min((k_c_max-k_cb),few*k_c_max) ! Kr = 1 in potential conditions
         k_e_act = few * k_r * (k_c_max-k_cb) ! %RR%: new approach
         k_e_pot = few * (k_c_max-k_cb) ! %RR%: new approach
         
