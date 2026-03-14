@@ -77,8 +77,7 @@ module cli_simulation_manager!
         real(dp),dimension(:,:,:),intent(in):: tab_CN2, tab_CN3!
         integer,intent(in)::sim_years!
         type(bound),intent(in)::boundaries!
-        logical,intent(in)::debug
-        logical,intent(in)::summary
+        logical,intent(in)::debug,summary
         type(soil2_rice),intent(in)::theta2_rice
         type(spatial_info),intent(inout)::info_spat!
         type(water_sources_table),dimension(:),intent(inout)::wat_src_tbl!
@@ -251,7 +250,7 @@ module cli_simulation_manager!
                 info_spat%h_meth=info_spat%domain
                 info_spat%h_meth%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_irr)  ! Spreads irrigation height for each irrigation method
                 call init_irrigation_units(info_spat%domain,info_spat%irr_unit_id,info_spat%eff_net,irr_units,wat_src_tbl,&
-                    &pars,info_spat%h_meth, debug)!
+                    &pars,info_spat%h_meth)!
                 alpha_ms_map=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_th_ms)  ! Spreads irrigation threshold for each irrigation method
                 alpha_unm_map=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_th_unm)! Spreads irrigation threshold for each irrigation method
                 fw_irr=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%f_wet)     ! Spreads wetted fraction for each irrigation method
@@ -364,7 +363,7 @@ module cli_simulation_manager!
                         info_spat%h_meth=info_spat%domain
                         info_spat%h_meth%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_irr) ! Spreads h_irr for each irrigation method
                         call init_irrigation_units(info_spat%domain,info_spat%irr_unit_id,info_spat%eff_net,irr_units,wat_src_tbl,&
-                            &pars,info_spat%h_meth, debug)!
+                            &pars,info_spat%h_meth)!
                             ! Spatial distribution of irrigation districts' (soil water content thresholds for irrigation application)
                         alpha_ms_map=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_th_ms)    ! Spreads activation threshold for each irrigation method
                         alpha_unm_map=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_th_unm)  ! Spreads activation threshold for each irrigation method
@@ -376,7 +375,7 @@ module cli_simulation_manager!
                         ! %EAC%: update percolation parameters
                         call calc_perc_booster_pars(info_spat,pars%irr%met,pars%sim%quantiles)
                         
-                        if (debug .eqv. .true.) then
+                        if (pars%sim%prt_debug_out == 'y') then
                             call write_grid(trim(pars%sim%path)//&
                                 & 'out_'//trim(pars%sim%soiluse_fn)//'_'//trim(adjustl(s_years))//'.asc', &
                                 & info_spat%soil_use_id, error_flag)
@@ -400,7 +399,7 @@ module cli_simulation_manager!
                         ! %EAC%: update percolation parameters
                         call calc_perc_booster_pars(info_spat,pars%irr%met,pars%sim%quantiles)
                         
-                        if (debug .eqv. .true.) then
+                        if (pars%sim%prt_debug_out == 'y') then
                             call write_grid(trim(pars%sim%path)//&
                                 & 'out_'//trim(pars%sim%soiluse_fn)//'_'//trim(adjustl(s_years))//'.asc', &
                                 & info_spat%soil_use_id, error_flag)
@@ -428,7 +427,7 @@ module cli_simulation_manager!
                         ! EAC: update percolation parameters
                         call calc_perc_booster_pars(info_spat,pars%irr%met,pars%sim%quantiles)
                         
-                        if (debug .eqv. .true.) then
+                        if (pars%sim%prt_debug_out == 'y') then
                             call write_grid(trim(pars%sim%path)//&
                                 & 'out_'//trim(pars%sim%soiluse_fn)//'_'//trim(adjustl(s_years))//'.asc', &
                                 & info_spat%soil_use_id, error_flag)
@@ -457,7 +456,7 @@ module cli_simulation_manager!
                         ! %EAC%: update percolation parameters
                         call calc_perc_booster_pars(info_spat,pars%irr%met,pars%sim%quantiles)
                         
-                        if (debug .eqv. .true.) then
+                        if (pars%sim%prt_debug_out == 'y') then
                             call write_grid(trim(pars%sim%path)//&
                                 & 'out_'//trim(pars%sim%soiluse_fn)//'_'//trim(adjustl(s_years))//'.asc', &
                                 & info_spat%soil_use_id, error_flag)
@@ -474,7 +473,7 @@ module cli_simulation_manager!
 
             ! Read all phenological tables and allocation of info_pheno%prm%tab(:,:)!
             call read_all_crop_pars(pars%sim%year_step(y),pars%sim%n_lus,info_pheno,pars)!
-            if (debug .eqv. .true.) then
+            if (pars%sim%prt_debug_out == 'y') then
                 call check_pheno_parameters(info_pheno,info_meteo)!
                 call seek_un(error_flag,unit_crop)!
                 call init_cell_output_file(unit_crop,trim(pars%sim%path)//'Kcb_levels.csv',&
@@ -517,7 +516,7 @@ module cli_simulation_manager!
             call make_random_emergence(info_pheno,meteo_weight,dir_meteo,info_spat%domain,info_spat%soil_use_id%mat, &
                 & crop_map, info_spat%irandom%mat, pars%sim%year_step(y))!
             
-            if (debug .eqv. .true.) then
+            if (pars%sim%prt_debug_out == 'y') then
                 ! write debug files of reference data for crop randomization
                 call print_mat_as_grid(trim(pars%sim%path)//trim(adjustl(s_years))//"_irandom.asc", &
                     & info_spat%irandom%header,info_spat%irandom%mat,error_flag)!
@@ -585,11 +584,11 @@ module cli_simulation_manager!
             ! Output files *.csv inizialization 
             if (pars%sim%mode == 1) then
                 call init_cell_output_by_year(out_tbl_list, pars%sim%path, s_years, info_meteo%filename, &
-                    & pars%sim%mode, pars%sim%f_out_cells, debug, &
+                    & pars%sim%mode, pars%sim%f_out_cells, pars%sim, &
                     & irr_units%id, pars%cr%n_withdrawals, info_sources%unm_src_tbl%wat_src_id)!
             else 
                 call init_cell_output_by_year(out_tbl_list,pars%sim%path,s_years,info_meteo%filename, &
-                    & pars%sim%mode, pars%sim%f_out_cells, debug)!
+                    & pars%sim%mode, pars%sim%f_out_cells, pars%sim)!
             end if
             if(pars%sim%f_out_cells .eqv. .true.)then!
                 call write_cell_info(info_spat, out_tbl_list%cell_info, pars%sim%mode, pars%sim%f_cap_rise, &
@@ -691,11 +690,11 @@ module cli_simulation_manager!
                 end if
                 
                 ! Output fc in debug %RR%
-                !if (debug .eqv. .true.) then
-                !    pheno_grd%mat = pheno%fc
-                !    call write_matrices(trim(xml%sim%path)//'fc_'//trim(adjustl(s_years))//'_'//&
+                ! if (pars%sim%prt_debug_out .eqv. .true.) then
+                !    pheno_grd%mat = pheno%f_c
+                !    call write_matrices(trim(pars%sim%path)//'fc_'//trim(adjustl(s_years))//'_'//&
                 !                                    trim(adjustl(s_gg))//'.asc', pheno_grd, errorflag)
-                !end if
+                ! end if
                 !!
                     
                 ! Creating cell parameters output on first day of simulation
@@ -1118,7 +1117,7 @@ module cli_simulation_manager!
                     iter1 = merge(iter1,wat_bal_hour%n_iter1,iter1>wat_bal_hour%n_iter1)
                     iter2 = merge(iter2,wat_bal_hour%n_iter2,iter2>wat_bal_hour%n_iter2)
                     
-                    if (debug .eqv. .true.) then
+                    if (pars%sim%prt_debug_out == 'y') then
                         ! print the number of iteration for each control cells
                         if(pars%sim%f_out_cells .eqv. .true.)then!
                             do i=1,size(out_tbl_list%cell_conv)!
@@ -1189,7 +1188,7 @@ module cli_simulation_manager!
                                 else
                                     pheno%pheno_idx(i,j) = 4
                                 end if
-                            else  ! permanent, pluriannual crop
+                            else  ! permanent, pluriannual cropfn
                                 ! Vernalization or after the harvest
                                 if (pheno%k_cb(i,j) == pheno%k_cb_low(i,j)) then
                                     pheno%pheno_idx(i,j) = 1
@@ -1249,8 +1248,8 @@ module cli_simulation_manager!
 
                 call write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal1, wat_bal2, wat_bal2_old, &
                     & info_spat, pars, wat, wat_bal_hour, fw_day, fw_old, esp_perc, out_cn, out_cn_day, h_bypass, coll_irr, priv_irr, out_tbl_list, &
-                    & pars%sim%mode,pars%sim%f_out_cells,debug) !! %RR% fw_old
-                    
+                    & pars%sim%mode,pars%sim%f_out_cells,pars%sim) !! %RR% fw_old
+
                 ! save output files by step
                 if (pars%sim%step_out == 0) then
                     call write_outputs_by_step (doy, meteo, h_irr_sum, wat_bal1, wat_bal2, &
@@ -1367,7 +1366,7 @@ module cli_simulation_manager!
             end where
 
             if (summary .eqv. .false.) then
-                call save_yearly_data(yr_map,info_spat%domain,debug)
+                call save_yearly_data(yr_map,info_spat%domain)
             else
                 call save_annual_irrigation_data(yr_map,info_spat%domain)
             end if
@@ -1384,7 +1383,7 @@ module cli_simulation_manager!
             call save_yield_debug_data(yield, info_spat%domain)
         
             ! close the csv files for cell outputs
-            call close_cell_output_by_year(out_tbl_list,pars%sim%mode,pars%sim%f_out_cells,debug)
+            call close_cell_output_by_year(out_tbl_list,pars%sim%mode,pars%sim%f_out_cells, pars%sim)
             ! destroy annual variables
             call destroy_infofeno_tab(info_pheno)
             call destroy_crop(crop_map)
@@ -1432,7 +1431,8 @@ module cli_simulation_manager!
     end subroutine simulation_manager!
 
     subroutine write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal1, wat_bal2, wat_bal2_old, &
-        & info_spat, pars, wat, wat_bal_hour, fw, fw_old, esp_perc, out_cn, out_cn_day, h_bypass, coll_irr, priv_irr, out_tbl, mode,cells,debug)
+        & info_spat, pars, wat, wat_bal_hour, fw, fw_old, esp_perc, out_cn, out_cn_day, h_bypass, coll_irr, & 
+        & priv_irr, out_tbl, mode,cells,sim)
         ! write daily output for each control cells
         implicit none
         integer, intent(in):: doy
@@ -1452,7 +1452,8 @@ module cli_simulation_manager!
         real(dp), dimension(:,:), intent(in):: coll_irr, priv_irr
         type(output_table_list), intent(in):: out_tbl
         integer, intent(in)::mode
-        logical, intent(in)::cells,debug
+        logical, intent(in)::cells
+        type(simulation),intent(in)::sim
         
         type(wat_matrix)::wat
         type(hourly)::wat_bal_hour
@@ -1516,8 +1517,11 @@ module cli_simulation_manager!
             end do!
         end if
         !
-        if (debug .eqv. .true.) then
+        if (sim%prt_cell_et0 =='y') then
             write(out_tbl%et0_ws%unit,*) doy,'; ',(info_meteo(i)%et0,'; ',i=1,size(info_meteo))
+        end if
+        
+        if (sim%prt_cell_evaporation =='y') then
             if (cells .eqv. .true.) then
                 do i=1,size(out_tbl%cell_eva)!
                     xx=out_tbl%cell_eva(i)%coord%row!
@@ -1546,6 +1550,11 @@ module cli_simulation_manager!
                             & ';', wat_bal1%h_eva_pot(xx,yy), ';', wat_bal1%h_eva(xx,yy), ';', wat_bal_hour%esten%k_r(xx,yy), ';', fw_old(xx,yy) !%RR% test
                     end if
                 end do!
+            end if
+        end if
+        
+        if (sim%prt_cell_runoff =='y') then
+            if (cells .eqv. .true.) then
                 do i=1, size(out_tbl%cell_cn)!
                     xx=out_tbl%cell_cn(i)%coord%row!
                     yy=out_tbl%cell_cn(i)%coord%col!
@@ -1576,7 +1585,7 @@ module cli_simulation_manager!
     end subroutine write_daily_output
 
     subroutine write_outputs_by_step (doy, meteo, irrigation_sum, bil1, bil2, &
-        & info_spat, coll_irr, priv_irr, asc, deb_asc, hbypass, intervals, clock_time, summary)
+        & info_spat, coll_irr, priv_irr, asc, deb_asc,hbypass, intervals, clock_time, summary)
         ! writes periodic (monthly/weekly/custom) output in *.asc files
         implicit none
         integer, intent(in):: doy
@@ -1636,7 +1645,7 @@ module cli_simulation_manager!
         type(meteo_mat)::meteo
         type(wat_matrix)::wat
         type(crop_pars_matrices)::pheno
-        integer,intent(in)::imax!
+        integer,intent(in)::imax!fn
         integer,intent(in)::jmax!
         logical::allocazione
 

@@ -218,7 +218,7 @@ module mod_irrigation
     end subroutine irrigation_need_fc!
 
     subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_irr, &
-        & day_from_irr, adj_perc_par, debug, bil1_old, bil2, bil2_old, &
+        & day_from_irr, adj_perc_par, verbose, bil1_old, bil2, bil2_old, &
         & a_loss, b_loss, c_loss, wind_vel, temp_ave,losses,eff_rain,xrice_ksat,h_sat2)
         ! spread irrigation height when scheduled
         ! TODO: need for testing
@@ -232,7 +232,7 @@ module mod_irrigation
         real(dp),dimension(:,:,:),intent(out)::h_irr!
         integer,dimension(:,:),intent(inout)::day_from_irr!
         real(dp),dimension(:,:,:),intent(inout)::adj_perc_par!
-        logical:: debug
+        logical:: verbose
         type(balance1_matrices),intent(inout):: bil1_old!
         type(balance2_matrices),intent(inout)::bil2, bil2_old!
         
@@ -256,7 +256,7 @@ module mod_irrigation
         ! loop throw scheduled irrigation list and update 'irrigation'
         do i=1,size(sch_irr)!
             if (sch_irr(i)%year == year_cur .and. sch_irr(i)%doy == doy_cur) then
-                if (debug .eqv. .true.) then
+                if (verbose .eqv. .true.) then
                     print *,'current year = ',  year_cur, '; current day = ', doy_cur, &
                         & '; irr.unit.id= ', sch_irr(i)%irr_unit_id, '; water depth = ', sch_irr(i)%h_irr, &
                         & '; h_irr_max= ', maxval(h_irr), '; h_irr_temp_max= ', maxval(h_irr_temp)

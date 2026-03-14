@@ -510,7 +510,7 @@ module cli_watsources
     end subroutine close_water_sources_dudy!
 
     subroutine nom_water_supply(watsources_fn, irr_units, src_info, wat_src_tbl, f_shapearea, cell_size, shape_area, &
-                                & irr_unit_map, debug)
+                                & irr_unit_map, verbose)
         implicit none!
         character(len=*), intent(in):: watsources_fn!
         type(irr_units_table),dimension(:),intent(inout)::irr_units!
@@ -520,7 +520,7 @@ module cli_watsources
         real(dp),intent(in)::cell_size
         real(dp),dimension(:,:),intent(in)::shape_area
         integer,dimension(:,:),intent(in)::irr_unit_map
-        logical,intent(in)::debug
+        logical,intent(in)::verbose
         integer,parameter::sec_to_day=24*60*60  ![s/d]!
         integer::i,j,k
         
@@ -568,7 +568,7 @@ module cli_watsources
         end if
         
         ! TODO: save as CSV file
-        if (debug .eqv. .true.) then
+        if (verbose .eqv. .true.) then
             print *,'===== DEBUG: water sources ====='
             print *,'Irrigation units IDs',irr_units%id
             print *,'Irrigation units Qnom',irr_units%q_nom

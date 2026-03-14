@@ -44,8 +44,8 @@ program main!
         if (arg(1:1)=='-') then
             call lower_case(arg)
             select case (arg)
-                case ('-verbose', '-v')         ! set debug mode
-                    debug = .true.
+                case ('-verbose', '-v')         ! set verbose mode: add some extra message to prompt
+                    verbose = .true.
                 case ('-summary','-s')          ! set if only irrigation is printed
                     summary = .true.
                 case ('-help', '-h')            ! show help string
@@ -80,7 +80,7 @@ program main!
     call date_and_time(values=t_start)
 
     ! Reads simulation input parameters
-    call read_all_parameters(filename, xml, xml_TDx, ErrorFlag, debug)!
+    call read_all_parameters(filename, xml, xml_TDx, ErrorFlag, verbose)!
 
     if (showpreview .eqv. .true.) then
         print *, '=== PREVIEW ==='
@@ -90,7 +90,7 @@ program main!
     print*,'Simulation parameters have been set'
 
     ! Evaluates simulation length [days] by counting meteorological files' lines
-    call meteo_series_length(xml%sim, debug)!
+    call meteo_series_length(xml%sim, verbose)!
 
     ! Defines simulation domain boundaries
     call min_domain(trim(xml%sim%input_path)//trim(xml%sim%domain_fn)//'.asc',boundaries,xml%sim)!
@@ -102,7 +102,7 @@ program main!
         ! Initializes info_spat and reads spatial files (*.asc); initializes tab_CN*
         call read_spatial_info(info_spat,boundaries,xml%sim,tab_CN2,tab_CN3,theta2_rice,xml%irr%met)!
         print*,"Variable info_spat has been initialized"!
-        if (debug .eqv. .true.) then
+        if (xml%sim%prt_debug_out=='y') then
             ! Print spatial data matrices in files out_*.asc
             call write_init_grids(info_spat,xml%sim%mode,xml%sim%path,xml%sim)!
             print*,"Input maps have been printed"!
@@ -110,11 +110,11 @@ program main!
 
         print *, '=== INITIAL CONDITION ==='
         ! Initializes info_meteo matrices with meteorological data
-        call read_meteo_parameters(xml%sim,info_meteo,debug)!
+        call read_meteo_parameters(xml%sim,info_meteo,verbose)!
         print*, 'Variable "info_meteo" has been initialized'
 
         ! Initializes info_pheno matrices (by associating file units to files)
-        call init_crop_phenology_pars(xml%sim,info_pheno,info_meteo, debug)!
+        call init_crop_phenology_pars(xml%sim,info_pheno,info_meteo, verbose)!
         print*, 'Variable "info_pheno" has been initialized'
 
         ! Initializes watsources and info_sources matrices
@@ -125,12 +125,14 @@ program main!
        
         ! Soil-crop water balance algorithm
         call simulation_manager(xml, xml_TDx, info_spat, watsour, info_sources, info_meteo, &!
-            & info_pheno, tab_CN2, tab_CN3, theta2_rice, 1, boundaries, debug, summary)!
+            & info_pheno, tab_CN2, tab_CN3, theta2_rice, 1, boundaries, verbose, summary)!
 
         ! Prints initial condition values
-        call write_grid(trim(xml%sim%path)//'IC_thetaI.asc',info_spat%theta(1)%old,errorflag)
-        call write_grid(trim(xml%sim%path)//'IC_thetaII.asc',info_spat%theta(2)%old,errorflag)
-
+        if (xml%sim%prt_init_cond == 'y') then
+            call write_grid(trim(xml%sim%path)//'IC_thetaI.asc',info_spat%theta(1)%old,errorflag)
+            call write_grid(trim(xml%sim%path)//'IC_thetaII.asc',info_spat%theta(2)%old,errorflag)
+        end if 
+        
         ! Closes input files
         if (xml%sim%mode == 1) call close_water_sources_dudy(info_sources,xml)        ! USE mode
         call close_meteo_file(info_meteo)!
@@ -141,7 +143,7 @@ program main!
     ! Initializes info_spat and reads spatial files (*.asc); initializes tab_CN*
     call read_spatial_info(info_spat,boundaries,xml%sim,tab_CN2,tab_CN3,theta2_rice,xml%irr%met)!
     print*,"Variable info_spat has been initialized"!
-    if (debug .eqv. .true.) then
+    if (xml%sim%prt_debug_out=='y') then
         ! Print spatial data matrices in files out_*.asc
         call write_init_grids(info_spat,xml%sim%mode,xml%sim%path,xml%sim)!
         print*,"Input maps have been printed"!
@@ -154,11 +156,11 @@ program main!
     end where
 
     ! Initializes info_meteo matrices with meteorological data
-    call read_meteo_parameters(xml%sim,info_meteo,debug)!
+    call read_meteo_parameters(xml%sim,info_meteo,verbose)!
     print*, 'Variable "info_meteo" has been initialized'
 
     ! Initializes info_pheno matrices (by associating file units to files)
-    call init_crop_phenology_pars(xml%sim,info_pheno,info_meteo, debug)!
+    call init_crop_phenology_pars(xml%sim,info_pheno,info_meteo, verbose)!
     print*, 'Variable "info_pheno" has been initialized'
 
     ! Initializes watsources and info_sources matrices
@@ -170,7 +172,7 @@ program main!
     ! Soil-crop water balance algorithm
     print*,"=== SIMULATION ==="!
     call simulation_manager(xml,xml_TDx,info_spat,watsour,info_sources,info_meteo,info_pheno, tab_CN2, tab_CN3, &!
-        & theta2_rice,xml%sim%sim_years,boundaries, debug, summary)!
+        & theta2_rice,xml%sim%sim_years,boundaries,verbose, summary)!
 
     ! Closes input files
     if (xml%sim%mode == 1) call close_water_sources_dudy(info_sources,xml)        ! USE mode

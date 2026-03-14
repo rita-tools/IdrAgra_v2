@@ -307,11 +307,11 @@ module cli_crop_parameters!
         !
     end subroutine read_crop_pars_i!
 
-    subroutine init_crop_phenology_pars(sim,info_pheno,info_meteo, debug)!
+    subroutine init_crop_phenology_pars(sim,info_pheno,info_meteo, verbose)!
         ! init crop parameters and file references for daily parameters
         type(simulation),intent(inout)::sim!
         type(meteo_info),dimension(:),intent(in)::info_meteo!
-        logical,intent(in)::debug
+        logical,intent(in)::verbose
 
         type(crop_pheno_info),dimension(:),allocatable::info_pheno!
         character(len=255)::dir,froot,dir_name!
@@ -396,7 +396,7 @@ module cli_crop_parameters!
             ! call open_daily_crop_par_file(info_pheno(i)%p%unit,trim(dir)//trim(froot)//trim(fname)//"\praw.dat",errorflag)
             
         end do!
-        if (debug .eqv. .true.) then
+        if (verbose .eqv. .true.) then
             print *,'===== DEBUG: crop parameters initialize ====='
             print *,'path to phenophase: ',  dir
             print *,'root of subfolder: ',  froot

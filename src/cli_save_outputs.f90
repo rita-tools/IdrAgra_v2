@@ -10,8 +10,8 @@ module cli_save_outputs!
     implicit none!
 
     type output!
-        integer::unit               ! unit linked to the file
-        character(len=255)::fn      ! name of the file
+        integer::unit                    ! unit linked to the file
+        character(len=255)::fn = ''      ! name of the file, set to empty by default
     end type output!
 
     type coordinate!
@@ -20,7 +20,7 @@ module cli_save_outputs!
     end type coordinate!
 
     type cell_output!
-        type(output)::file          !
+        type(output)::file          ! file object
         integer::num                ! cell id (only for reading)
         type(coordinate)::coord     !
     end type cell_output!
@@ -147,7 +147,7 @@ module cli_save_outputs!
         !
         errorflag=0!
         ios=0!
-        !
+
         call seek_un(errorflag,free_unit)    ! in utility
         open(free_unit,file=file_name,action="write",iostat=ios)!
         if(ios/=0)then!
@@ -162,7 +162,8 @@ module cli_save_outputs!
         end if!
     end subroutine init_cell_output_file!
     
-    subroutine init_cell_output_by_year(out_tbl_list,path,yr,id_ws_list, mode, f_cell_exists, debug, id_irr_unit_list, n_nm_pub, id_nm_pub_list)!
+    subroutine init_cell_output_by_year(out_tbl_list,path,yr,id_ws_list, mode, f_cell_exists, sim, &
+                                       & id_irr_unit_list, n_nm_pub, id_nm_pub_list)!
         ! read the list of output cells and
         ! prepare the output file for the selected year
         character(len=*),intent(in)::path                                   ! output path
@@ -173,7 +174,8 @@ module cli_save_outputs!
         character(len=*),dimension(:),intent(in),optional::id_nm_pub_list   ! id list of non monitored public sources
         type(output_table_list),intent(inout)::out_tbl_list                 ! list of the output table to be printed
         integer, intent(in)::mode                                           ! simulation mode
-        logical,intent(in)::f_cell_exists,debug
+        logical,intent(in)::f_cell_exists
+        type(simulation),intent(in)::sim
         character(len=100),dimension(:),allocatable::id_irr_unit_str!
         character(len=100),dimension(:),allocatable::id_ws_str
         character(len=100),dimension(:),allocatable::w_str!
@@ -183,6 +185,7 @@ module cli_save_outputs!
         character(len=255)::title!
         character(len=300) :: comment, buffer, label
         integer :: line, table_start, p
+
 
         ! TODO: move to a separate subroutine
         line = 0
@@ -214,11 +217,9 @@ module cli_save_outputs!
                             case ('ncells')
                                 read (buffer, *, iostat = ios) n_cells
                                 allocate(out_tbl_list%sample_cells(n_cells),out_tbl_list%cell_info(n_cells),out_tbl_list%prod_info(n_cells))
-                                if (debug .eqv. .true.) then
-                                    allocate(out_tbl_list%cell_conv(n_cells))!
-                                    allocate(out_tbl_list%cell_eva(n_cells))!
-                                    allocate(out_tbl_list%cell_cn(n_cells))!
-                                end if
+                                if (sim%prt_cell_convergence=='y') allocate(out_tbl_list%cell_conv(n_cells))!
+                                if (sim%prt_cell_evaporation=='y') allocate(out_tbl_list%cell_eva(n_cells))!
+                                if (sim%prt_cell_runoff=='y') allocate(out_tbl_list%cell_cn(n_cells))!
                             case ('table')
                                 table_start = line
                                 read (freeunit, *) ! skip the table header
@@ -249,14 +250,6 @@ module cli_save_outputs!
             out_tbl_list%cell_info%coord%col=out_tbl_list%sample_cells%coord%col!
             out_tbl_list%prod_info%coord%row=out_tbl_list%sample_cells%coord%row!
             out_tbl_list%prod_info%coord%col=out_tbl_list%sample_cells%coord%col!
-            if (debug .eqv. .true.) then
-                out_tbl_list%cell_conv%coord%row=out_tbl_list%sample_cells%coord%row!
-                out_tbl_list%cell_conv%coord%col=out_tbl_list%sample_cells%coord%col!
-                out_tbl_list%cell_eva%coord%row=out_tbl_list%sample_cells%coord%row!
-                out_tbl_list%cell_eva%coord%col=out_tbl_list%sample_cells%coord%col!
-                out_tbl_list%cell_cn%coord%row=out_tbl_list%sample_cells%coord%row!
-                out_tbl_list%cell_cn%coord%col=out_tbl_list%sample_cells%coord%col!
-            end if
             !
             ! save file header and connect to the control cell
             do i=1,size(out_tbl_list%sample_cells)!
@@ -306,8 +299,11 @@ module cli_save_outputs!
                 call init_cell_output_file(out_tbl_list%prod_info(i)%file%unit,trim(path)//trim(adjustl(out_tbl_list%prod_info(i)%file%fn)), 'input files')!
             end do!
             
-            if (debug .eqv. .true.) then
-                ! convergence log
+            ! convergence log
+            if (sim%prt_cell_convergence=='y') then
+                out_tbl_list%cell_conv%coord%row=out_tbl_list%sample_cells%coord%row!
+                out_tbl_list%cell_conv%coord%col=out_tbl_list%sample_cells%coord%col!
+
                 do i=1,size(out_tbl_list%cell_conv)!
                     write(row_str,*)out_tbl_list%cell_conv(i)%coord%row!
                     write(col_str,*)out_tbl_list%cell_conv(i)%coord%col!
@@ -316,7 +312,13 @@ module cli_save_outputs!
                     call init_cell_output_file(out_tbl_list%cell_conv(i)%file%unit,trim(path)//trim(adjustl(out_tbl_list%cell_conv(i)%file%fn)), &!
                         & 'date; hour; mmax1; nIter1; mmax2; nIter2')!
                 end do!
-                ! evaporation terms
+            end if
+
+            ! evaporation terms
+            if (sim%prt_cell_evaporation=='y') then
+                out_tbl_list%cell_eva%coord%row=out_tbl_list%sample_cells%coord%row!
+                out_tbl_list%cell_eva%coord%col=out_tbl_list%sample_cells%coord%col!
+
                 do i=1,size(out_tbl_list%cell_eva)!
                     write(row_str,*)out_tbl_list%cell_eva(i)%coord%row!
                     write(col_str,*)out_tbl_list%cell_eva(i)%coord%col!
@@ -332,7 +334,13 @@ module cli_save_outputs!
                         & 'Ke'//'; '//&                                                 ! Evaporation coefficient
                         & 'eva_pot_mm'//'; '//'eva_mm'//'; '//'kr'//'; '//'fw_old')     ! Evaporation ! %RR% test kr fw_old
                 end do!
-                ! CN & runoff terms
+            end if
+
+            ! CN & runoff terms
+            if (sim%prt_cell_runoff=='y') then
+                out_tbl_list%cell_cn%coord%row=out_tbl_list%sample_cells%coord%row!
+                out_tbl_list%cell_cn%coord%col=out_tbl_list%sample_cells%coord%col!
+
                 do i=1, size(out_tbl_list%cell_cn)!
                     write(row_str,*)out_tbl_list%cell_cn(i)%coord%row!
                     write(col_str,*)out_tbl_list%cell_cn(i)%coord%col!
@@ -456,7 +464,7 @@ module cli_save_outputs!
         end if
         
         ! TODO: not referred to cells, move away
-        if (debug .eqv. .true.) then
+        if (sim%prt_cell_et0=='y') then
             allocate(id_ws_str(size(id_ws_list)))
             ! evapotranspiration for each weather station
             out_tbl_list%et0_ws%fn = trim(adjustl(yr))//'_et0_stations.csv'!
@@ -475,11 +483,12 @@ module cli_save_outputs!
         !
     end subroutine init_cell_output_by_year!
     !
-    subroutine close_cell_output_by_year(out_tbl_list,mode,f_cell_exists,debug)!
+    subroutine close_cell_output_by_year(out_tbl_list,mode,f_cell_exists,sim)!
         ! close all opened file
         integer,intent(in)::mode
-        logical,intent(in)::f_cell_exists,debug
+        logical,intent(in)::f_cell_exists
         type(output_table_list),intent(inout)::out_tbl_list
+        type(simulation),intent(in)::sim
         integer::i!
         !!
         if (f_cell_exists .eqv. .true.) then
@@ -487,18 +496,15 @@ module cli_save_outputs!
                 close(out_tbl_list%sample_cells(i)%file%unit)!
                 close(out_tbl_list%cell_info(i)%file%unit)!
                 close(out_tbl_list%prod_info(i)%file%unit)!
-                if (debug .eqv. .true.) then
-                    close(out_tbl_list%cell_conv(i)%file%unit)!
-                    close(out_tbl_list%cell_eva(i)%file%unit)!
-                    close(out_tbl_list%cell_cn(i)%file%unit)!
-                end if
+                if (sim%prt_cell_convergence=='y') close(out_tbl_list%cell_conv(i)%file%unit)!
+                if (sim%prt_cell_evaporation=='y') close(out_tbl_list%cell_eva(i)%file%unit)!
+                if (sim%prt_cell_runoff=='y') close(out_tbl_list%cell_cn(i)%file%unit)!
             end do!
+            
             deallocate(out_tbl_list%sample_cells,out_tbl_list%cell_info,out_tbl_list%prod_info)
-            if (debug .eqv. .true.) then
-                deallocate(out_tbl_list%cell_conv)   !to re-allocate them the year after!
-                deallocate(out_tbl_list%cell_eva)
-                deallocate(out_tbl_list%cell_cn)
-            end if
+            if (sim%prt_cell_convergence=='y') deallocate(out_tbl_list%cell_conv)   !to re-allocate them the year after!
+            if (sim%prt_cell_evaporation=='y') deallocate(out_tbl_list%cell_eva)
+            if (sim%prt_cell_runoff=='y')deallocate(out_tbl_list%cell_cn)
         end if
         if (mode == 1 ) then
             close(out_tbl_list%q_irr_units%unit)!
@@ -509,9 +515,9 @@ module cli_save_outputs!
             close(out_tbl_list%q_un_priv%unit)!
             close(out_tbl_list%n_inv_cells%unit)!
         end if
-        if (debug .eqv. .true.) then
-            close(out_tbl_list%et0_ws%unit)!
-        end if
+        
+        if (sim%prt_cell_et0=='y') close(out_tbl_list%et0_ws%unit)!
+        
     end subroutine close_cell_output_by_year!
     !
     subroutine write_cell_info(info_spat, cell_info, mode, f_caprise, ze_fix, zr_fix, sim_year)
@@ -629,6 +635,7 @@ module cli_save_outputs!
         integer::zmax
         integer::i!
         integer::nan=-9999.
+
         !!
         do i=1,size(info_prod)!
             x=info_prod(i)%coord%row!
@@ -1062,12 +1069,11 @@ module cli_save_outputs!
         end do!
     end subroutine save_debug_step_data!
     !
-    subroutine save_yearly_data(yr_map,domain,debug)!
+    subroutine save_yearly_data(yr_map,domain)!
         ! save annual outputs (water balance variable and efficiency)
         implicit none!
         type(annual_map),intent(in)::yr_map!
         type(grid_i),intent(in)::domain!
-        logical,intent(in)::debug
         !!
         integer::errorflag!
         !!
@@ -1100,10 +1106,8 @@ module cli_save_outputs!
         call print_mat_as_grid(trim(yr_map%total_eff%fn),domain%header,yr_map%total_eff%mat,errorflag)!
         call print_mat_as_grid(trim(yr_map%n_irr_events%fn),domain%header,yr_map%n_irr_events%mat,errorflag)!
         call print_mat_as_grid(trim(yr_map%h_irr_mean%fn),domain%header,yr_map%h_irr_mean%mat,errorflag)!
-        !
-        if (debug .eqv. .true.) then
-            call print_mat_as_grid(trim(yr_map%rain_crop_season%fn),domain%header,yr_map%rain_crop_season%mat,errorflag)!
-        end if
+        call print_mat_as_grid(trim(yr_map%rain_crop_season%fn),domain%header,yr_map%rain_crop_season%mat,errorflag)!
+        
     end subroutine save_yearly_data!
     !
     subroutine save_yield_data(yield,domain)!

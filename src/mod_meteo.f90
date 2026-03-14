@@ -45,19 +45,19 @@ module mod_meteo!
     !
     contains!
     !
-    subroutine meteo_series_length(sim, debug)!
+    subroutine meteo_series_length(sim, verbose)!
         ! calculate the length of the weather time series [days]
         ! check if time series have the same length
         implicit none!
         type(simulation),intent(INout)::sim
-        logical,optional,intent(in)::debug
+        logical,optional,intent(in)::verbose
         type(meteo_info),dimension(:),allocatable::info_meteo!
         integer::k!
         real(dp)::value!
         integer::count,gg_count,gg_in_yy, gg_diff
         integer,dimension(12)::calendario!
 
-        call read_meteo_parameters(sim,info_meteo,debug)!
+        call read_meteo_parameters(sim,info_meteo,verbose)!
         
         ! Set simulation dates, if not already set
         if(sim%start_simulation%doy==calc_doy(29,02,1600)) sim%start_simulation = info_meteo(1)%start
@@ -149,7 +149,7 @@ module mod_meteo!
         call close_meteo_file(info_meteo)!
         !
         !debug!
-        if(debug .eqv. .true.)then!
+        if(verbose .eqv. .true.)then!
             print *,'===== DEBUG: meteo series length ====='
             print*,"Total number of days: ",gg_count!
             print*,"First simulation year: ",sim%start_year!
@@ -162,13 +162,13 @@ module mod_meteo!
         end if!
     end subroutine meteo_series_length!
     !
-    subroutine read_meteo_parameters(sim,info_meteo,debug)!
+    subroutine read_meteo_parameters(sim,info_meteo,verbose)!
         ! read the number  of weather station in the file "weather_stations.dat" and init the array
         ! for each station, it will be read: the name of the station, the latitude, the altitude, the starting day of the time series
         implicit none!
         type(simulation),intent(inout)::sim!
         type(meteo_info),dimension(:),allocatable,intent(inout)::info_meteo!
-        logical, intent(in)::debug
+        logical, intent(in)::verbose
         integer::errorflag!
         !!
         integer :: free_unit, i!
@@ -266,7 +266,7 @@ module mod_meteo!
         end do
         close(free_unit)!
 
-        if (debug .eqv. .true.) then
+        if (verbose .eqv. .true.) then
             print *,'===== DEBUG: weather station data====='
             print *,'Weather station file: ',  filemeteo_name
             print *,'Meteo files path: ',  dir

@@ -79,12 +79,12 @@ module cli_read_parameter!
     end subroutine read_all_parameters
 
 
-    subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,debug)
+    subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
         ! read settings for the simulation
         implicit none
         character(len=*), intent(in) :: file_xml
         integer, intent(out) :: ErrorFlag
-        logical, intent(in) :: debug
+        logical, intent(in) :: verbose
         type(TDx_index), intent(inout) :: xml_dtx
         type(parameters), intent(INout) :: xml
         integer :: unit_txt
@@ -410,6 +410,10 @@ module cli_read_parameter!
                             read(buffer, *, iostat=ios) xml%sim%prt_debug
                             ! call the function to set print option on/off (y/n)
                             call print_debug(xml%sim%prt_debug, xml%sim)
+                        case ('prt_cell_all')
+                            read(buffer, *, iostat=ios) xml%sim%prt_cell_all
+                            ! call the function to set print option on/off (y/n)
+                            call print_cell_all(xml%sim%prt_debug, xml%sim)
                         ! set specific options for printing
                         case ('prt_stp_rain')
                             read(buffer, *, iostat=ios) xml%sim%prt_stp_rain
@@ -500,6 +504,24 @@ module cli_read_parameter!
                         case ('prt_yr_dbg_iter2')
                             read(buffer, *, iostat=ios) xml%sim%prt_yr_dbg_iter2
                         
+                        ! cells output
+                        case ('prt_cell_convergence')
+                            read(buffer, *, iostat=ios) xml%sim%prt_cell_convergence
+                        case ('prt_cell_evaporation')
+                            read(buffer, *, iostat=ios) xml%sim%prt_cell_evaporation
+                        case ('prt_cell_runoff')
+                            read(buffer, *, iostat=ios) xml%sim%prt_cell_runoff     
+                        case ('prt_cell_et0')
+                            read(buffer, *, iostat=ios) xml%sim%prt_cell_et0
+
+                        ! not classified debug outputs
+                        case ('prt_debug_out')
+                            read(buffer, *, iostat=ios) xml%sim%prt_debug_out
+    
+                        case ('prt_init_cond')
+                            read(buffer, *, iostat=ios) xml%sim%prt_init_cond
+    
+
                         case default ! all other cases ... !
                             print *, 'Skipping invalid or obsolete label <',trim(label),'> at line', line, &
                                 & ' of file: ', trim(file_xml)
@@ -565,18 +587,18 @@ module cli_read_parameter!
             end do
         end do
 
-        if (debug .eqv. .true.) then
+        if (verbose .eqv. .true.) then
             print *, "Simulated crop IDs:", xml%sim%lu_list
             print *, "Not simulated crop IDs:", xml%sim%no_lu_list
         end if
     end subroutine read_sim_parameters
 
     ! TODO: %EAC% at the moment the id of the irrigation method define its order in the list
-    subroutine read_irr_method(irr_method_fn, met, debug)!
+    subroutine read_irr_method(irr_method_fn, met, verbose)!
         implicit none!
         character(len=*),intent(in) :: irr_method_fn!
         type(par_method),dimension(:),intent(inout) :: met!
-        logical, intent(in), optional :: debug
+        logical, intent(in), optional :: verbose
         ! Input related variables used in parsing loop
         character(len=300) :: comment,buffer, label
         integer :: c
@@ -675,7 +697,7 @@ module cli_read_parameter!
         end do
         close(unit_txt)!
 
-        if (debug .eqv. .true.) then
+        if (verbose .eqv. .true.) then
             print *,'====== DEBUG: irrigation method: ', irr_method_fn, ' ====='
             print *,'Id = ',  p
             print *,'Qwat = ',  met(p)%h_irr
@@ -1240,7 +1262,7 @@ module cli_read_parameter!
         !!
     end subroutine write_init_grids!
     
-    subroutine init_irrigation_units(domain_map,irr_units_map,eff_net,irr_units_tbl,wat_src_tbl,pars,h_met,debug)!
+    subroutine init_irrigation_units(domain_map,irr_units_map,eff_net,irr_units_tbl,wat_src_tbl,pars,h_met)!
         !allocazione e inizializzazione della variabile IU!
         implicit none!
         type(grid_i),intent(in)::domain_map,irr_units_map!
@@ -1248,7 +1270,6 @@ module cli_read_parameter!
         type(parameters),intent(in)::pars!
         type(irr_units_table),dimension(:),allocatable,intent(out)::irr_units_tbl
         type(water_sources_table),dimension(:),intent(inout)::wat_src_tbl!
-        logical,intent(in)::debug
         !!
         integer::i,free_unit,error_flag,ios!
         integer:: strlen
@@ -1334,7 +1355,7 @@ module cli_read_parameter!
         irr_units_tbl%n_irrigated_cells=0!
         irr_units_tbl%q_un_priv=0!
 
-        if(debug .eqv. .true.)then!
+        if (pars%sim%prt_debug_out=='y') then
             call seek_un(error_flag,free_unit)!
             open(free_unit,file=(trim(pars%sim%path)//"out_"//trim(pars%sim%watsources_fn)),action="write")!
             write(free_unit,*)'distr_id; source_code; source_type; flow_ratio; distr_column; watsour_column'!
@@ -1407,6 +1428,16 @@ module cli_read_parameter!
         sim%prt_yr_dbg_rain_eff = flag
         sim%prt_yr_dbg_iter1 = flag
         sim%prt_yr_dbg_iter2 = flag
+        ! cell outputs
+        sim%prt_cell_convergence = flag
+        sim%prt_cell_evaporation = flag
+        sim%prt_cell_runoff = flag
+        sim%prt_cell_et0 = flag
+        ! not classified debug outputs
+        sim%prt_debug_out = flag
+
+        ! initial conditions
+        sim%prt_init_cond = flag
     end subroutine
 
     subroutine print_step(flag, sim)
@@ -1480,6 +1511,30 @@ module cli_read_parameter!
         sim%prt_yr_dbg_rain_eff = flag
         sim%prt_yr_dbg_iter1 = flag
         sim%prt_yr_dbg_iter2 = flag
+
+        ! cell output
+        sim%prt_cell_convergence = flag
+        sim%prt_cell_evaporation = flag
+        sim%prt_cell_runoff = flag
+        sim%prt_cell_et0 = flag
+
+        ! not classified debug outputs
+        sim%prt_debug_out = flag
+
+        ! initial conditions
+        sim%prt_init_cond = flag
+
+    end subroutine
+
+    subroutine print_cell_all(flag, sim)
+        character, intent(in) :: flag
+        type(simulation), intent(inout) :: sim
+
+        ! cell output
+        sim%prt_cell_convergence = flag
+        sim%prt_cell_evaporation = flag
+        sim%prt_cell_runoff = flag
+        sim%prt_cell_et0 = flag
     end subroutine
 
 

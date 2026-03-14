@@ -157,7 +157,20 @@ module mod_parameters!
         character :: prt_annual = 'y'
         character :: prt_yield = 'y'
         character :: prt_debug = 'y'
-        
+        character :: prt_cell_all = 'y'
+
+        ! set options for cell outputs
+        character :: prt_cell_convergence = 'y'
+        character :: prt_cell_evaporation = 'y'
+        character :: prt_cell_runoff = 'y'
+        character :: prt_cell_et0 = 'y'
+
+        ! set other print options
+        character :: prt_debug_out = 'y'
+
+        character :: prt_init_cond = 'y'
+
+
     end type simulation!
 
     type layer_depth!
