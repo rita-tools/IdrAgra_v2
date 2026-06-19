@@ -348,7 +348,7 @@ module mod_irrigation
         end where!
     end subroutine irrigate_rice!
 
-    subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, transp_pot, h_soil_old,             &
+    subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, transp_pot, k_cb, h_soil_old,       &
                             & h_raw_coll, h_raw_half, h_raw, h_raw_priv, h_irr, doy, priv_irr, coll_irr, day_from_irr, &
                             & esp_perc, am_perc,bm_perc, f_shape_area, cell_area, h_met, irr_starts, irr_ends          )
         ! calculate irrigation heights in "USE" mode
@@ -356,6 +356,7 @@ module mod_irrigation
         integer,dimension(:,:),intent(in)::irr_class
         type(irr_units_table),dimension(:),intent(inout)::irr_units
         real(dp),dimension(:,:),intent(in)::h_soil_old                 ! average soil water content of previous day [mm]
+        real(dp),dimension(:,:),intent(in)::k_cb                       ! crop coefficient
         real(dp),dimension(:,:),intent(in)::transp_pot                 ! potential transpiration of previous day [mm]
         real(dp),dimension(:,:),intent(in)::h_raw, h_raw_half          ! soil water content at RAW and half RAW [mm]
         real(dp),dimension(:,:),intent(in)::h_raw_coll                 ! irrigation threshold for collective water sources [mm]
@@ -436,7 +437,8 @@ module mod_irrigation
             irr_mask=(irr_units_map%mat==irr_units(k)%id &
                      .and. irr_class==1 &
                      .and. irr_starts<=doy &
-                     .and. irr_ends>=doy)
+                     .and. irr_ends>=doy &
+                     .and. k_cb > 0.0D0) !%PS% ensure crop is growing (safer than irrigation_class, which is sometimes not updated: TODO: check)
 
             n_cells_tobe_irr = count(irr_mask)!
             
@@ -650,7 +652,7 @@ module mod_irrigation
     end subroutine irrigation_use!
 
     subroutine calc_daily_duty(cur_doy,irr_units,sources_info,wat_sources,irr_units_map,domain_map,par,&!
-        & irrigation_class,h_soil_old,h_transp_pot,raw,h_fc,zr)!
+        & irrigation_class, k_cb, h_soil_old,h_transp_pot,raw,h_fc,zr)!
         ! estimate the water volume for irrigation available in each irrigation units
         integer,intent(in)::cur_doy ! current day of simulation
         type(irr_units_table), dimension(:),intent(inout)::irr_units!
@@ -659,7 +661,7 @@ module mod_irrigation
         type(grid_i),intent(in)::irr_units_map,domain_map!
         type(parameters),intent(in)::par!
         integer,dimension(:,:),intent(in)::irrigation_class!
-        real(dp),dimension(:,:),intent(in)::h_soil_old, h_transp_pot, raw,h_fc, zr!
+        real(dp),dimension(:,:),intent(in)::k_cb, h_soil_old, h_transp_pot, raw,h_fc, zr!
 
         integer,dimension(:,:),allocatable::cells_un_coll       ! map of the cells irrigated by unmonitored collective water sources
         real(dp)::frac_rel_un_coll                              ! fraction of water released respect to the maximum water available
@@ -683,8 +685,9 @@ module mod_irrigation
                 ! %AB% irrigation_class is updated every days, so this cycle must be updated every day
                 if (wat_sources(i)%type_id == 4) then
                     where (irr_units_map%mat == wat_sources(i)%id_irr_unit &
-                        &.and. domain_map%mat /= domain_map%header%nan &
-                        & .and. irrigation_class == 1) &
+                        & .and. domain_map%mat /= domain_map%header%nan &
+                        & .and. irrigation_class == 1 &
+                        & .and. k_cb > 0.0D0) & !%PS% ensure crop is growing (safer than irrigation_class, which is sometimes not updated: TODO: check)
                         & cells_un_coll = wat_sources(i)%wat_src_idx
                 end if
             end do
