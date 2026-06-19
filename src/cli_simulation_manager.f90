@@ -764,23 +764,19 @@ module cli_simulation_manager!
                     end where!
 
                     pheno%p_day = pheno%p + 0.04*(5.-(wat_bal1_old%h_eva_pot + wat_bal1_old%h_transp_pot + wat_bal2_old%h_transp_pot))!
-                    ! pheno%pday amendment if pday values are not in its range [0.1 ; 0.8]
+                    ! pheno%pday amendment if pday values are not in their allowed range [0.1 ; 0.8]
                     where (pheno%p_day <0.1) pheno%p_day=0.1
                     where (pheno%p_day >0.8) pheno%p_day=0.8 ! TODO: larger values will be permitted in order to consider stress irrigation
-                end where!
-                ! 
+
+                end where
+
                 call calculate_RF_t(wat_bal2%d_t, pheno, info_spat%domain)
-                !!
+
                 ! Soil water thresholds update (wat variable)
-                call update_soil_pars(info_spat%domain, info_spat%theta, &
-                                      wat_bal1%d_e, wat_bal2%d_t, wat, theta2_rice, &
-                                      pheno%cn_class, pheno%k_cb)!
+                call update_soil_pars(info_spat%domain, info_spat%theta, wat_bal1%d_e, wat_bal2%d_t, wat, theta2_rice, pheno%cn_class, pheno%k_cb)
+
                 ! Irrigation application thresholds update
                 where(info_spat%domain%mat /= info_spat%domain%header%nan)!
-!~                     bil2%RAWbig =   wat%layer(2)%fc - (wat%layer(2)%fc-wat%layer(2)%wp)*pheno%pday*mkraw
-!~                     bil2%RAW =      wat%layer(2)%fc - (wat%layer(2)%fc-wat%layer(2)%wp)*pheno%pday
-!~                     bil2%RAWinf =   wat%layer(2)%fc - (wat%layer(2)%fc-wat%layer(2)%wp)*((pheno%pday+1)/2)
-!~                     bil2%RAWaz =    wat%layer(2)%fc - (wat%layer(2)%fc-wat%layer(2)%wp)*pheno%pday*mkpraw
                     ! wat_bal2%h_raw_sup =   wat%layer(1)%h_fc + wat%layer(2)%h_fc - &
                     !     & (wat%layer(1)%h_fc - wat%layer(1)%h_wp + wat%layer(2)%h_fc - wat%layer(2)%h_wp)*pheno%p_day*(alpha_ms_map+pheno%r_stress)
 
@@ -792,26 +788,26 @@ module cli_simulation_manager!
                         
                     ! wat_bal2%h_raw_priv    =   wat%layer(1)%h_fc + wat%layer(2)%h_fc - &
                     !     & (wat%layer(1)%h_fc - wat%layer(1)%h_wp + wat%layer(2)%h_fc - wat%layer(2)%h_wp)*pheno%p_day*(alpha_unm_map+pheno%r_stress)
-                
-                
-                    wat_bal2%h_raw_sup =  (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*pheno%p_day*(alpha_ms_map+pheno%r_stress))*pheno%RF_e + &
-                                          (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*pheno%p_day*(alpha_ms_map+pheno%r_stress))*pheno%RF_t 
-                    
-                    wat_bal2%h_raw     =  (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*pheno%p_day)*pheno%RF_e + &
-                                          (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*pheno%p_day)*pheno%RF_t 
 
-                    wat_bal2%h_raw_inf =  (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*((pheno%p_day+1)/2))*pheno%RF_e + &
-                                          (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*((pheno%p_day+1)/2))*pheno%RF_t 
-                        
-                    wat_bal2%h_raw_priv    =   (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*pheno%p_day*(alpha_unm_map+pheno%r_stress))*pheno%RF_e + &
-                                               (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*pheno%p_day*(alpha_unm_map+pheno%r_stress))*pheno%RF_t 
+                    ! Sum of the layer 1 and layer 2 values, weighted according to RF_e and RF_t
+                    ! TODO: move out of wat_bal2 (these are average values for the entire profile, not layer2-specific)
 
-                
+                    wat_bal2%h_raw_sup  = (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*pheno%p_day*(alpha_ms_map+pheno%r_stress))*pheno%RF_e + &
+                                          (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*pheno%p_day*(alpha_ms_map+pheno%r_stress))*pheno%RF_t
+
+                    wat_bal2%h_raw      = (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*pheno%p_day)*pheno%RF_e + &
+                                          (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*pheno%p_day)*pheno%RF_t
+
+                    wat_bal2%h_raw_inf  = (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*((pheno%p_day+1)/2))*pheno%RF_e + &
+                                          (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*((pheno%p_day+1)/2))*pheno%RF_t
+
+                    wat_bal2%h_raw_priv = (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*pheno%p_day*(alpha_unm_map+pheno%r_stress))*pheno%RF_e + &
+                                          (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*pheno%p_day*(alpha_unm_map+pheno%r_stress))*pheno%RF_t
                 end where
-                !!
-                ! read weather daily data and calculate ET0 for each weather stations 
-                call read_meteo_data(info_meteo,doy,pars%sim%res_canopy(y), pars%sim%forecast_day)!
-                
+
+                ! read weather daily data and calculate ET0 for each weather stations
+                call read_meteo_data(info_meteo,doy,pars%sim%res_canopy(y), pars%sim%forecast_day)
+
                 ! spread weather data to the entire domain
                 if (y==pars%sim%start_simulation%year - info_meteo(1)%start%year + 1 &
                     & .and. (pars%sim%start_simulation%day > 1 .or. pars%sim%start_simulation%month > 1)) then
@@ -821,7 +817,7 @@ module cli_simulation_manager!
                 else
                     call create_meteo_matrices(info_meteo,dir_meteo,meteo_weight,meteo,info_spat%domain,doy,pars%sim%res_canopy(y))
                 end if
-                
+
                 ! calculate average latitude
                 if (doy == 1) then 
                     forall (i=1:size(meteo%lat,1), j=1:size(meteo%lat,2), meteo%lat(i,j)/=nan_r)!
@@ -835,11 +831,11 @@ module cli_simulation_manager!
                 call calculateDLH(doy, lat_mean, DLH)
                 ! calculate radiation distribution along day and update params
                 pars%fet0 = pdf_normal(cost_hrs, 12.5D0, DLH/5)
-                
+
                 ! calculate the effective precipitation for the rice (only precipitation is considered)
                 wat_bal1%h_interc=calc_interception(meteo%p,pheno)
                 wat_bal1%h_eff_rain = net_precipitation(meteo%p,wat_bal1%h_interc)
-                
+
                 ! calculate the temperature stress factor
                 ! TODO: move to day of the year
                 jul_day = calc_doy(info_meteo(1)%start%day, info_meteo(1)%start%month, info_meteo(1)%start%year) + y + doy
@@ -868,41 +864,50 @@ module cli_simulation_manager!
 
                 ! define irrigation height base on irrigation period and specific condiction
                 select case (pars%sim%mode)
-                    case (1)                        ! use mode
+                    case(0) ! NO IRRIGATION mode
+                        ! do nothing
+
+                    case (1) ! USE mode
                         ! %AB%: init the the cumulative value at the beginning of the season
                         !if (doy==pars%sim%start_irr_season) irr_units(:)%q_surplus = 0
                         ! %EAC%: as the irrigation season can change with the irrigation methods,
                         ! q_surplus is updated at the beginning of the year
                         ! TODO: manage condition when irrigation season is in winter
                         if (doy==1) irr_units(:)%q_rem = 0
-                        ! calculate the daily water duty for each irrigation units, considering the water distribution efficiency 
-                        call calc_daily_duty(doy, irr_units, info_sources, wat_src_tbl, info_spat%irr_unit_id, &
-                            & info_spat%domain, pars, pheno%irrigation_class, &
-                            & (wat_bal1_old%h_soil + wat_bal2_old%h_soil), (wat_bal1_old%h_transp_pot + wat_bal2_old%h_transp_pot), &
-                            & wat_bal2%h_raw, info_spat%theta(2)%fc%mat, wat_bal2_old%d_t)!
-                        ! %EAC%: save irrigation units results
-                        call save_irr_unit_debug_data(doy,out_tbl_list,irr_units)
 
-                        call irrigation_use(info_spat%domain, info_spat%irr_unit_id, pheno%irrigation_class,&
-                            & info_spat%irr_meth_id, irr_units, &
-                            & (wat_bal1_old%h_transp_pot+wat_bal2_old%h_transp_pot), (wat_bal1_old%h_soil + wat_bal2_old%h_soil), &
-                            & wat_bal2%h_raw_sup, wat_bal2%h_raw_inf, wat_bal2%h_raw, wat_bal2%h_raw_priv, &
-                            & h_irr, doy, priv_irr, coll_irr, day_from_irr, esp_perc, &
-                            & info_spat%a_perc, info_spat%b_perc, pars%sim%f_shapearea, info_spat%cell_area%mat, &
-                            & info_spat%h_meth%mat, info_spat%irr_starts%mat, info_spat%irr_ends%mat)!pars%sim%end_irr_season)!
+                        ! calculate the daily water duty for each irrigation unit, considering the water distribution efficiency 
+                        call calc_daily_duty(doy, irr_units, info_sources, wat_src_tbl, info_spat%irr_unit_id,      &
+                                           & info_spat%domain, pars, pheno%irrigation_class,                        &
+                                           & (wat_bal1_old%h_soil * pheno%RF_e + wat_bal2_old%h_soil * pheno%RF_t), & !%PS%: h_soil_old is now weighted according to RF
+                                           & (wat_bal1_old%h_transp_pot + wat_bal2_old%h_transp_pot),               &
+                                           & wat_bal2%h_raw, info_spat%theta(2)%fc%mat, wat_bal2_old%d_t            )
+
                         ! %EAC%: save irrigation units results
-                        call save_irr_unit_data(doy,out_tbl_list,irr_units)
+                        call save_irr_unit_debug_data(doy, out_tbl_list, irr_units)
+
+                        call irrigation_use(info_spat%domain, info_spat%irr_unit_id, pheno%irrigation_class, info_spat%irr_meth_id, &
+                                          & irr_units, (wat_bal1_old%h_transp_pot+wat_bal2_old%h_transp_pot),                       &
+                                          & (wat_bal1_old%h_soil * pheno%RF_e + wat_bal2_old%h_soil * pheno%RF_t),                  & !%PS%: h_soil_old is now weighted according to RF
+                                          & wat_bal2%h_raw_sup, wat_bal2%h_raw_inf, wat_bal2%h_raw, wat_bal2%h_raw_priv,            &
+                                          & h_irr, doy, priv_irr, coll_irr, day_from_irr, esp_perc,                                 &
+                                          & info_spat%a_perc, info_spat%b_perc, pars%sim%f_shapearea, info_spat%cell_area%mat,      &
+                                          & info_spat%h_meth%mat, info_spat%irr_starts%mat, info_spat%irr_ends%mat                  )
+
+                        ! %EAC%: save irrigation units results
+                        call save_irr_unit_data(doy, out_tbl_list, irr_units)
 
                         ! update irrigation losses
-                        call calc_irrigation_losses(a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min),irr_loss)
+                        call calc_irrigation_losses(a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min), irr_loss)
                         ! calculate net irrigation
                         do z=1, pars%sim%n_irr_meth
                             h_irr(:,:,z) = h_irr(:,:,z) * (1.0-irr_loss/100.0)
                         end do
+
                         ! %AB% init the cumulative value
                         ! %EAC% not sure that q_surplus must be initialized to zero at the beginning and the end of the irrigation period
                         !if (doy==pars%sim%end_irr_season) irr_units(:)%q_surplus = 0
-                    case (2)                        ! need mode at field capacity
+
+                    case (2) ! NEED mode with field capacity target
                         call irrigation_need_fc(info_spat, h_irr, wat_bal2, wat_bal2_old, wat_bal1_old, pheno, &
                             & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, day_from_irr, esp_perc)
                         ! if outside the irrigation period, set irrigation height to zero
@@ -910,8 +915,9 @@ module cli_simulation_manager!
                             where(doy<info_spat%irr_starts%mat .or. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
                         end do
                         irr_loss = 0. ! not consider irrigation losses
-                    case (3)                        ! need mode with fixed volume
-                        call irrigation_need_fix(info_spat, h_irr, wat_bal2, wat_bal2_old, wat_bal1_old, pheno, &
+
+                    case (3) ! NEED mode with fixed volume
+                        call irrigation_need_fixed(info_spat, h_irr, wat_bal2, wat_bal2_old, wat_bal1_old, pheno, &
                             & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, day_from_irr, esp_perc)
                         ! update irrigation losses
                         call calc_irrigation_losses(a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min),irr_loss)
@@ -921,7 +927,8 @@ module cli_simulation_manager!
                             where(doy<info_spat%irr_starts%mat .or. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
                             h_irr(:,:,z) = h_irr(:,:,z) * (1.0-irr_loss/100.0)
                         end do
-                    case (4)                        ! scheduled irrigation mode
+
+                    case (4)! SCHEDULED mode
                         call irrigation_scheduled(info_spat, doy, current_year, irr_sch, pheno, &
                             & h_irr, day_from_irr, esp_perc, debug, wat_bal1_old, wat_bal2, wat_bal2_old, &
                             & a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min),irr_loss,&
@@ -932,7 +939,10 @@ module cli_simulation_manager!
                             where(doy<info_spat%irr_starts%mat .or. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
                             h_irr(:,:,z) = h_irr(:,:,z) * (1.0-irr_loss/100.0)
                         end do
+
                     case default
+                        print *, "Invalid simulation mode ", pars%sim%mode, ". Simulation mode should be 0, 1, 2, 3, or 4."
+
                 end select
                 
                 h_irr_sum = sum(h_irr,dim=3)
@@ -947,8 +957,6 @@ module cli_simulation_manager!
                 ! irrigation losses due to the irrigation method
                 h_bypass = h_irr_sum * irr_loss / (100 - irr_loss)
                 where (h_irr_sum/=0) yr_map%n_irr_events%mat = yr_map%n_irr_events%mat +1
-                
-                !end if ! end check irrigation season
 
                 ! calculate intercetion according to the Von Hoyningen-Huene and Braden model 
                 ! consider both precipitation and above canopy irrigation
@@ -975,7 +983,6 @@ module cli_simulation_manager!
                 wat_bal1%h_net_av_water = wat_bal1%h_eff_rain ! + wat_bal1_old%h_pond %CG% 2024-03-29 removed
                 !wat_bal1%h_net_av_water = wat_bal1%h_eff_rain  + wat_bal1_old%h_pond
 
-                
                 ! calculate the runoff with the CN model
                 call CN_runoff(wat_bal1%h_gross_av_water, wat_bal1%h_net_av_water, &
                     & h_irr_sum*(1-f_interception), info_spat%domain, pheno, &

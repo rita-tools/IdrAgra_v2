@@ -69,7 +69,6 @@ module mod_irrigation
         
     end subroutine calc_perc_booster_pars!
 
-
     subroutine update_adj_perco_parameters(info_spat, matrice_irr, day_from_irr, adj_perc_par)
         ! calculate adjustment parameter of the percolation model (eq 1.44)!
         ! from the last irrigation event
@@ -108,8 +107,7 @@ module mod_irrigation
 
     end subroutine
 
-
-    subroutine irrigation_need_fix(info_spat, h_irr, bil2, bil2_old, bil1_old, pheno, &!
+    subroutine irrigation_need_fixed(info_spat, h_irr, bil2, bil2_old, bil1_old, pheno, &!
         & eff_rain, xrice_ksat, day_from_irr, adj_perc_par)!
         ! calculate irrigation needs at field capacity and fixed volume (defined by irrigation methods)
         implicit none!
@@ -156,10 +154,8 @@ module mod_irrigation
         forall(i=1:size(info_spat%domain%mat,1),j=1:size(info_spat%domain%mat,2),&!
             & info_spat%irr_meth_id%mat(i,j)/=info_spat%irr_meth_id%header%nan) &!
             & h_irr(i,j,info_spat%irr_meth_id%mat(i,j)) = h_irr_temp(i,j)!
-        
-        !call update_adj_perco_parameters(info_spat, h_irr_temp, day_from_irr, adj_perc_par)
-        
-    end subroutine irrigation_need_fix!
+
+    end subroutine irrigation_need_fixed!
 
     subroutine irrigation_need_fc(info_spat,h_irr,bil2,bil2_old,bil1_old,pheno,&!
         & eff_rain,xrice_ksat,day_from_irr,adj_perc_par)!
@@ -212,9 +208,7 @@ module mod_irrigation
         forall(i=1:size(info_spat%domain%mat,1),j=1:size(info_spat%domain%mat,2),&!
             & info_spat%irr_meth_id%mat(i,j)/=info_spat%irr_meth_id%header%nan) &!
             & h_irr(i,j,info_spat%irr_meth_id%mat(i,j)) = h_irr_temp(i,j)!
-        
-        !call update_adj_perco_parameters(info_spat, h_irr_temp, day_from_irr, adj_perc_par)
-        
+
     end subroutine irrigation_need_fc!
 
     subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_irr, &
@@ -332,8 +326,6 @@ module mod_irrigation
             & info_spat%irr_meth_id%mat(i,j)/=info_spat%irr_meth_id%header%nan) &
             & h_irr(i,j,info_spat%irr_meth_id%mat(i,j)) = h_irr_temp(i,j)!
 
-        !call update_adj_perco_parameters(info_spat, h_irr_temp, day_from_irr, adj_perc_par)
-        
     end subroutine irrigation_scheduled
     
     subroutine irrigate_rice(h_irr,pheno,eff_rain,k_sat)!
@@ -356,14 +348,14 @@ module mod_irrigation
         end where!
     end subroutine irrigate_rice!
 
-    subroutine irrigation_use(domain, irr_units_map, irr_class, method, &!
-        & irr_units, transp_pot, h_old, h_raw_coll,h_raw_half,h_raw,h_raw_priv,h_irr,doy,priv_irr,coll_irr, &!
-        & day_from_irr,esp_perc,am_perc,bm_perc, f_shape_area, cell_area, h_met,irr_starts,irr_ends)!
-        ! calculate irrigation heights at use mode
+    subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, transp_pot, h_soil_old,             &
+                            & h_raw_coll, h_raw_half, h_raw, h_raw_priv, h_irr, doy, priv_irr, coll_irr, day_from_irr, &
+                            & esp_perc, am_perc,bm_perc, f_shape_area, cell_area, h_met, irr_starts, irr_ends          )
+        ! calculate irrigation heights in "USE" mode
         type(grid_i),intent(in)::domain, irr_units_map, method
-        integer,dimension(:,:),intent(in)::irr_class!
-        type(irr_units_table),dimension(:),intent(inout)::irr_units!
-        real(dp),dimension(:,:),intent(in)::h_old                      ! water content of 2nd layer of previous day [mm]
+        integer,dimension(:,:),intent(in)::irr_class
+        type(irr_units_table),dimension(:),intent(inout)::irr_units
+        real(dp),dimension(:,:),intent(in)::h_soil_old                 ! average soil water content of previous day [mm]
         real(dp),dimension(:,:),intent(in)::transp_pot                 ! potential transpiration of previous day [mm]
         real(dp),dimension(:,:),intent(in)::h_raw, h_raw_half          ! soil water content at RAW and half RAW [mm]
         real(dp),dimension(:,:),intent(in)::h_raw_coll                 ! irrigation threshold for collective water sources [mm]
@@ -459,7 +451,7 @@ module mod_irrigation
                 allocate(vj(n_cells_tobe_irr)); vj=pack(j_mat,irr_mask)!
                 allocate(vid(n_cells_tobe_irr)); vid=pack(id_cell,irr_mask)!
                 ! the following are all the required parameters
-                allocate(s_h_old(n_cells_tobe_irr)); s_h_old=pack(h_old,irr_mask)!
+                allocate(s_h_old(n_cells_tobe_irr)); s_h_old=pack(h_soil_old,irr_mask)!
                 allocate(s_h_raw_coll(n_cells_tobe_irr)); s_h_raw_coll=pack(h_raw_coll,irr_mask)!
                 allocate(s_h_raw(n_cells_tobe_irr)); s_h_raw=pack(h_raw,irr_mask)!
                 allocate(s_h_raw_half(n_cells_tobe_irr)); s_h_raw_half=pack(h_raw_half,irr_mask)!
@@ -658,8 +650,8 @@ module mod_irrigation
     end subroutine irrigation_use!
 
     subroutine calc_daily_duty(cur_doy,irr_units,sources_info,wat_sources,irr_units_map,domain_map,par,&!
-        & irrigation_class,h_soil,h_transp_pot,raw,h_fc,zr)!
-        ! estimate the water volume for irrigation available in each irrigation units 
+        & irrigation_class,h_soil_old,h_transp_pot,raw,h_fc,zr)!
+        ! estimate the water volume for irrigation available in each irrigation units
         integer,intent(in)::cur_doy ! current day of simulation
         type(irr_units_table), dimension(:),intent(inout)::irr_units!
         type(source_info),intent(in)::sources_info!
@@ -667,25 +659,23 @@ module mod_irrigation
         type(grid_i),intent(in)::irr_units_map,domain_map!
         type(parameters),intent(in)::par!
         integer,dimension(:,:),intent(in)::irrigation_class!
-        real(dp),dimension(:,:),intent(in)::h_soil, h_transp_pot, raw,h_fc, zr!
-        !!
+        real(dp),dimension(:,:),intent(in)::h_soil_old, h_transp_pot, raw,h_fc, zr!
+
         integer,dimension(:,:),allocatable::cells_un_coll       ! map of the cells irrigated by unmonitored collective water sources
         real(dp)::frac_rel_un_coll                              ! fraction of water released respect to the maximum water available
         integer:: n_cells_irr_un_coll                           ! number of cells irrigated by unmonitored collective water sources
         integer:: n_cells_un_coll                               ! number of cells irrigable by unmonitored collective water sources
-        !real(dp),dimension(par%cr%n_withdrawals)::q_un_coll!
-        integer::i,j,k!
-        !!
+        integer::i,j,k
+
         ! estimate the daily duty for each irrigation units
-        irr_units%q_act_fld(1)=0.;irr_units%q_act_fld(2)=0.;irr_units%q_act_fld(3)=0.;irr_units%q_act_fld(4)=0.;!
-        irr_units%q_day=0.!
+        irr_units%q_act_fld(1)=0.;irr_units%q_act_fld(2)=0.;irr_units%q_act_fld(3)=0.;irr_units%q_act_fld(4)=0.;
+        irr_units%q_day=0.
         irr_units%q_surplus=0.
         irr_units%n_irrigated_cells=0.
         irr_units%q_un_priv=0.
         irr_units%q_un_coll=0.
         frac_rel_un_coll = 0.
-        !q_un_coll=0.!
-        !
+
         if(.not.(allocated(cells_un_coll))) allocate(cells_un_coll(domain_map%header%imax, domain_map%header%jmax))
         cells_un_coll = 0
         if (par%cr%f_exists .eqv. .true.) then
@@ -699,7 +689,7 @@ module mod_irrigation
                 end if
             end do
         end if
-        !
+
         do i=1,size(wat_sources)!
             j=wat_sources(i)%irr_unit_idx;
             if (j==0) then
@@ -708,14 +698,17 @@ module mod_irrigation
             end if
             k=wat_sources(i)%wat_src_idx!
             select case(wat_sources(i)%type_id)!
-                case(1)!
+                case(1)
                     irr_units(j)%q_act_fld(1) = wat_sources(i)%duty_frc * sources_info%mn_src_tbl1%q_daily(cur_doy,k) * irr_units(j)%int_distr_eff + irr_units(j)%q_act_fld(1)
-                case(2)!
+
+                case(2)
                     irr_units(j)%q_act_fld(2) = wat_sources(i)%duty_frc * sources_info%mn_src_tbl2%q_daily(cur_doy,k) * irr_units(j)%int_distr_eff + irr_units(j)%q_act_fld(2)
-                case(3)!
+
+                case(3)
                     irr_units(j)%q_act_fld(3) = wat_sources(i)%duty_frc * sources_info%int_reuse_tbl%q_daily(cur_doy,k) * irr_units(j)%int_distr_eff + irr_units(j)%q_act_fld(3)
-                case(4)!
-                    frac_rel_un_coll = deliverable_ratio_unm_coll(cells_un_coll,h_soil,h_transp_pot,raw,h_fc,zr,irrigation_class,par, &
+
+                case(4) ! collective unmonitored sources
+                    frac_rel_un_coll = deliverable_ratio_unm_coll(cells_un_coll,h_soil_old,h_transp_pot,raw,h_fc,zr,irrigation_class,par, &
                                         & domain_map%header%imax, domain_map%header%jmax, k)!
                     n_cells_irr_un_coll = count(cells_un_coll==k .and. irrigation_class==1)!
                     n_cells_un_coll = count(cells_un_coll==k)
@@ -730,9 +723,10 @@ module mod_irrigation
                     
                     ! at irrigation unit, alway consider the 
                     irr_units(j)%q_un_coll = irr_units(j)%q_act_fld(4)
-                case default!
-            end select!
-        end do!
+
+                case default
+            end select
+        end do
 
         ! compute the water duty of each irrigation unit
         irr_units%q_day=irr_units%q_act_fld(1)+irr_units%q_act_fld(2)+irr_units%q_act_fld(3)+irr_units%q_act_fld(4)+irr_units%q_rem ! %AB% consider also the water surplus of the previous day
