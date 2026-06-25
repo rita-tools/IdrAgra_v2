@@ -73,9 +73,9 @@ all:
 # call as: make cleanall
 .PHONY: cleanall
 cleanall:
-	$(DEL) $(wildcard ./$(OBJDIR)/*.mod)
-	$(DEL) $(wildcard ./$(OBJDIR)/*.o)
-	$(DEL) $(wildcard ./$(RELDIR)/*.exe)
+	$(if $(wildcard ./$(OBJDIR)/*.mod),$(DEL) $(wildcard ./$(OBJDIR)/*.mod),@echo No module files to clean)
+	$(if $(wildcard ./$(OBJDIR)/*.o),$(DEL) $(wildcard ./$(OBJDIR)/*.o),@echo No object files to clean)
+	$(if $(wildcard ./$(RELDIR)/*.exe),$(DEL) $(wildcard ./$(RELDIR)/*.exe),@echo No executables to clean)
 
 .PHONY: cleanmain
 cleanmain:
