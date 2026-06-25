@@ -1,19 +1,14 @@
-program main!
+program main
     use mod_utility, only: lower_case, print_execution_time
-    use mod_parameters!, only: read_parameters, make_default, print_parameters  ! variables and methods to read file *.xml paramters
-    use mod_grid, only: write_grid, min_domain, bound      ! variables and methods to handle spatial input
-    use mod_meteo!, only: meteo_series_length, read_meteo_parameters,
-        ! close_meteo_file, read_meteo_data
-    use mod_TDx_index                                     ! variables and methods to handle meteorological data
-
+    use mod_parameters                                ! variables and methods to read file *.xml paramters
+    use mod_grid, only: write_grid, min_domain, bound ! variables and methods to handle spatial input
+    use mod_TDx_index                                 ! variables and methods to handle meteorological data
     use cli_crop_parameters, only: init_crop_phenology_pars, close_pheno_file, crop_pheno_info ! variables and methods to handle crop parameters
-    use cli_watsources                                                          ! variables and methods to handle irrigation units water supply
-    use cli_simulation_manager                                                  ! simulation manager: control IO and daily cycle
+    use cli_watsources                                ! variables and methods to handle irrigation units water supply
+    use cli_simulation_manager                        ! simulation manager: control IO and daily cycle
     use cli_read_parameter
-
     use mod_system
-
-    implicit none!
+    implicit none
 
     type(parameters) :: xml                                     ! stores parameters of input file
     type(TDx_index) :: xml_TDx                                  ! stores parameters of input file for TDX indices
@@ -212,7 +207,6 @@ end subroutine print_header
 subroutine make_default(xml, xml_dtx)
     use mod_parameters
     use mod_TDx_index
-    implicit none
     type(parameters), intent(inout) :: xml
     type(TDx_index), intent(inout) :: xml_dtx
     
@@ -328,7 +322,6 @@ end subroutine make_default
 subroutine print_parameters(xml,xml_dtx)
     use mod_parameters, only: parameters
     use mod_TDx_index, only: TDx_index
-    implicit none
     type(parameters), intent(in) :: xml
     type(TDx_index), intent(in) :: xml_dtx
     

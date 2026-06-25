@@ -5,7 +5,6 @@ module mod_irrigation
     use mod_common, only: balance1_matrices,balance2_matrices, spatial_info
     use mod_crop_phenology, only: crop_pars_matrices
     use mod_parameters, only: parameters, scheduled_irrigation, irr_units_table, source_info, water_sources_table
-    
     implicit none
 
     contains
@@ -110,7 +109,6 @@ module mod_irrigation
     subroutine irrigation_need_fixed(info_spat, h_irr, bil2, bil2_old, bil1_old, pheno, &!
         & eff_rain, xrice_ksat, day_from_irr, adj_perc_par)!
         ! calculate irrigation needs at field capacity and fixed volume (defined by irrigation methods)
-        implicit none!
         real(dp),dimension(:,:,:),intent(out)::h_irr
         type(spatial_info),intent(in)::info_spat
         type(balance1_matrices),intent(in)::bil1_old
@@ -160,7 +158,6 @@ module mod_irrigation
     subroutine irrigation_need_fc(info_spat,h_irr,bil2,bil2_old,bil1_old,pheno,&!
         & eff_rain,xrice_ksat,day_from_irr,adj_perc_par)!
         ! calculate irrigation needs at field capacity
-        implicit none!
         real(dp),dimension(:,:,:),intent(out)::h_irr!
         type(spatial_info),intent(in)::info_spat!
         type(balance1_matrices),intent(in)::bil1_old!

@@ -1,7 +1,7 @@
-module mod_utility!
-
+module mod_utility
     use mod_constants, only: sp, dp, pi
-    
+    implicit none
+
     ! type that stores date
     type date!
         integer::day!
@@ -25,7 +25,6 @@ module mod_utility!
 
     ! Count the frequency of unique values from vec
     subroutine count_element(vec,vec_el)
-        implicit none
         character(len=*),dimension(:),intent(in) :: vec
         integer,dimension(:),intent(inout) :: vec_el
         
@@ -49,7 +48,6 @@ module mod_utility!
 
     subroutine split_string(string, delimiter, substrings, substring_count)
         ! split a string into two sides of a delimiter token
-        implicit none
         character(len=*), intent(in) :: string
         character, intent(in) :: delimiter
         character(len=*), intent(out) :: substrings(*)
@@ -194,7 +192,6 @@ module mod_utility!
     subroutine get_uniform_sample(irandom, amplitude, rand_symmetry,repeatable)!
         ! Get a matrix of random number from a matrix of integer values
         ! values are included between [-amplitude, +amplitude]
-        implicit none!
         integer,dimension(:,:),intent(out)::irandom!
         integer,intent(in)::amplitude!
         logical,intent(in)::rand_symmetry
@@ -219,7 +216,6 @@ module mod_utility!
     function calc_doy(idd,imm,iyyy)
         ! Calculate the day of the year from day, month, year
         ! source: Numerical recipes in FORTRAN 90
-        implicit none
         integer, intent(in) :: imm, idd, iyyy
         integer :: calc_doy
         integer, parameter :: igreg=15+31*(10+12*1582) ! Gregorian Calendar adopted Oct. 15, 1582.
@@ -243,7 +239,6 @@ module mod_utility!
     subroutine calc_date(julian_day,idd, imm,iyyy)
         ! Calculate the date from the julian date
         ! source: Numerical recipes in FORTRAN 90
-        implicit none
         integer, intent(in) :: julian_day
         integer, intent(out) :: imm, idd, iyyy
         INTEGER :: ja,jalpha,jb,jc,jd,je
@@ -272,7 +267,6 @@ module mod_utility!
     function day_of_week(idd, imm, iyy)
         ! Calculate the day of the week [0- Sat, 1-Sun, ..., 6-Fri]
         ! source: Rosetta Code
-        implicit none
         integer, intent(in) :: idd, imm, iyy
         integer :: day_of_week, j, k, mm, yy
 
@@ -390,7 +384,6 @@ module mod_utility!
 
     pure recursive function replace_str(string,search,substitute) result(modifiedString)
         ! https://stackoverflow.com/questions/58938347/how-do-i-replace-a-character-in-the-string-with-another-charater-in-fortran
-        implicit none
         character(len=*), intent(in)  :: string, search, substitute
         character(len=:), allocatable :: modifiedString
         integer                       :: i, stringLen, searchLen
@@ -419,14 +412,12 @@ module mod_utility!
     end function replace_str
 
     function round(val, n)
-        implicit none
         real(dp) :: val, round
         integer :: n
         round = anint(val*10.0**n)/10.0**n
     end function round
 
     function round_2darray(mat, n) result(res)
-        implicit none
         real(dp), dimension(:,:)::mat!
         real(dp), allocatable ::res(:,:)!
         integer :: n
@@ -435,7 +426,6 @@ module mod_utility!
     end function round_2darray
 
     pure elemental function pdf_normal(x, x_mean, x_std) result(pdf)
-        implicit none
         real(dp), intent(in):: x, x_mean, x_std
         real(dp):: pdf
         

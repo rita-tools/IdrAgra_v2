@@ -95,7 +95,6 @@ module cli_watsources
         ! List =
         ! 60.txt
         ! EndList =
-        implicit none!
         character(len=*), intent(in):: file_name
         type(unmonitored_sources_table),intent(inout)::unm_coll_src_tbl!
         type(parameters),intent(inout)::pars!
@@ -171,9 +170,8 @@ module cli_watsources
         end do
         close(free_unit)
     end subroutine read_unm_coll_sources_list
-    !
+
     subroutine read_unm_coll_source_par(file_name,unm_col_sour_tbl,error_flag,k,pars)!
-        implicit none
         character(len=*), intent(in) :: file_name!
         integer,intent(in)::k!
         type(parameters),intent(inout)::pars!
@@ -276,7 +274,6 @@ module cli_watsources
         !   - a field header line
         !   - a 1-n list of record with data in the form: | irrigation unit id | year | doy | water depth |
         !     separated by tab character or spaces
-        implicit none
         character(len=*), intent(in) :: file_name!
         logical, intent(IN):: debug
         type(scheduled_irrigation),dimension(:),allocatable,intent(out)::sch_irr!
@@ -511,7 +508,6 @@ module cli_watsources
 
     subroutine nom_water_supply(watsources_fn, irr_units, src_info, wat_src_tbl, f_shapearea, cell_size, shape_area, &
                                 & irr_unit_map, debug)
-        implicit none!
         character(len=*), intent(in):: watsources_fn!
         type(irr_units_table),dimension(:),intent(inout)::irr_units!
         type(source_info),intent(in)::src_info!
@@ -579,7 +575,6 @@ module cli_watsources
     
     subroutine read_water_sources(year_length,pars,src_info)!
         ! read daily discharges for one year
-        implicit none!
         integer,intent(in)::year_length
         type(source_info),intent(inout)::src_info
         type(parameters),intent(in)::pars

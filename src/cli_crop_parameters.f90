@@ -1,12 +1,11 @@
-module cli_crop_parameters!
+module cli_crop_parameters
     use mod_constants, only: sp, dp
     use mod_utility, only: seek_un, lower_case, string_to_integers, string_to_reals, split_string, count_element
     use mod_parameters, only: simulation,parameters
     use mod_meteo, only: meteo_info
     use mod_crop_phenology
     use mod_system
-    
-    implicit none!
+    implicit none
 
     interface read_crop_pars!
         module procedure read_crop_pars_r, read_crop_pars_i
@@ -37,7 +36,6 @@ module cli_crop_parameters!
     
     subroutine init_crop_par_from_file(file_name, n_crop, n_crop_alt, string_elements, n_crops_by_year, error_flag)!
         ! init static crop parameters from parameter file
-        implicit none
         character(len=*), intent(in) :: file_name!
         integer, intent(in) :: n_crop
         integer, intent(inout) :: n_crop_alt
@@ -91,7 +89,6 @@ module cli_crop_parameters!
     
     subroutine read_water_prod_file(file_name, string_elements, n_crops_by_year, unit_param, error_flag)!
         ! read water productivity related parameters
-        implicit none
         character(len=*), intent(in) :: file_name!
         integer, intent(in) :: string_elements
         integer, dimension(:), intent(in) :: n_crops_by_year
@@ -174,7 +171,6 @@ module cli_crop_parameters!
     end subroutine read_canopy_resistance_file!
     
     subroutine spread_col_i(string_in, sep, string_el, string_space, string_out)
-        implicit none
         character(len=*), intent(in) :: string_in
         character(len=*), intent(in) :: sep
         integer, intent(in) :: string_el
@@ -192,7 +188,6 @@ module cli_crop_parameters!
     end subroutine spread_col_i
     
     subroutine spread_col_r(string_in, sep, string_el, string_space, string_out)
-        implicit none
         character(len=*), intent(in) :: string_in
         character(len=*), intent(in) :: sep
         integer, intent(in) :: string_el
@@ -213,7 +208,6 @@ module cli_crop_parameters!
     subroutine read_crop_par_file(file_name, string_elements, unit_param, error_flag)!
         ! read static crop parameters file
         ! TODO: merge with init_crop_par_from_file ?
-        implicit none
         character(len=*), intent(in) :: file_name!
         integer, intent(in) :: string_elements
         type(crop_pheno_info) :: unit_param
@@ -407,7 +401,6 @@ module cli_crop_parameters!
 
     subroutine read_all_crop_pars(n_days,n_crop,info_pheno,pars)!
         ! read all daily crop parameters by the number of days over the opened files
-        implicit none!
         integer,intent(in)::n_days!
         integer,intent(in)::n_crop!
         type(parameters),intent(in)::pars!
@@ -632,7 +625,6 @@ module cli_crop_parameters!
     !
     subroutine check_pheno_parameters(info_pheno,info_meteo)!
     ! check if phenological parameters match weather station data
-        implicit none!
         type(crop_pheno_info),dimension(:),intent(in)::info_pheno!
         type(meteo_info),dimension(:),intent(in)::info_meteo!
         integer::i!
@@ -645,7 +637,6 @@ module cli_crop_parameters!
     subroutine check_crop_parameters(info_pheno,weather_station)!
     ! check if phenological parameters match weather station data
     ! if k_cb is null than all the other parameters must be null
-        implicit none
         type(crop_pheno_info),intent(in)::info_pheno!
         character(len=*),intent(in)::weather_station!
         integer::error_flag!

@@ -1,9 +1,10 @@
-module mod_meteo!
+module mod_meteo
     use mod_constants, only: sp, dp
     use mod_utility, only: date, lower_case, days_x_month, calc_doy, seek_un, split_date
     use mod_parameters, only: simulation, par_method
     use mod_evapotranspiration, only: ET_reference
-    implicit none!
+    implicit none
+
     ! store weather station data
     type meteo_info!
         integer::unit                   ! unit associated to the input file
@@ -48,7 +49,6 @@ module mod_meteo!
     subroutine meteo_series_length(sim, debug)!
         ! calculate the length of the weather time series [days]
         ! check if time series have the same length
-        implicit none!
         type(simulation),intent(INout)::sim
         logical,optional,intent(in)::debug
         type(meteo_info),dimension(:),allocatable::info_meteo!
@@ -165,7 +165,6 @@ module mod_meteo!
     subroutine read_meteo_parameters(sim,info_meteo,debug)!
         ! read the number  of weather station in the file "weather_stations.dat" and init the array
         ! for each station, it will be read: the name of the station, the latitude, the altitude, the starting day of the time series
-        implicit none!
         type(simulation),intent(inout)::sim!
         type(meteo_info),dimension(:),allocatable,intent(inout)::info_meteo!
         logical, intent(in)::debug
@@ -284,7 +283,6 @@ module mod_meteo!
     !
     subroutine close_meteo_file(info_meteo)!
         ! close all files with weather data and set memory free 
-        implicit none!
         type(meteo_info),dimension(:),allocatable,intent(inout)::info_meteo!
         !
         integer::i!
@@ -297,7 +295,6 @@ module mod_meteo!
     !
     subroutine read_meteo_data(info_meteo,current_doy,res_surf, forecast_day)
         ! read meteo data and update ET0
-        implicit none!
         integer,intent(in)::current_doy!
         integer,intent(in)::forecast_day!
         type(meteo_info),dimension(:),intent(inout)::info_meteo!

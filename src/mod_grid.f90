@@ -2,7 +2,7 @@ module mod_grid!
     use mod_constants, only: sp, dp, tabCN
     use mod_utility, only: lower_case, seek_un
     use mod_parameters, only: simulation, par_method
-    implicit none!
+    implicit none
 
     ! header of the grid file for integer matrix
     type grid_header_i             
@@ -146,7 +146,6 @@ module mod_grid!
         ! read ascii grid file *.ASC
         ! if present(sim)=.TRUE. ==> check georeference information with those stored in simulation parameters
         ! if present(extent)=.TRUE. ==> only value inside bound are loaded
-        implicit none!
         character(len=*), intent(in) :: filename!
         type(grid_r),intent(out)::prm!
         type(simulation),optional,intent(in)::sim!
@@ -216,7 +215,6 @@ module mod_grid!
         ! read ascii grid file *.ASC
         ! if present(sim)=.TRUE. ==> check georeference information with those stored in simulation parameters
         ! if present(extent)=.TRUE. ==> only value inside bound are loaded
-        implicit none!
         character(len=*), intent(in) :: filename!
         type(grid_i),intent(out)::prm!
         type(simulation),optional,intent(in)::sim!
@@ -293,7 +291,6 @@ module mod_grid!
 
     subroutine write_grid_r( filename, grid, ErrorFlag)!
         ! save real grid in ascii format file *.ASC
-        implicit none!
         character(len=*), intent(in) ::filename!
         type(grid_r),intent(in)::grid!
         integer, intent(out) :: ErrorFlag!
@@ -324,7 +321,6 @@ module mod_grid!
     !
     subroutine write_grid_i( filename, grid, ErrorFlag)!
         ! save integer grid in ascii format file *.ASC
-        implicit none!
         character(len=*), intent(in) ::filename!
         type(grid_i),intent(in)::grid!
         integer, intent(out) :: ErrorFlag!
@@ -354,7 +350,6 @@ module mod_grid!
 
     subroutine write_head_and_mat_i(filename,header,mat,errorflag)!
         ! save header and matrix of integers in ascii format file *.ASC
-        implicit none!
         character(len=*),intent(in)::filename!
         integer,dimension(:,:),intent(in)::mat!
         type(grid_header_i),intent(in)::header!
@@ -375,7 +370,6 @@ module mod_grid!
     !
     subroutine write_header_and_mat_r(filename,titolo,matrice,errorflag)!
         ! save header and matrix of reals in ascii format file *.ASC
-        implicit none!
         character(len=*),intent(in)::filename!
         real(dp),dimension(:,:),intent(in)::matrice!
         type(grid_header_i),intent(in)::titolo!
@@ -423,10 +417,9 @@ module mod_grid!
         sim%y0=extent%header%y0
         !
     end subroutine min_domain!
-    !
+
     subroutine check_header_i(sim,header_i,file_name)!
         ! compare the header of the grid with settings in the simulation parameters
-        implicit none!
         type(simulation),intent(in)::sim!
         type(grid_header_i),intent(in)::header_i!
         character(len=*),intent(in)::file_name!
@@ -513,7 +506,6 @@ module mod_grid!
         ! return a matrix of real values
         ! choosing the values from the list provided (pars_list)
         ! base on the position in the list
-        implicit none!
         type(grid_i),intent(in)::id_grid
         real(dp),dimension(:),intent(in)::pars_list
         
@@ -530,7 +522,6 @@ module mod_grid!
         ! return a matrix of integer values
         ! choosing the values from the list provided (pars_list)
         ! base on the position in the list
-        implicit none!
         type(grid_i),intent(in)::id_grid
         integer,dimension(:),intent(in)::pars_list
         

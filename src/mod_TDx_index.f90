@@ -3,6 +3,7 @@ module mod_TDx_index
     use mod_constants, only: sp, dp, nan_r
     use mod_utility, only: seek_un
     use mod_grid, only: grid_i, grid_r, print_mat_as_grid
+    implicit none
 
     ! type for DTx calculation
     type clock!
@@ -18,11 +19,10 @@ module mod_TDx_index
         integer::n!
     end type TDx_index!
 
-    
+
     contains
 
     subroutine calc_TDx(domain,gg,year,DxiTOT,kcb,gg_max,max_year,x,TD,unit_Dxi)
-        implicit none
         type(grid_i),intent(in)::domain
         integer,intent(in)::gg,year
         real(dp),dimension(:,:),intent(in)::kcb
@@ -113,7 +113,6 @@ module mod_TDx_index
 
     subroutine init_TDx(unit_deficit,domain,path,TDx)
     ! initializes scratch files to NaN
-        implicit none
         integer,dimension(:),intent(in)::unit_deficit
         type(grid_i),intent(in)::domain
         character(len=*),intent(in)::path
@@ -159,7 +158,6 @@ module mod_TDx_index
 
     subroutine update_TDx_DB(deficit,TDx,time_step,domain,path)
     ! database updating
-        implicit none
         real(dp),dimension(:,:),intent(in)::deficit
         integer,intent(in)::time_step
         type(grid_i),intent(in)::domain
@@ -327,7 +325,6 @@ module mod_TDx_index
     end subroutine update_TDx_DB
 
     subroutine save_TDx_statistics(unit_deficit,domain,path,threshold_num,TDx)
-        implicit none
         integer,dimension(:),intent(in)::unit_deficit
         type(grid_i),intent(in)::domain
         character(len=*),intent(in)::path
@@ -422,7 +419,6 @@ module mod_TDx_index
     end subroutine save_TDx_statistics
 
     subroutine make_TDx_report(domain,path,n_week,TDx)
-        implicit none
         type(grid_i),intent(in)::domain
         character(len=*),intent(in)::path
         integer,intent(in)::n_week
@@ -464,7 +460,6 @@ module mod_TDx_index
     end subroutine make_TDx_report
 
     subroutine sum_TD(transp_act,transp_pot,k_cb,doy,year,TD)
-        implicit none
         real(dp),dimension(:,:),intent(in)::transp_act,transp_pot
         integer,intent(in)::doy,year
         real(dp),dimension(:,:),intent(in)::k_cb

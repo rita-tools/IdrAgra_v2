@@ -1,5 +1,5 @@
 ! TODO: some fixes
-module cli_save_outputs!
+module cli_save_outputs
     use mod_constants, only: sp, dp
     use mod_utility, only: seek_un, lower_case
     use mod_grid, only: grid_i, grid_r, print_mat_as_grid
@@ -7,7 +7,7 @@ module cli_save_outputs!
     use mod_parameters
     use cli_watsources
     use mod_crop_phenology
-    implicit none!
+    implicit none
 
     type output!
         integer::unit               ! unit linked to the file
@@ -138,7 +138,6 @@ module cli_save_outputs!
     ! TODO: make a general form
     subroutine init_cell_output_file(free_unit,file_name,table_header,table_subheader)!
         ! create the output file and print the header
-        implicit none!
         character(len=*),intent(in)::file_name!
         character(len=*),intent(in)::table_header                               ! column names
         character(len=*),dimension(:),optional,intent(in)::table_subheader      ! additional column names
@@ -780,7 +779,6 @@ module cli_save_outputs!
     end subroutine destroy_annual_output!
     
     subroutine destroy_yield_output(yld_map)!
-        implicit none!
         type(yield_t)::yld_map!
         !!
         deallocate(yld_map%biomass_pot%mat)!
@@ -797,7 +795,6 @@ module cli_save_outputs!
     end subroutine destroy_yield_output!
     !
     subroutine destroy_annual_debug_output(dbg_yr_map)!
-        implicit none!
         type(annual_debug_map)::dbg_yr_map!
         !!
         deallocate(dbg_yr_map%eva_act_tot%mat)!
@@ -1003,7 +1000,6 @@ module cli_save_outputs!
     !
     subroutine save_step_irrigation(a_step_map,doy,domain,calendar, init_total)
         ! save only irrigation map
-        implicit none!
         type(step_map),intent(inout)::a_step_map!
         integer,intent(in)::doy!
         type(grid_i),intent(in)::domain!
@@ -1074,7 +1070,6 @@ module cli_save_outputs!
     !
     subroutine save_yearly_data(yr_map,domain,debug)!
         ! save annual outputs (water balance variable and efficiency)
-        implicit none!
         type(annual_map),intent(in)::yr_map!
         type(grid_i),intent(in)::domain!
         logical,intent(in)::debug
@@ -1200,7 +1195,6 @@ module cli_save_outputs!
     end subroutine save_annual_debug_data!
     !
     subroutine save_yield_debug_data(yield,domain)!
-        implicit none!
         type(yield_t),intent(in)::yield!
         type(grid_i),intent(in)::domain!
         integer::errorflag!
