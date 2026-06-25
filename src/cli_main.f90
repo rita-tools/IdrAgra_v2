@@ -3,7 +3,7 @@ use mod_utility, only: lower_case, print_execution_time
 use mod_parameters                                ! variables and methods to read file *.xml paramters
 use mod_grid, only: write_grid, min_domain, bound ! variables and methods to handle spatial input
 use mod_TDx_index                                 ! variables and methods to handle meteorological data
-use mod_meteo, only: read_meteo_parameters, close_meteo_file, meteo_info ! variables and methods to handle meteorological data
+use mod_meteo, only: read_meteo_parameters, close_meteo_file, meteo_info, meteo_series_length ! variables and methods to handle meteorological data
 use cli_crop_parameters, only: init_crop_phenology_pars, close_pheno_file, crop_pheno_info ! variables and methods to handle crop parameters
 use cli_watsources                                ! variables and methods to handle irrigation units water supply
 use cli_simulation_manager                        ! simulation manager: control IO and daily cycle
