@@ -373,9 +373,10 @@ module mod_irrigation
         integer,dimension(:,:),intent(in)::irr_starts
         integer,dimension(:,:),intent(in)::irr_ends
         logical,intent(in)::f_shape_area
-        
-        integer::i,j,k,shift,p!
-        integer::n_cells_tobe_irr
+
+        integer :: i, j, k, shift, p
+        integer :: n_cells_tobe_irr ! number of cells that might receive irrigation today (in-season & with an irrigable crop growing)
+        integer :: n_cells_req_irr  ! number of cells that require irrigation from monitored sources today (irrigable + soil dry enough)
         integer,parameter::sec_to_day=24*60*60
         real(dp),dimension(domain%header%imax,domain%header%jmax)::v_irr_cell   ! irrigation volumes [m^3]
         logical,dimension(domain%header%imax,domain%header%jmax)::irr_mask      ! a mask to get all the irrigable cells
@@ -438,7 +439,7 @@ module mod_irrigation
                      .and. irr_class==1 &
                      .and. irr_starts<=doy &
                      .and. irr_ends>=doy &
-                     .and. k_cb > 0.0D0) !%PS% ensure crop is growing (safer than irrigation_class, which is sometimes not updated: TODO: check)
+                     .and. k_cb > 0.0D0) !%PS% ensure crop is growing (safer than irrigation_class, which is sometimes not switched off: TODO: check)
 
             n_cells_tobe_irr = count(irr_mask)!
             
@@ -462,7 +463,8 @@ module mod_irrigation
                 allocate(vcells(n_cells_tobe_irr)); vcells=0
                 allocate(s_v_irr_cell(n_cells_tobe_irr)); s_v_irr_cell=pack(v_irr_cell,irr_mask)!
                 allocate(s_h_met(n_cells_tobe_irr)); s_h_met=pack(h_met,irr_mask)!
-                
+                n_cells_req_irr = count(s_h_old <= s_h_raw_coll)
+
                 ! find the index of the latest irrigated cell (the day before)
                 ! get_value_index returns shift=0 by default
                 if (any(vid == irr_units(k)%last_cell_id)) then
@@ -535,17 +537,15 @@ module mod_irrigation
                 else ! irrigation units with no irrigable cells
                     irr_units(k)%n_irrigated_cells = 0
                 end if
-            
+
                 ! mass conservation: how much water remains
                 irr_units(k)%q_surplus = irr_units(k)%q_day - Q_tot_act
-                
-                ! %AB% store the amount of water surplus for the next day if:
-                ! 1 - the irrigation unit has irrigable cells
-                ! 2 - not all the cells are evaluated for irrigation requirements
-                ! 3 - current day is in the irrigation season
-                !if (n/=0 .and. irr_units(k)%n_irrigated_cells /= n .and. doy < end_irr_season) then
-                if (n_cells_tobe_irr/=0 .and. irr_units(k)%n_irrigated_cells /= 0 .and. & ! %EAC% also the number of irrigated cells must be zero
-                    & irr_units(k)%n_irrigated_cells /= n_cells_tobe_irr) then
+
+                ! Store the amount of water surplus for the next day if:
+                ! 1 - the IU has at least a cell eligible for irrigation (irr_class == 1, k_cb > 0, in-season)
+                ! 2 - at least one eligible cell requires collective-source irrigation !%PS%: Used to be "at least one cell was irrigated". Now surplus can be carried over to the next day if we are waiting for it to reach a "usable" threshold;
+                ! 3 - not all cells in the IU were evaluated today                                                                        ! ; with this condition it is acceptable to simulate a IU receiving x m3/s every n days using a x/n m3/s daily flow,
+                if (n_cells_tobe_irr/=0 .and. n_cells_req_irr /= 0 .and. irr_units(k)%n_irrigated_cells /= n_cells_tobe_irr) then         ! , even when the resulting flow is insufficient to trigger one irrigation event per day (as per original IdrAgra v1 behaviour)
                     irr_units(k)%q_rem = irr_units(k)%q_surplus
                     irr_units(k)%q_surplus = 0.  ! %AB% re-init the surplus
                 else
@@ -687,7 +687,7 @@ module mod_irrigation
                     where (irr_units_map%mat == wat_sources(i)%id_irr_unit &
                         & .and. domain_map%mat /= domain_map%header%nan &
                         & .and. irrigation_class == 1 &
-                        & .and. k_cb > 0.0D0) & !%PS% ensure crop is growing (safer than irrigation_class, which is sometimes not updated: TODO: check)
+                        & .and. k_cb > 0.0D0) & !%PS% ensure crop is growing (safer than irrigation_class, which is sometimes not switched off: TODO: check)
                         & cells_un_coll = wat_sources(i)%wat_src_idx
                 end if
             end do

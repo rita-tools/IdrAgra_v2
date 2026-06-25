@@ -814,7 +814,7 @@ module cli_save_outputs!
         integer,dimension(:),intent(in)::calendar!
         integer,intent(in)::init_total
         character(len=*),intent(in)::string
-        type(step_map),intent(out)::a_step_map!
+        type(step_map),intent(inout)::a_step_map!
         integer::i,total!
         character(len=33)::year,step!
         !!
@@ -856,7 +856,7 @@ module cli_save_outputs!
         integer,dimension(:),intent(in)::calendar!
         integer,intent(in)::init_total
         character(len=*),intent(in)::string
-        type(step_debug_map),intent(out)::a_dbg_map!
+        type(step_debug_map),intent(inout)::a_dbg_map!
         integer::i,total!
         character(len=33)::year,step!
         
@@ -942,7 +942,7 @@ module cli_save_outputs!
     !
     subroutine save_step_data(a_step_map,doy,domain,calendar, init_total)
         ! save the results aggregated by step if the current day (doy) is the last day of the step
-        type(step_map),intent(in)::a_step_map!
+        type(step_map),intent(inout)::a_step_map!
         integer,intent(in)::doy!
         type(grid_i),intent(in)::domain!
         integer,dimension(:),intent(in)::calendar!
@@ -1004,7 +1004,7 @@ module cli_save_outputs!
     subroutine save_step_irrigation(a_step_map,doy,domain,calendar, init_total)
         ! save only irrigation map
         implicit none!
-        type(step_map),intent(in)::a_step_map!
+        type(step_map),intent(inout)::a_step_map!
         integer,intent(in)::doy!
         type(grid_i),intent(in)::domain!
         integer,dimension(:),intent(in)::calendar!
@@ -1031,7 +1031,7 @@ module cli_save_outputs!
     !
     subroutine save_debug_step_data(a_debug_asc,doy,domain,calendar, total_init)
         ! save the results for debug aggregated by step if the current day (doy) is the last day of the step
-        type(step_debug_map),intent(in)::a_debug_asc!
+        type(step_debug_map),intent(inout)::a_debug_asc!
         integer,intent(in)::doy!
         type(grid_i),intent(in)::domain!
         integer,dimension(:),intent(in)::calendar!

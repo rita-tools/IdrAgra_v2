@@ -1571,8 +1571,8 @@ module cli_simulation_manager!
         type(balance2_matrices), intent(in):: bil2
         type(spatial_info), intent(in):: info_spat
         real(dp), dimension(:,:), intent(in):: coll_irr, priv_irr
-        type(step_map), intent(in):: asc
-        type(step_debug_map), intent(in):: deb_asc
+        type(step_map), intent(inout):: asc
+        type(step_debug_map), intent(inout):: deb_asc
         integer, dimension(:), intent(in):: intervals
         integer, intent(in):: clock_time
         logical, intent(in)::debug
