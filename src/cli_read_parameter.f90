@@ -1,4 +1,4 @@
-module cli_read_parameter!
+module cli_read_parameter
     use mod_parameters
     use mod_common
     use mod_grid
@@ -7,14 +7,12 @@ module cli_read_parameter!
     use mod_TDx_index
     use mod_system
     use mod_utility
-
     use cli_save_outputs
-    implicit none!
+    implicit none
 
     contains
 
     subroutine read_all_parameters(file_xml, xml, xml_dtx, ErrorFlag, debug)
-        implicit none
         character(len=*), intent(in) :: file_xml
         logical, intent(in) :: debug
         integer, intent(out) :: ErrorFlag
@@ -100,8 +98,6 @@ module cli_read_parameter!
         integer,parameter :: nanvalue=-9999       ! general NaN value
         integer,dimension(:),allocatable :: dummy
         character(len=300) :: dir_ic, dir_fc
-
-        !character :: delimiter
 
         ErrorFlag = 0
         line = 0
@@ -586,7 +582,6 @@ module cli_read_parameter!
     end subroutine read_irr_method!
 
     subroutine read_all_irr_methods(xml, ErrorFlag, debug)
-        implicit none
         logical, intent(in) :: debug
         integer, intent(out) :: ErrorFlag
         type(parameters), intent(INout) :: xml
@@ -599,16 +594,12 @@ module cli_read_parameter!
         integer :: ios          ! state variable (0 = ok)
         integer :: line, tablestart
 
-        ErrorFlag = 0
-        line = 0; tablestart = 0
-        ios = 0
-        call seek_un(errorflag,free_unit)!
-        print*,'In read_irr_parameters, irr_met_path:',xml%sim%irr_met_path
-        print*,'In read_irr_parameters, irr_met_filename:',xml%sim%irr_met_list_fn
-        
+        ErrorFlag = 0; line = 0; tablestart = 0; ios = 0
+
+        call seek_un(errorflag,free_unit)
+        print *, 'Reading the irrigation methods list from file: ', trim(xml%sim%irr_met_path)//trim(xml%sim%irr_met_list_fn)
+
         open(free_unit,file=trim(xml%sim%irr_met_path)//trim(xml%sim%irr_met_list_fn),action="read")!
-        line = 0; tablestart = 0
-        ios = 0
         do while (ios == 0)
             read(free_unit, '(A)', iostat=ios) buffer
             if (ios == 0) then
@@ -626,7 +617,7 @@ module cli_read_parameter!
                     buffer = buffer(p+1:)
                     select case (label)
                         case ('irrmethnum')
-                             ! number of irrigation method considered in the simulation
+                             ! number of irrigation methods considered in the simulation
                             read(buffer, *, iostat=ios) xml%sim%n_irr_meth
                             allocate (xml%irr%met(xml%sim%n_irr_meth))!
                             ! set defualt values for irrigation methods from general setup
@@ -636,9 +627,9 @@ module cli_read_parameter!
                             end do
                         case ('list')
                             tablestart = line
-                            ! List of the file with the irrigation methods
+                            ! List of the files with the irrigation methods
                             do i = 1, xml%sim%n_irr_meth
-                                read(free_unit, *, iostat=ios) irr_method_fn  
+                                read(free_unit, *, iostat=ios) irr_method_fn
                                 line = line + 1
                                 call read_irr_method(trim(xml%sim%irr_met_path)//irr_method_fn, xml%irr%met, debug)!
                             end do
@@ -1139,7 +1130,7 @@ module cli_read_parameter!
         integer::i,free_unit,error_flag,ios!
         integer:: strlen
         character(len=999) :: str                            ! File string
-        character(len=1),parameter :: delimiter = achar(9)   ! Delimiter: horizontal tab
+        character(len=1),parameter :: tab_char = achar(9)   ! Delimiter: horizontal tab
         integer::cols, n_irr_units                                 ! File columns (cols) and rows (n_bac = irrigation district number)
         !!
         strlen = 999
@@ -1157,7 +1148,7 @@ module cli_read_parameter!
         
         cols = 1                        ! Count the number of delimiters in the first line
         do i = 1, strlen
-            if (str(i:i) == delimiter) then
+            if (str(i:i) == tab_char) then
                 cols = cols+1
             end if
         end do
