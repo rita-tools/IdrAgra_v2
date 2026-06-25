@@ -10,7 +10,7 @@ module mod_system
     character(len = 10), private :: mkdir_cmd = 'mkdir'
     character :: delimiter = '/'
 #endif
-    
+
     contains
 
     subroutine make_dir(path)
@@ -25,5 +25,5 @@ module mod_system
         print*,'folder separator: ', delimiter
         print*, '================='
     end subroutine
-    
-end module 
+
+end module

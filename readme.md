@@ -35,7 +35,7 @@ pacman -S --needed base-devel mingw-w64-x86_64-toolchain
 pacman -S mingw-w64-x86_64-python3-pip mingw-w64-x86_64-python3-setuptools
 /mingw64/bin/pip3 install fortran-language-server
 pacman -S mingw-w64-x86_64-lapack
-pacman -S git unzip zsh 
+pacman -S git unzip zsh
 ```
 > [!NOTE]
 > After step 5, the terminal will be closed and you have to reopen it. Step 7 will install a complete building toolchain, other steps install useful packages
@@ -44,7 +44,7 @@ Install Visual Studio Code, VSC, (not Visual Studio!) from https://code.visualst
 #### Step 3: install Visual Studio Code Extensions (once) ####
 Launch VSC. In the side bar (left), click the “Extensions” icon (in the middle). The following extensions of VSC should be (already) installed:
 - C/C++ extension
-- Makefile extension 
+- Makefile extension
 - Code Runner
 - Modern Fortran
 - Data Preview (to view and analyze csv files, optional)
@@ -107,7 +107,7 @@ The Ubuntu app center is the easy way to installVisual Studio Code, VSC.
 #### Step 3: install Visual Studio Code Extensions (once) ####
 Launch VSC. In the side bar (left), click the “Extensions” icon (in the middle). The following extensions of VSC should be (already) installed:
 - C/C++ extension
-- Makefile extension 
+- Makefile extension
 - Code Runner
 - Modern Fortran
 - Data Preview (to view and analyze csv files, optional)
@@ -149,7 +149,6 @@ From the terminal (supposing make is not installed):
 ```Shell
 sudo apt install make
 ```
-
 
 #### Step 8: clone this repository ####
 

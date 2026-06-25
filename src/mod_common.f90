@@ -6,40 +6,40 @@ module mod_common
     implicit none
 
     ! TODO: merge the two types in only one
-    type balance1_matrices!
+    type balance1_matrices
     ! Definition of type balance1_matrices
     ! Stores in distributed form all 1st layer (evaporative layer) balance terms
     ! The variable is modified each day
-        real(dp),dimension(:,:),pointer::d_e               ! depth of the evaporative layer  [m]!
-        real(dp),dimension(:,:),pointer::h_eva            ! actual evaporation [mm]!
-        real(dp),dimension(:,:),pointer::h_eva_pot        ! potential evaporation [mm]!
-        real(dp),dimension(:,:),pointer::h_transp_act     ! actual transpiration [mm]!
-        real(dp),dimension(:,:),pointer::h_transp_pot     ! potential transpiration [mm]!
-        real(dp),dimension(:,:),pointer::h_soil           ! water content [mm]!
-        real(dp),dimension(:,:),pointer::t_soil           ! volumetric water content [m3/m3]!
-        real(dp),dimension(:,:),pointer::h_interc         ! interception [mm]!
-        real(dp),dimension(:,:),pointer::h_perc           ! percolation from 1st to 2nd layer [mm]!
+        real(dp),dimension(:,:),pointer::d_e               ! depth of the evaporative layer  [m]
+        real(dp),dimension(:,:),pointer::h_eva            ! actual evaporation [mm]
+        real(dp),dimension(:,:),pointer::h_eva_pot        ! potential evaporation [mm]
+        real(dp),dimension(:,:),pointer::h_transp_act     ! actual transpiration [mm]
+        real(dp),dimension(:,:),pointer::h_transp_pot     ! potential transpiration [mm]
+        real(dp),dimension(:,:),pointer::h_soil           ! water content [mm]
+        real(dp),dimension(:,:),pointer::t_soil           ! volumetric water content [m3/m3]
+        real(dp),dimension(:,:),pointer::h_interc         ! interception [mm]
+        real(dp),dimension(:,:),pointer::h_perc           ! percolation from 1st to 2nd layer [mm]
         real(dp),dimension(:,:),pointer::h_pond           ! excessive surface ponding [m]
-        real(dp),dimension(:,:),pointer::h_inf            ! infiltration [mm]!
+        real(dp),dimension(:,:),pointer::h_inf            ! infiltration [mm]
         real(dp),dimension(:,:),pointer::k_s_dry          ! water scarcity stress coefficient [-]
         real(dp),dimension(:,:),pointer::k_s_sat          ! water saturation stress coefficient [-]
         real(dp),dimension(:,:),pointer::k_s              ! water stress coefficient [-]
-        real(dp),dimension(:,:),pointer::h_runoff         ! runoff [mm]!
-        real(dp),dimension(:,:),pointer::h_eff_rain       ! effective rainfall [mm]!
+        real(dp),dimension(:,:),pointer::h_runoff         ! runoff [mm]
+        real(dp),dimension(:,:),pointer::h_eff_rain       ! effective rainfall [mm]
         real(dp),dimension(:,:),pointer::h_net_av_water   ! net available water = effective rainfall + sprinkle irrigation (over which runoff is calculated)
         real(dp),dimension(:,:),pointer::h_gross_av_water ! gross available water = effective rainfall + sprinkle irrigation
-    end type balance1_matrices!
+    end type balance1_matrices
 
-    type balance2_matrices!
+    type balance2_matrices
     ! Definition of type balance2_matrices
     ! Stores in distributed form all 2nd layer (transpirative layer) balance terms
     ! The variable is modified each day
-        real(dp),dimension(:,:),pointer::d_t            ! thickness of the transpirative layer  [m]!
-        real(dp),dimension(:,:),pointer::h_soil         ! water content [mm]!
-        real(dp),dimension(:,:),pointer::t_soil         ! volumetric water content of the evaporative layer  [m3/m3]!
-        real(dp),dimension(:,:),pointer::h_transp_act   ! actual transpiration [mm]!
-        real(dp),dimension(:,:),pointer::h_transp_pot   ! potential transpiration [mm]!
-        real(dp),dimension(:,:),pointer::h_perc         ! percolation from 2nd layer out of the root zone [mm]!
+        real(dp),dimension(:,:),pointer::d_t            ! thickness of the transpirative layer  [m]
+        real(dp),dimension(:,:),pointer::h_soil         ! water content [mm]
+        real(dp),dimension(:,:),pointer::t_soil         ! volumetric water content of the evaporative layer  [m3/m3]
+        real(dp),dimension(:,:),pointer::h_transp_act   ! actual transpiration [mm]
+        real(dp),dimension(:,:),pointer::h_transp_pot   ! potential transpiration [mm]
+        real(dp),dimension(:,:),pointer::h_perc         ! percolation from 2nd layer out of the root zone [mm]
         real(dp),dimension(:,:),pointer::h_raw_sup      ! difference between water content at field capacity
                                                         ! and threshold water content
                                                         ! for irrigation application [mm]
@@ -54,10 +54,10 @@ module mod_common
         real(dp),dimension(:,:),pointer::k_s_dry        ! water scarcity stress coefficient [-]
         real(dp),dimension(:,:),pointer::k_s_sat        ! water saturation stress coefficient [-]
         real(dp),dimension(:,:),pointer::k_s            ! water stress coefficient [-]
-        real(dp),dimension(:,:),pointer::depth_under_rz ! depth of water table from root zone [m]!
+        real(dp),dimension(:,:),pointer::depth_under_rz ! depth of water table from root zone [m]
         real(dp),dimension(:,:),pointer::h_caprise      ! capillary rise [mm]
         real(dp),dimension(:,:),pointer::h_rise         ! rise from 2nd to 1st layer [mm]
-    end type balance2_matrices!
+    end type balance2_matrices
 
     type extensive                                      ! hourly steps of balance terms
     ! Definition of type extensive
@@ -79,7 +79,7 @@ module mod_common
         real(dp),dimension(:,:),pointer::h_eff_rain          ! effective rainfall [mm] - hourly
         real(dp),dimension(:,:),pointer::h_net_av_water      ! net available water = effective rainfall + sprinkle irrigation (over which runoff is calculated) - hourly
         real(dp),dimension(:,:),pointer::h_gross_av_water    ! gross available water = effective rainfall + sprinkle irrigation - hourly
-    end type extensive!
+    end type extensive
 
     type intensive
     ! Definition of type intensive
@@ -90,9 +90,9 @@ module mod_common
         real(dp),dimension(:,:),pointer::k_s_sat         ! water saturation stress coefficient [-] - hourly, h-1 (previous iteration)
         real(dp),dimension(:,:),pointer::k_s             ! water stress coefficient [-] - hourly, h-1 (previous iteration)
         real(dp),dimension(:,:),pointer::h_pond0         ! ponding [mm] - hourly, h-1 (previous iteration)
-    end type intensive!
+    end type intensive
 
-    type hourly!
+    type hourly
     ! Definition of type hourly
     ! Inherits extensive/intensive variables and stores algorithm iterations
         type(extensive)::esten
@@ -101,13 +101,12 @@ module mod_common
         integer,dimension(:,:),pointer::n_iter2  ! convergence index for water_balance_transp_lay [-] - hourly
         integer,dimension(:,:),pointer::n_max1   ! convergence index for water_balance_evap_lay [-] - n. of iterations in an hour
         integer,dimension(:,:),pointer::n_max2   ! convergence index for water_balance_transp_lay - n. of iterations in an hour
-    end type hourly!
+    end type hourly
 
-    type unit_file_scratch!
-        integer,dimension(:),pointer::dxi!
-    end type unit_file_scratch!
+    type unit_file_scratch
+        integer,dimension(:),pointer::dxi
+    end type unit_file_scratch
 
-    
     type moisture               ! Moisture indicates in this case the relative water content [m^3/m^3]
         type(grid_r)::wp        ! Soil moisture at wilting point
         type(grid_r)::fc        ! Soil moisture at field capacity
@@ -116,7 +115,7 @@ module mod_common
         type(grid_r)::r         ! Residual soil moisture
     end type moisture
 
-    type spatial_info!
+    type spatial_info
         type(grid_i)::domain                        ! Domain - skipping not simulated soil uses
         type(grid_i)::backup_domain                 ! Domain - all soil uses
         type(grid_i)::soil_use_id                   ! id of soil uses
@@ -140,40 +139,40 @@ module mod_common
         type(grid_r),dimension(:),pointer::weight_ws! weights of weather stations
         type(grid_r),dimension(2)::a_perc           ! calibration parameter a for the percolation booster parameter
         type(grid_r),dimension(2)::b_perc           ! calibration parameter b for the percolation booster parameter
-        type(grid_r)::h_meth                        ! irrigation volume [mm] 
+        type(grid_r)::h_meth                        ! irrigation volume [mm]
         type(grid_r)::cell_area                     ! area of the calculation cell (vectorialization)
         type(grid_r):: h_maxpond                    ! maximum ponding depth [mm]
         type(grid_i)::irr_starts                    ! doy of the year when irrigation period starts
         type(grid_i)::irr_ends                      ! doy of the year when irrigation period ends
         type(grid_i)::irandom                       ! a map with the number to use to shift crop growing
-    end type spatial_info!
+    end type spatial_info
 
     ! Store the water content in mm
-    type vol_mm!
+    type vol_mm
         real(dp),dimension(:,:),pointer::h_fc
         real(dp),dimension(:,:),pointer::h_wp
         real(dp),dimension(:,:),pointer::h_sat
         real(dp),dimension(:,:),pointer::rew   ! only for the 1st evaporative layer
         real(dp),dimension(:,:),pointer::h_r
-    end type vol_mm!
+    end type vol_mm
 
-    type wat_matrix!
+    type wat_matrix
         type(vol_mm),dimension(2)::layer
         type(vol_mm),dimension(1)::theta2_rice
         real(dp),dimension(:,:),pointer::wat1_rew   ! soil water content at REW TODO: units?
         real(dp),dimension(:,:),pointer::few        ! fraction of soil exposed to evaporation
         real(dp),dimension(:,:),pointer::kc_max     ! maximum value of Kcb
-    end type wat_matrix!
+    end type wat_matrix
 
     ! Store the hydrological properties for paddy field
-    type soil2_rice!
+    type soil2_rice
         integer::unit_soil_rice  ! unit to file that contains the parameters for rice
-        real(dp)::k_sat_2=10.!
-        real(dp)::n_2!
-        real(dp)::theta2_FC!
-        real(dp)::theta2_R!
-        real(dp)::theta2_SAT!
-        real(dp)::theta2_WP!
-    end type soil2_rice!
+        real(dp)::k_sat_2=10.
+        real(dp)::n_2
+        real(dp)::theta2_FC
+        real(dp)::theta2_R
+        real(dp)::theta2_SAT
+        real(dp)::theta2_WP
+    end type soil2_rice
 
 end module

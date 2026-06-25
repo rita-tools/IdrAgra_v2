@@ -4,8 +4,8 @@
 # 									#
 #########################################################################
 
-# number of weather stations:		
-StatNum = 1	
+# number of weather stations:
+StatNum = 1
 # Weather stations table:
 Table =
 sar.dat x32632            y32632

@@ -6,19 +6,18 @@ module mod_TDx_index
     implicit none
 
     ! type for DTx calculation
-    type clock!
-        integer::n_ind!
-        integer,dimension(:),pointer::x!
-        integer::td!
+    type clock
+        integer::n_ind
+        integer,dimension(:),pointer::x
+        integer::td
         integer::delay           ! time shift of report generation
-    end type clock!
+    end type clock
 
-    type TDx_index!
-        character(len=255)::mode!
-        type(clock)::temp!
-        integer::n!
-    end type TDx_index!
-
+    type TDx_index
+        character(len=255)::mode
+        type(clock)::temp
+        integer::n
+    end type TDx_index
 
     contains
 
@@ -272,11 +271,10 @@ module mod_TDx_index
                 & ". Execution will be aborted..."
             stop
         end if
-        
+
         ! it takes into account values (different from NaN) of tot_deficit in TDx_"str7"_3.tmp
         ! at cycle end, count_num contains the count of values over which statistics are performed
-        where(deficit/=nan)count_num=count_num+1 
-        
+        where(deficit/=nan)count_num=count_num+1
 
         write(free_unit,iostat=ios)count_num
         if(ios/=0)then
@@ -312,7 +310,7 @@ module mod_TDx_index
 
         ! it takes into account zeros of tot_deficit in TDx_"str7"_4.tmp
         ! at cycle end, count_zeros contains the count of zeros over which statistics are performed
-        where(deficit==0.)count_zeros=count_zeros+1                         
+        where(deficit==0.)count_zeros=count_zeros+1
 
         write(free_unit,iostat=ios)count_zeros
         if(ios/=0)then
@@ -474,6 +472,6 @@ module mod_TDx_index
         else where
             TD=nan
         end where
-        
+
     end subroutine sum_TD
 end module mod_TDx_index

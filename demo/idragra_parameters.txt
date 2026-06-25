@@ -1,7 +1,7 @@
 ################ Input file for Idragra ##########################
 #
 #                   Note: lines starting with <#> are comments
-# 
+#
 ########################################################
 
 ### 1. General section ###
@@ -31,7 +31,7 @@ PhenoFileRoot = pheno_
 # IrrMethPath: path to irrigation methods folder (default: irrmeth_data\\)
 IrrMethPath = irrmethods\\
 # IrrMethFileName: file, located in irrigation methods folder, in which irrigation methods filenames are stored (default: irrmethods.txt)
-IrrMethFileName = irrmethods.txt 
+IrrMethFileName = irrmethods.txt
 
 # WatSourPath: path to water sources folder (default: watsour_data\\)
 WatSourPath = wsources\\
@@ -91,7 +91,7 @@ RandSowDaysWind = 0
 MonthlyFlag = T
 
 # if MonthlyFlag = F, choose output interval - output will be recorded from StartDate to EndDate every DeltaDate days
-# StartDate: start Julian day [1...366] for periodic output 
+# StartDate: start Julian day [1...366] for periodic output
 StartDate = 105
 # EndDate: end Julian day [1...366] for periodic output
 EndDate = 273
@@ -134,7 +134,7 @@ DeltaDate = 10
 StartIrrSeason = 1
 
 # EndIrrSeason: Julian day [1...366] in which irrigation season starts (e.g. 273)
-EndIrrSeason = 366 
+EndIrrSeason = 366
 
 # if Mode = 1 (consumptions), define irrigation sources
 # BasinsTotNum: total number of irrigation districts
@@ -172,16 +172,16 @@ zRoot = 0.9
 DTxMode = none
 
 # DTxNumXs: number of calculated indices (one for each integration period), i.e. elements of DTx_x
-DTxNumXs = 3 
+DTxNumXs = 3
 
 # DTx_x: integration period  (DT10 sums transpirative deficit of 10 days)
 DTx_x = 10 20 30
 
 # DTxDeltaDate: DTx calculation interval
 DTxDeltaDate = 10
-# DTxDelayDays: delay from the first day of year to start calculation 
-DTxDelayDays = 1 
+# DTxDelayDays: delay from the first day of year to start calculation
+DTxDelayDays = 1
 
 # if DTxMode = analysis, choose minimum cardinality (i.e. number of elements for a valid estimate)
 # DTxMinCard: minimum cardinality for statistical analysis
-DTxMinCard = 3 
+DTxMinCard = 3

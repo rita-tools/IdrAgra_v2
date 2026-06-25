@@ -1,10 +1,10 @@
-module mod_parameters!
+module mod_parameters
     use mod_utility, only: date, lower_case, seek_un, string_to_integers, calc_doy, split_date
     use mod_constants
-    implicit none!
+    implicit none
 
-    type simulation!
-        character(len=200) :: path                      ! path of output!
+    type simulation
+        character(len=200) :: path                      ! path of output
         character(len=200) :: meteo_path                ! path of meteo tables
         character(len=200) :: ws_list_fn                ! filename (with complete path) of weather stations list
         character(len=200) :: pheno_path                ! path where phenophases files are stored
@@ -58,7 +58,6 @@ module mod_parameters!
         character(len=255) :: meteoweight_fn
         character(len=255) :: shapearea_fn
         character(len=255) :: irandom_fn
-        
 
         integer :: step_out                         ! monthly output = 0, weekly output = 1, user defined = 2
         integer :: mode                             ! type of simulation:
@@ -99,66 +98,66 @@ module mod_parameters!
         real(dp),dimension(:,:),pointer :: quantiles! extremes of variability of the k_sat (percolation model): 10th e 90th for 1st layer, 10th e 90th for 2nd layer
         real(dp) :: lambda_cn                       ! lambda parameters for curve number [-]
         REAL(dp) :: h_prec_lim = 5.0                ! minimum meaningful precipitation [mm]
-        
+
         type(date) :: start_simulation              ! start simulation date
         type(date) :: end_simulation                ! end simulation date
         integer :: forecast_day = 5                 ! number of days to use to cumulate precipitation
         real(dp) :: h_maxpond = 0.0D0               ! overall maximum pond (mm). It will replaced by irrigation method
-    end type simulation!
+    end type simulation
 
-    type layer_depth!
+    type layer_depth
         real(dp) :: ze_fix                          ! depth of the evaporative (1st from top) layer [m]
         real(dp) :: zr_fix                          ! depth of the transpirative (2nd from top) layer [m] (used when crop is missing) [m]
-    end type layer_depth!
+    end type layer_depth
 
-    type par_method!
+    type par_method
         integer :: id                               ! id of the irrigation method, linked to the irrigation input map
-        real(dp) :: h_irr                           ! irrigation depth [mm]!
+        real(dp) :: h_irr                           ! irrigation depth [mm]
         real(dp) :: irr_th_ms                        ! threshold coefficient for the activation of irrigation from monitored source of need mode
         real(dp) :: irr_th_unm                       ! threshold coefficient for the activation of irrigation from unmonitored source of need mode
         real(dp) :: f_wet                           ! fraction of wetted soil [-]
         real(dp) :: a_min = 0.0D0                   ! min value of the "a" parameter for percolation model
-        real(dp) :: a_max = 0.0D0                   ! max value of the "a" parameter for percolation model              
+        real(dp) :: a_max = 0.0D0                   ! max value of the "a" parameter for percolation model
         real(dp) :: b_min = 0.0D0                   ! min value of the "b" parameter for percolation model
         real(dp) :: b_max = 0.0D0                   ! max value of the "b" parameter for percolation model
-        
+
         ! irrigation losses estimation model: losses=a_loss+b_loss x wind_vel+c_loss x T_mean
         real(dp) :: a_loss
         real(dp) :: b_loss
         real(dp) :: c_loss
 
         integer :: f_interception                   ! if 1 (true), irrigation is above the canopy
-        real(dp),dimension(:),pointer::freq!
+        real(dp),dimension(:),pointer::freq
 
         integer :: irr_starts = 1                    ! irrigation period can start from
         integer :: irr_ends  = 366                   ! irrigation period will end to
 
         real(dp) :: h_maxpond = 0.0D0            ! maximum ponding depth
 
-    end type par_method!
+    end type par_method
 
     type par_irr_event
-        real(dp) :: f_w                                 ! wetted fraction                             
+        real(dp) :: f_w                                 ! wetted fraction
         type(par_method),dimension(:),pointer::met      ! irrigation method parameter
-        real(dp) :: h_irr                               ! water application depth [mm]!
+        real(dp) :: h_irr                               ! water application depth [mm]
         real(dp) :: alpha_raw                           ! fraction of RAW at which the irrigation occurs
         ! for USE mode only
         real(dp) :: alpha_raw_uc                        ! fraction of RAW at which the irrigation occurs for unmonitored collective water sources
         real(dp) :: expl_fact                           ! exploration factor: multiply the number of cells potentially irrigable
-    end type par_irr_event!
+    end type par_irr_event
 
-    type water_source!
+    type water_source
         integer :: n_withdrawals                    ! number of withdrawals for each water sources
         logical :: f_exists                         ! if true, allocate the variable
         logical :: f_allocate_timeserie             ! if true, allocate the array
-    end type water_source!
+    end type water_source
 
     type uc_act_rule                                      ! activation rule for unmonitored collective water sources
         integer :: id_well_group                          ! id of the group of wells
         real(dp) :: min_act_trsld                         ! minimum activation threshold
         real(dp), dimension(3) :: flow_rate               ! activation flow rate
         real(dp), dimension(3) :: act_trsld               ! activation threshold
-    end type uc_act_rule!
+    end type uc_act_rule
 
     ! TODO: NOT USED
     !type pond
@@ -167,21 +166,21 @@ module mod_parameters!
     !    real(dp)::slope_max
     !    real(dp)::q_min
     !end type pond
-    
-    type parameters!
-        type(simulation) :: sim!
-        integer :: n_bac!
-        type(layer_depth) :: depth!
-        type(par_irr_event) :: irr!
-        integer :: n_dotaz!
-        type(water_source) :: ms_i!
-        type(water_source) :: ms_ii!
-        type(water_source) :: intreu!
-        type(water_source) :: cr!
-        type(uc_act_rule),dimension(:),pointer :: uc_act_rules!
-        real(dp),dimension(:),pointer::f_eff_rain!
-        real(dp),dimension(:),pointer::fet0!
-    end type parameters!
+
+    type parameters
+        type(simulation) :: sim
+        integer :: n_bac
+        type(layer_depth) :: depth
+        type(par_irr_event) :: irr
+        integer :: n_dotaz
+        type(water_source) :: ms_i
+        type(water_source) :: ms_ii
+        type(water_source) :: intreu
+        type(water_source) :: cr
+        type(uc_act_rule),dimension(:),pointer :: uc_act_rules
+        real(dp),dimension(:),pointer::f_eff_rain
+        real(dp),dimension(:),pointer::fet0
+    end type parameters
 
     type water_sources_table
         integer :: id_irr_unit              ! id of the irrigation unit served by the water source
@@ -193,32 +192,32 @@ module mod_parameters!
     end type water_sources_table
 
     type monitored_sources_table
-        ! store monitored sources parameters and daily data    
+        ! store monitored sources parameters and daily data
         real(dp),dimension(:),pointer::q_nom                ! list of nominal discharge [m3/s]
         character(len=10),dimension(:),pointer::wat_src_id  ! list of water sources id (name of max 10 characters)
         real(dp),dimension(:,:),pointer::q_daily            ! matrix of daily discharges (days x num water sources) [m3/s]
         integer::unit                                       ! unit associated to the input file
         type(date)::start                                   ! start date of the time serie
         type(date)::finish                                  ! end date of the time serie
-    end type monitored_sources_table!
+    end type monitored_sources_table
 
     type unmonitored_sources_table
-        ! store unmonitored collective sources parameters    
-        real(dp),dimension(:),pointer::q_max                ! list of maximum discharge value [m3/s]!
-        real(dp),dimension(:),pointer::q_nom                ! list of nominal discharge value [m3/s]!
+        ! store unmonitored collective sources parameters
+        real(dp),dimension(:),pointer::q_max                ! list of maximum discharge value [m3/s]
+        real(dp),dimension(:),pointer::q_nom                ! list of nominal discharge value [m3/s]
         character(len=10),dimension(:),pointer::wat_src_id  ! list of water sources id (name of max 10 characters)
         integer,dimension(:),pointer::unit                  ! unit associated to the input file
-    end type unmonitored_sources_table!
+    end type unmonitored_sources_table
 
-    type source_info!
+    type source_info
     ! collect all the different water sources
         type(monitored_sources_table)::mn_src_tbl1              ! monitored sources (i)
         type(monitored_sources_table)::mn_src_tbl2              ! monitored sources (ii)
         type(monitored_sources_table)::int_reuse_tbl            ! internal reuse
         type(unmonitored_sources_table)::unm_src_tbl            ! unmonitored water sources
-    end type source_info!
+    end type source_info
 
-    type irr_units_table!
+    type irr_units_table
         ! store all the data referred to th irrigation units
         integer::id                             ! irrigation unit id
         integer::n_cells                        ! number of cells belonging to the irrigation units
@@ -234,7 +233,7 @@ module mod_parameters!
         real(dp)::q_surplus                     ! discharge lost at the end of the rotation or the end of the irrigation season
         real(dp)::q_rem                     ! discharge available the following day
         real(dp)::q_un_priv                     ! discharge extracted from unmonitored private sources (e.g. farm wells)
-        real(dp)::q_un_coll                     ! discharge extracted from unmonitored collective sources (e.g. public wells)    
+        real(dp)::q_un_coll                     ! discharge extracted from unmonitored collective sources (e.g. public wells)
         integer::n_irrigated_cells              ! number of cell irrigated in the current day
         integer::f_un_priv                      ! flag for activate irrigation from unmonitored private sources (e.g. farm wells)
         real(dp)::n_irrigable_cells             ! number of cell potentially irrigable calculated as v_nom/SUM(v_irr_cells)
@@ -243,8 +242,8 @@ module mod_parameters!
         real(dp)::f_explore                     ! multiplicative factor to set the number of cells potentially irrigable in a day
         !!! %AB% <------- new variable for the rotation
         real::wat_shift                     ! rotation length (in days or fraction of day)
-        integer::n_day                      ! number of cells irrigable in a day (related to the rotation)!
-    end type irr_units_table!
+        integer::n_day                      ! number of cells irrigable in a day (related to the rotation)
+    end type irr_units_table
 
     type scheduled_irrigation
         integer::irr_unit_id               ! id of the irrigation unit
@@ -252,5 +251,5 @@ module mod_parameters!
         integer::doy                       ! day of the year [1-->365/6]
         real(dp)::h_irr                    ! water depth in each irrigation
     end type
-    
-end module mod_parameters!
+
+end module mod_parameters

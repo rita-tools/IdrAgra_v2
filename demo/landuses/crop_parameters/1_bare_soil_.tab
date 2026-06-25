@@ -19,12 +19,12 @@ daylength_if	= 0 	# day length threshold below (above) which no accumulation of 
 daylength_ins	= 0 	#  day length threshold above (below) which maximum accumulation of physiological time occurs for long-day (short-day) crops
 WP              = 0.0  # biomass water productivity [t/ha] (C4 crops = 0.30 - 0.35, C3 crops = 0.15 - 0.20, some leguminous crops < 0.15 t/ha)
 fsink           = 0.0   # crop sink strength coefficient
-Tcrit_HS        = 0.0   # critical temperature threshold for heat stress [°C] 
-Tlim_HS         = 0.0    # limit temperature threshold for heat stress[°C] 
+Tcrit_HS        = 0.0   # critical temperature threshold for heat stress [°C]
+Tlim_HS         = 0.0    # limit temperature threshold for heat stress[°C]
 HI              = 0.0  # harvest index
-kyT		= 0.0 	# water stress coefficient for the overall crop growth cycle 
-ky1		= 0.0 	# water stress coefficient for the ini stage 
-ky2		= 0.0 	# water stress coefficient for the dev stage 
+kyT		= 0.0 	# water stress coefficient for the overall crop growth cycle
+ky1		= 0.0 	# water stress coefficient for the ini stage
+ky2		= 0.0 	# water stress coefficient for the dev stage
 ky3		= 0.0 	# water stress coefficient for the mid stage
 ky4		= 0.0 	# water stress coefficient for the end stage
 pRAW		= 0.0 	# parameter to compute RAW
@@ -34,8 +34,7 @@ Irrigation	= 0     # irrigation (1 = Yes, 0 = No)
 
 # Add here extra option(s)
 
-
-# table of GDD [°C], Kcb [-], LAI [-], crop height [m], root depth [m]; missing values are entered as * 
+# table of GDD [°C], Kcb [-], LAI [-], crop height [m], root depth [m]; missing values are entered as *
 GDD	Kcb LAI	Hc	Sr
 0 0 0 0 1.0
 endTable
