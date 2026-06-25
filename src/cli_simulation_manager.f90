@@ -818,12 +818,16 @@ module cli_simulation_manager!
                     call create_meteo_matrices(info_meteo,dir_meteo,meteo_weight,meteo,info_spat%domain,doy,pars%sim%res_canopy(y))
                 end if
 
-                ! calculate average latitude
-                if (doy == 1) then 
-                    forall (i=1:size(meteo%lat,1), j=1:size(meteo%lat,2), meteo%lat(i,j)/=nan_r)!
-                        lat_sum = lat_sum + meteo%lat(i,j)
-                        lat_num = lat_num + 1
-                    end forall!
+                ! calculate average latitude %PS%: switched from "forall" to an equivalent "do-do-if" structure to avoid compile-time warnings
+                if (doy == 1) then
+                    do i=1,size(meteo%lat,1)
+                        do j=1,size(meteo%lat,2)
+                            if (meteo%lat(i,j)/=nan_r) then
+                                lat_sum = lat_sum + meteo%lat(i,j)
+                                lat_num = lat_num + 1
+                            end if
+                        end do
+                    end do
                     lat_mean = lat_sum/lat_num
                 end if
 
