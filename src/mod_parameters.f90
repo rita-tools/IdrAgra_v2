@@ -1,5 +1,5 @@
 module mod_parameters
-use mod_utility, only: date, lower_case, seek_un, string_to_integers, calc_doy, split_date
+use mod_utility, only: date, lower_case, string_to_integers, calc_doy, split_date
 use mod_constants
 implicit none
 

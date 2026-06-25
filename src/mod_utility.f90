@@ -83,22 +83,6 @@ subroutine lower_case(word)
     end do
 end subroutine lower_case
 
-subroutine seek_un(ErrorFlag, free_unit)
-    ! Find the first free unit for reading and writing operation
-
-    integer :: ErrorFlag    ! check for any error
-    integer :: free_unit    ! number of the first available free unit from 11 to 99999
-    logical :: OP           ! check if the unit is used
-
-    ErrorFlag=0
-    ! find for the first free unit
-    do free_unit=11,99999
-        inquire( UNIT=free_unit, OPENED=OP)
-        if( free_unit .eq. 99999 ) ErrorFlag=1  ! no unit is available
-        if(.not. OP) exit                       ! the unit is not used
-    end do
-end subroutine seek_un
-
 pure function get_value_index_i( val_list, a_value) result( val_idx)
     ! Find the position of an integer value in an array of integers
     integer, dimension(:), intent(in) :: val_list    ! a list of values

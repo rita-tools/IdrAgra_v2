@@ -76,7 +76,7 @@ subroutine read_all_parameters(file_xml, xml, xml_dtx, ErrorFlag, debug)
 
 end subroutine read_all_parameters
 
-subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,debug)
+subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag, debug)
     ! read settings for the simulation
     character(len=*), intent(in) :: file_xml
     integer, intent(out) :: ErrorFlag
@@ -105,9 +105,7 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,debug)
     dir_fc = xml%sim%final_condition
     allocate(xml%sim%clock(3))
 
-    ! get a free number to open the file and open it
-    call seek_un(errorflag,unit_txt)
-    open(unit_txt,file=trim(file_xml), status="old", action="read", IOSTAT = ios)
+    open(newunit=unit_txt,file=trim(file_xml), status="old", action="read", IOSTAT = ios)
 
     if (ios /= 0 ) then
         print *, 'Cannot open file ', trim(file_xml), '. The specified file does not exist.'
@@ -468,8 +466,7 @@ subroutine read_irr_method(irr_method_fn, met, debug)
     line = 0
     ios = 0
     e = 1
-    call seek_un(ErrorFlag,unit_txt)
-    open(unit_txt,file=trim(irr_method_fn),action="read", IOSTAT = ios)
+    open(newunit=unit_txt,file=trim(irr_method_fn),action="read", IOSTAT = ios)
     if (ios /= 0 ) then
         print *, "Cannot open file ", trim(irr_method_fn), ". The specified file does not exist."
         print *, 'Execution will be aborted...'
@@ -593,10 +590,9 @@ subroutine read_all_irr_methods(xml, ErrorFlag, debug)
 
     ErrorFlag = 0; line = 0; tablestart = 0; ios = 0
 
-    call seek_un(errorflag,free_unit)
     print *, 'Reading the irrigation methods list from file: ', trim(xml%sim%irr_met_path)//trim(xml%sim%irr_met_list_fn)
 
-    open(free_unit,file=trim(xml%sim%irr_met_path)//trim(xml%sim%irr_met_list_fn),action="read")
+    open(newunit=free_unit,file=trim(xml%sim%irr_met_path)//trim(xml%sim%irr_met_list_fn),action="read")
     do while (ios == 0)
         read(free_unit, '(A)', iostat=ios) buffer
         if (ios == 0) then
@@ -981,8 +977,7 @@ subroutine read_rice_parameters(sim, theta2_rice)
     line = 0
     ios = 0
 
-    call seek_un(errorflag,theta2_rice%unit_soil_rice)
-    open(theta2_rice%unit_soil_rice,file=trim(dir)//trim(sim%soil_prop_x_rice_fn),action='read')
+    open(newunit=theta2_rice%unit_soil_rice,file=trim(dir)//trim(sim%soil_prop_x_rice_fn),action='read')
     do while (ios == 0)
         read (theta2_rice%unit_soil_rice, '(A)', iostat = ios) buffer
         if (ios == 0) then
@@ -1125,8 +1120,7 @@ subroutine init_irrigation_units(domain_map,irr_units_map,eff_net,irr_units_tbl,
 
     strlen = 999
     ! Read "<irrdistr_list>.txt"
-    call seek_un(error_flag,free_unit)
-    open(free_unit,file=trim(pars%sim%watsour_path)//trim(pars%sim%irrdistr_list_fn),action="read",iostat=ios)
+    open(newunit=free_unit,file=trim(pars%sim%watsour_path)//trim(pars%sim%irrdistr_list_fn),action="read",iostat=ios)
     if(ios/=0)then
         print *, "Error opening file ", trim(pars%sim%irrdistr_list_fn)," connected to unit ", free_unit, &
             & " iostat=", ios, '. Execution will be aborted...'
@@ -1202,8 +1196,7 @@ subroutine init_irrigation_units(domain_map,irr_units_map,eff_net,irr_units_tbl,
     irr_units_tbl%q_un_priv=0
 
     if(debug .eqv. .true.)then
-        call seek_un(error_flag,free_unit)
-        open(free_unit,file=(trim(pars%sim%path)//"out_"//trim(pars%sim%watsources_fn)),action="write")
+        open(newunit=free_unit,file=(trim(pars%sim%path)//"out_"//trim(pars%sim%watsources_fn)),action="write")
         write(free_unit,*)'distr_id; source_code; source_type; flow_ratio; distr_column; watsour_column'
         do i=1,size(wat_src_tbl)
             write(free_unit,*)wat_src_tbl(i)%id_irr_unit,'; ',wat_src_tbl(i)%id_wat_src,'; ',wat_src_tbl(i)%type_id, &

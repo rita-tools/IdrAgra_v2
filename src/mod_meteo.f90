@@ -1,6 +1,6 @@
 module mod_meteo
 use mod_constants, only: sp, dp
-use mod_utility, only: date, lower_case, days_x_month, calc_doy, seek_un, split_date
+use mod_utility, only: date, lower_case, days_x_month, calc_doy, split_date
 use mod_parameters, only: simulation, par_method
 use mod_evapotranspiration, only: ET_reference
 implicit none
@@ -167,8 +167,6 @@ subroutine read_meteo_parameters(sim,info_meteo,debug)
     type(simulation),intent(inout)::sim
     type(meteo_info),dimension(:),allocatable,intent(inout)::info_meteo
     logical, intent(in)::debug
-    integer::errorflag
-
     integer :: free_unit, i
     integer :: ios
     character(len=255) :: filemeteo_name
@@ -183,11 +181,9 @@ subroutine read_meteo_parameters(sim,info_meteo,debug)
     ios = 0
     line = 0; tablestart = 0
     dir=trim(sim%meteo_path)
-    errorflag=0
-    call seek_un( ErrorFlag, free_unit) ! search for free unit
     filemeteo_name=trim(sim%ws_list_fn)
 
-    open( unit = free_unit, file = filemeteo_name, status = 'old', action="read", iostat = ios )
+    open(newunit = free_unit, file = filemeteo_name, status = 'old', action="read", iostat = ios )
     if (ios /= 0 ) then
         print *, 'Cannot open file ', filemeteo_name, '. The specified file does not exist. Execution will be aborted...'
         stop
@@ -225,8 +221,7 @@ subroutine read_meteo_parameters(sim,info_meteo,debug)
                         do i=1,size(info_meteo)
                             read(free_unit,*)info_meteo(i)%filename, info_meteo(i)%x_m, info_meteo(i)%y_m
                             line = line + 1
-                            call seek_un(errorflag,info_meteo(i)%unit)
-                            open( unit=info_meteo(i)%unit, file=trim(dir)//trim(info_meteo(i)%filename), status='old',&
+                            open(newunit=info_meteo(i)%unit, file=trim(dir)//trim(info_meteo(i)%filename), status='old',&
                                 & action="read", iostat=ios )
                             if (ios /= 0 ) then
                                 print *, 'Cannot open file ', trim(info_meteo(i)%filename), '. The specified file does &

@@ -239,13 +239,13 @@ subroutine populate_crop_pars_matrices(crop_pars_mat,info_pheno,irandom,doy,ws_i
                         ! from 1/1 to harvest date, only the contraction/expansion of crop cycle is taken into account
                         ! in the first part of the year, the limits are 1/1 and harvest date (only contraction/expansion)
                         doy_s = doy * (crop_mat%iie_ref(i,j,crop_pars_mat%n_crop_in_year(i,j))) / &
-							& crop_mat%iie(i,j,crop_pars_mat%n_crop_in_year(i,j)) - irandom(i,j)
+                              & crop_mat%iie(i,j,crop_pars_mat%n_crop_in_year(i,j)) - irandom(i,j)
                     else if (doy >= crop_mat%ii0(i,j,crop_pars_mat%n_crop_in_year(i,j)) + irandom(i,j)) then
 
                         ! from emergence to 31/12, both parameters are taken into account: the randomization of emergence date and the contraction/expansion of crop cycle
                         ! in the second part of the year, the limits are the randomized emergence date and 31/12 (day 365/366)
                         doy_s = (doy - crop_mat%ii0(i,j,crop_pars_mat%n_crop_in_year(i,j))) * &
-							& (year_length - crop_mat%ii0_ref(i,j,crop_pars_mat%n_crop_in_year(i,j))) / &
+                            & (year_length - crop_mat%ii0_ref(i,j,crop_pars_mat%n_crop_in_year(i,j))) / &
                             & (year_length - crop_mat%ii0(i,j,crop_pars_mat%n_crop_in_year(i,j))) + &
                             & crop_mat%ii0_ref(i,j,crop_pars_mat%n_crop_in_year(i,j)) - irandom (i,j)
                     else

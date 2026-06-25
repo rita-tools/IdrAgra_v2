@@ -1,7 +1,7 @@
 ! TODO: some fixes
 module cli_save_outputs
 use mod_constants, only: sp, dp
-use mod_utility, only: seek_un, lower_case
+use mod_utility, only: lower_case
 use mod_grid, only: grid_i, grid_r, print_mat_as_grid
 use mod_common, only: spatial_info
 use mod_parameters
@@ -146,8 +146,7 @@ subroutine init_cell_output_file(free_unit,file_name,table_header,table_subheade
     errorflag=0
     ios=0
 
-    call seek_un(errorflag,free_unit)    ! in utility
-    open(free_unit,file=file_name,action="write",iostat=ios)
+    open(newunit=free_unit,file=file_name,action="write",iostat=ios)
     if(ios/=0)then
         print*, "Error opening file '",file_name,"' connected to unit ",free_unit," iostat=",ios, &
             & ". Execution will be aborted..."
@@ -186,8 +185,7 @@ subroutine init_cell_output_by_year(out_tbl_list,path,yr,id_ws_list, mode, f_cel
     line = 0
     if (f_cell_exists .eqv. .true.) then
         ! coordinates of the sample cells (deallocated at the end of each year)
-        call seek_un(errorflag,freeunit)
-        open(freeunit,file='cells.txt',action="read",status="old",iostat=ios)
+        open(newunit=freeunit,file='cells.txt',action="read",status="old",iostat=ios)
         if(ios/=0)then
             print*," Error opening file 'cells.txt' connected to unit ",freeunit, &
                 & " iostat=",ios, ". Execution will be aborted..."

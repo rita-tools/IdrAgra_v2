@@ -1,6 +1,6 @@
 module cli_crop_parameters
 use mod_constants, only: sp, dp
-use mod_utility, only: seek_un, lower_case, string_to_integers, string_to_reals, split_string, count_element
+use mod_utility, only: lower_case, string_to_integers, string_to_reals, split_string, count_element
 use mod_parameters, only: simulation,parameters
 use mod_meteo, only: meteo_info
 use mod_crop_phenology
@@ -24,8 +24,7 @@ subroutine open_daily_crop_par_file(file_unit, file_name, error_flag)
     integer, intent(out) :: error_flag
     integer :: ios ! check opening errors
     error_flag = 0
-    call seek_un( error_flag, file_unit) ! find free file unit
-    open(unit=file_unit, file=trim(file_name), status='old', action="read", iostat=ios )
+    open(newunit=file_unit, file=trim(file_name), status='old', action="read", iostat=ios )
     if (ios /= 0 ) then
         print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. &
             & Execution will be aborted..."
@@ -49,8 +48,7 @@ subroutine init_crop_par_from_file(file_name, n_crop, n_crop_alt, string_element
     character(len=10), dimension(:), allocatable :: dummy, dummy_clean
 
     error_flag = 0
-    call seek_un(error_flag, free_unit) ! find for free unit
-    open(unit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios )
+    open(newunit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios )
     if (ios /= 0 ) then
         print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. &
             & Execution will be aborted..."
@@ -100,8 +98,7 @@ subroutine read_water_prod_file(file_name, string_elements, n_crops_by_year, uni
     character(len=string_elements*20) :: buffer, label  !EAC:  use string_elements x 20
 
     error_flag = 0
-    call seek_un(error_flag, free_unit)
-    open(unit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios )
+    open(newunit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios )
     if (ios /= 0 ) then
         print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. &
             & Execution will be aborted..."
@@ -143,9 +140,7 @@ subroutine read_canopy_resistance_file(file_name, unit_param, string_elements, e
 
     error_flag = 0
     i = 1
-    call seek_un(error_flag, free_unit)
-
-    open(unit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios )
+    open(newunit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios )
     if (ios /= 0 ) then
         print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. &
             & Execution will be aborted..."
@@ -218,8 +213,7 @@ subroutine read_crop_par_file(file_name, string_elements, unit_param, error_flag
     character(len=string_elements*20) :: buffer, label !EAC: use string_elements x 20
 
     error_flag = 0
-    call seek_un(error_flag, free_unit)
-    open(unit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios )
+    open(newunit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios )
     if (ios /= 0 ) then
         print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. &
             & Execution will be aborted..."

@@ -1,9 +1,9 @@
 # version string for the header: use an exact tag when present, otherwise the commit string
 VERSION := $(shell git describe --tags --exact-match HEAD 2>/dev/null || git rev-parse --short HEAD)
-CURRENTDATE := $(shell date --iso=seconds)
+CURRENTDATE := $(shell powershell -NoProfile -Command "Get-Date -Format yyyy-MM-ddTHH:mm:ss")
 
 # Windows OS variables & settings
-DEL = rm
+DEL = powershell -NoProfile -Command
 EXE = .exe
 WIN = 1
 
@@ -49,7 +49,7 @@ FILES = mod_constants mod_utility mod_parameters mod_grid mod_common mod_evapotr
 # Builds the app
 # force removing main.o in order to update program metadata
 $(APPNAME): $(patsubst %, $(OBJDIR)/%.o, $(FILES))
-	$(DEL) -f /$(OBJDIR)/cli_main.o
+	$(DEL) "if (Test-Path '$(OBJDIR)\cli_main.o') { Remove-Item -Force '$(OBJDIR)\cli_main.o' }"
 	$(CC) -o $(OBJDIR)/cli_main.o -J$(OBJDIR) $(GFFLAGS) $(SRCDIR)/cli_main.f90
 	$(CPP) -g -o $(RELDIR)/$@$(EXE) $^ $(OBJDIR)/cli_main.o $(LDFLAGS) -static
 
@@ -73,11 +73,11 @@ all:
 # call as: make cleanall
 .PHONY: cleanall
 cleanall:
-	$(if $(wildcard ./$(OBJDIR)/*.mod),$(DEL) $(wildcard ./$(OBJDIR)/*.mod),@echo No module files to clean)
-	$(if $(wildcard ./$(OBJDIR)/*.o),$(DEL) $(wildcard ./$(OBJDIR)/*.o),@echo No object files to clean)
-	$(if $(wildcard ./$(RELDIR)/*.exe),$(DEL) $(wildcard ./$(RELDIR)/*.exe),@echo No executables to clean)
+	$(DEL) "if (Test-Path '$(OBJDIR)\*.mod') { Remove-Item -Force '$(OBJDIR)\*.mod' }"
+	$(DEL) "if (Test-Path '$(OBJDIR)\*.o') { Remove-Item -Force '$(OBJDIR)\*.o' }"
+	$(DEL) "if (Test-Path '$(RELDIR)\*.exe') { Remove-Item -Force '$(RELDIR)\*.exe' }"
 
 .PHONY: cleanmain
 cleanmain:
 	@echo "hello from cleanmain"
-	$(DEL) -f /$(OBJDIR)/main.o
+	$(DEL) "if (Test-Path '$(OBJDIR)\cli_main.o') { Remove-Item -Force '$(OBJDIR)\cli_main.o' }"

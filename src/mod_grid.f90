@@ -1,6 +1,6 @@
 module mod_grid
 use mod_constants, only: sp, dp, tabCN
-use mod_utility, only: lower_case, seek_un
+use mod_utility, only: lower_case
 use mod_parameters, only: simulation, par_method
 implicit none
 
@@ -154,16 +154,13 @@ subroutine read_grid_r( filename, prm, sim, extent)
     integer :: i
     integer :: free_unit
     integer :: ios ! To check for read errors or end of file
-    integer :: ErrorFlag
     real(dp),dimension(:,:),allocatable::aux_parametro
     character(len=14)::str
 
-    ErrorFlag = 0
     ios=0
 
     ! open the file in read only mode
-    call seek_un( ErrorFlag, free_unit) !Look for a free unit
-    open( unit=free_unit, file=trim(filename), status='old', action="read", iostat=ios )
+    open(newunit=free_unit, file=trim(filename), status='old', action="read", iostat=ios )
     if (ios /= 0 ) then
         print *, "Cannot open file ", trim(filename), ". The specified file does not exist. Execution will be aborted..."
         stop
@@ -224,17 +221,14 @@ subroutine read_grid_i( filename, prm, sim, extent)
     integer :: free_unit
     integer :: ios              ! To check for read errors or end of file
     integer :: ierror           ! %AB% To check for read errors in file content (real instead of integer)
-    integer :: ErrorFlag
     integer,dimension(:,:),allocatable::aux_parametro
     character(len=14)::str
 
-    ErrorFlag = 0
     ios=0
     ierror=0
 
     ! open the file in read only mode
-    call seek_un( ErrorFlag, free_unit) !Look for a free unit
-    open( unit=free_unit, file=trim(filename), status='old', action="read", iostat=ios )
+    open(newunit=free_unit, file=trim(filename), status='old', action="read", iostat=ios )
     if (ios /= 0 ) then
         print *, "Cannot open file ", trim(filename), ". The specified file does not exist. Execution will be aborted..."
         stop
@@ -298,8 +292,7 @@ subroutine write_grid_r( filename, grid, ErrorFlag)
     ErrorFlag = 0
     ios=0
 
-    call seek_un( ErrorFlag, free_unit) !Look for a free unit
-    open( unit=free_unit, file=trim(filename), action="write", iostat=ios )
+    open(newunit=free_unit, file=trim(filename), action="write", iostat=ios )
     if( ios /= 0 ) then
         print *, 'Error opening file'' ', trim(filename), ' ''connected to unit ', free_unit, ' iostat=', ios
         print *, 'Execution will be aborted...'
@@ -329,8 +322,7 @@ subroutine write_grid_i( filename, grid, ErrorFlag)
     ErrorFlag = 0
     ios=0
 
-    call seek_un( ErrorFlag, free_unit) !Look for a free unit
-    open( unit=free_unit, file=trim(filename), action="write", iostat=ios )
+    open(newunit=free_unit, file=trim(filename), action="write", iostat=ios )
     if( ios /= 0 ) then
         print *, " Error opening file '", trim(filename), "' connected to unit ", free_unit, " iostat=", ios
         stop

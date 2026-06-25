@@ -1,6 +1,6 @@
 module cli_watsources
 use mod_constants, only: sp, dp
-use mod_utility, only: get_value_index, lower_case, seek_un, calc_doy, split_date
+use mod_utility, only: get_value_index, lower_case, calc_doy, split_date
 use mod_parameters
 use mod_grid, only: grid_i, grid_r
 use mod_meteo, only: date, meteo_info
@@ -29,8 +29,7 @@ subroutine open_daily_discharges_file(file_name,mn_src_tbl,source_nr,error_flag)
     integer:: strlen
     character(len=1),parameter :: delimiter = achar(9)   ! Delimiter: horizontal tab
 
-    call seek_un( error_flag, mn_src_tbl%unit)
-    open( unit=mn_src_tbl%unit, file=trim(file_name), status='old', action="read", iostat=ios )
+    open(newunit=mn_src_tbl%unit, file=trim(file_name), status='old', action="read", iostat=ios )
     if (ios /= 0 ) then
         print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. Execution will be aborted..."
         stop
@@ -111,8 +110,7 @@ subroutine read_unm_coll_sources_list(file_name, unm_coll_src_tbl, error_flag, n
     ios = 0
     line = 0
     error_flag = 0
-    call seek_un(error_flag,free_unit)
-    open(free_unit,file=file_name, action="read")
+    open(newunit=free_unit,file=file_name, action="read", iostat=ios)
     if (ios /= 0) then
         print *, "Error opening file ", file_name, " connected to unit ", free_unit, " iostat = ", ios, &
             & ". Execution will be aborted..."
@@ -186,8 +184,7 @@ subroutine read_unm_coll_source_par(file_name,unm_col_sour_tbl,error_flag,k,pars
     integer :: p
 
     ! open the file
-    call seek_un( error_flag, unm_col_sour_tbl%unit(k))
-    open( unit=unm_col_sour_tbl%unit(k), file=trim(file_name), status='old', action="read", iostat=ios )
+    open(newunit=unm_col_sour_tbl%unit(k), file=trim(file_name), status='old', action="read", iostat=ios )
     if( ios /= 0 ) then
         print *, "Error opening file '", trim(file_name), "' connected to unit ", unm_col_sour_tbl%unit(k), " iostat=", ios
         print *, 'Execution will be aborted...'
@@ -285,8 +282,7 @@ subroutine open_scheduled_irrigation(file_name,sch_irr,debug)
     ios=0
 
     ! open the file
-    call seek_un( error_flag, free_unit) !Look for a free unit
-    open( unit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios )
+    open(newunit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios )
     if (ios /= 0 ) then
         print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. Execution will be aborted..."
         stop
@@ -333,8 +329,7 @@ subroutine read_water_sources_table(wat_sour_tbl_fn, wat_sour_tbl, error_flag)
     character(len=1), parameter :: delimiter = achar(9)
 
     ! open the file
-    call seek_un( error_flag, free_unit)
-    open(unit=free_unit, file=trim(wat_sour_tbl_fn), status='old', action="read", iostat=ios )
+    open(newunit=free_unit, file=trim(wat_sour_tbl_fn), status='old', action="read", iostat=ios )
     if(ios /= 0) then
         error_flag=1
         print *, "Error opening file '", trim(wat_sour_tbl_fn), "' connected to unit ", free_unit, " iostat=", ios, &

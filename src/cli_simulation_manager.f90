@@ -474,7 +474,6 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         call read_all_crop_pars(pars%sim%year_step(y),pars%sim%n_lus,info_pheno,pars)
         if (debug .eqv. .true.) then
             call check_pheno_parameters(info_pheno,info_meteo)
-            call seek_un(error_flag,unit_crop)
             call init_cell_output_file(unit_crop,trim(pars%sim%path)//'Kcb_levels.csv',&
                 &'MeteoStat; SoilUse; nCrop; low; mid; high')
             do i=1, size(info_pheno)
