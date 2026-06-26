@@ -37,7 +37,7 @@ use mod_evapotranspiration, only: ET_reference, calculateDLH
 use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data
 use mod_runoff
 use mod_crop_soil_water
-use mod_crop_phenology, only: crop_pheno_info, crop_matrices
+use mod_crop_phenology, only: crop_pheno_info, crop_matrices, calculate_RF_t
 use mod_TDx_index
 use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva
 use mod_common, only: wat_matrix, soil2_rice, hourly, unit_file_scratch
