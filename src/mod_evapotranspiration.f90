@@ -39,7 +39,7 @@ subroutine calculate_water_stresses(h_soil,h_fc,h_wp,h_sat,p_day,k_stress_dry,k_
 end subroutine
 
 subroutine evaporation(h_soil, h_rew, h_wp, k_c_max, few, k_e_act, k_cb,h_et0,h_eva,h_eva_pot,k_r)
-    ! evaporation (daily calculation)
+    ! evaporation (hourly calculation)
 
     real(dp), intent(in)::h_soil            ! soil water content [mm]
     real(dp), intent(in)::h_rew             ! ready evaporable water [mm]

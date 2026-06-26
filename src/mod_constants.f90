@@ -35,7 +35,7 @@ real(dp),dimension(24),parameter :: cost_f_eff_rain = &
     &     1.0/24.0,&
     &     1.0/24.0,&
     &     1.0/24.0/)
-real(dp),dimension(24),parameter :: cost_fet0 =  &
+real(dp),dimension(24),parameter :: cost_fet0 =  & ! These values are overwritten later - see the pdf_normal function
     &   (/0.001784677,&
     &     0.001640849,&
     &     0.002308392,&

@@ -1010,10 +1010,10 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                     do i=1,size(info_spat%domain%mat,1)
                         if(info_spat%domain%mat(i,j)/=info_spat%domain%header%nan)then
                             ! %RR%: add k_r
-                            ! water balance for the evaporative layer
-                            call water_balance_evap_lay(h_irr(i,j, info_spat%irr_meth_id%mat(i,j)) * &
-                                & pars%irr%met(info_spat%irr_meth_id%mat(i,j))%freq(hour)  &
-                                & * (1-pars%irr%met(info_spat%irr_meth_id%mat(i,j))%f_interception), &
+                            ! water balance for the evaporative layer                                  ! %PS%:
+                            call water_balance_evap_lay(h_irr(i,j, info_spat%irr_meth_id%mat(i,j)) * & ! the first three lines can be summarized as h_irr * freq(hour) * (1-f_interception), becoming h_net_irr in the subroutine.
+                                & pars%irr%met(info_spat%irr_meth_id%mat(i,j))%freq(hour)  &           ! This means that "net irrigation" only refers to below-canopy irrigation. Above-canopy irrigation is added to rain before the hourly loop.
+                                & * (1-pars%irr%met(info_spat%irr_meth_id%mat(i,j))%f_interception), & ! As a side effect, this means that freq(hour) has no effect in sprinkler irrigation (where f_interception = 1): irrigation is distributed uniformly in the 24 hours.
                                 & wat_bal_hour%inten%h_soil1(i,j), wat_bal_hour%esten%h_inf(i,j), &
                                 & wat_bal_hour%esten%h_eva(i,j), wat_bal_hour%esten%h_eva_pot(i,j), &
                                 & wat_bal_hour%esten%h_perc1(i,j), wat_bal_hour%inten%h_pond0(i,j), wat_bal_hour%esten%h_pond(i,j), &
@@ -2003,7 +2003,7 @@ subroutine b1_no_iter_eva(pheno, meteo, h_rain_lim, wat, fw_day, fw_irr, fw_rain
         ELSE WHERE(h_irr_sum/=0)
             fw_day = fw_irr
         eLSE WHERE (meteo%P>= h_rain_lim)
-            fw_day = fw_rain
+            fw_day = fw_rain ! %PS% with fw_rain being == 1.0 by default
         ELSE WHERE
             fw_day = fw_old
         END WHERE

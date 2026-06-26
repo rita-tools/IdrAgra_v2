@@ -1,5 +1,3 @@
-! translate --> OK
-
 module mod_common
 use mod_constants, only: dp
 use mod_grid
