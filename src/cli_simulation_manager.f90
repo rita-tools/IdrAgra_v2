@@ -728,37 +728,38 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             end where
 
             where(info_spat%domain%mat /= info_spat%domain%header%nan)
+
                 ! Layer depths update as a function of d_r (phenological parameter - root depth)
                 where(pheno%d_r > pars%depth%ze_fix)
                     wat_bal2%d_t = pheno%d_r - wat_bal1%d_e
                 else where
                     wat_bal2%d_t = pars%depth%zr_fix
                 end where
+
                 ! Water table depth inizialization under root zone (referred to the sum of layer depth to be consistent)
-                wat_bal2%depth_under_rz = info_spat%wat_tab%mat - wat_bal1%d_e - wat_bal2%d_t
-                ! fix negative depth
-                where (wat_bal2%depth_under_rz < 0.0D0)
-                    wat_bal2%depth_under_rz = 0.0D0
-                end where
-                ! Soil water content update
+                wat_bal2%depth_under_rz = max(0.0D0, info_spat%wat_tab%mat - wat_bal1%d_e - wat_bal2%d_t)
+
+                ! Update layer 2's water content:
+                !   If root depth didn't change
                 where(wat_bal2%d_t == wat_bal2_old%d_t)
                     wat_bal2_old%h_soil = wat_bal2_old%t_soil*1000*wat_bal2_old%d_t
+                !   If root depth increased
                 else where(wat_bal2%d_t > wat_bal2_old%d_t)
-                    ! Paddy field correction (only during growth season)
-                    where(pheno%cn_class==7 .and. pheno%k_cb>0)
-                        wat_bal2_old%h_soil = wat_bal2_old%t_soil*1000*wat_bal2_old%d_t + &
-                                                theta2_rice%theta2_FC*1000*(wat_bal2%d_t-wat_bal2_old%d_t)
-                    else where
-                        wat_bal2_old%h_soil = wat_bal2_old%t_soil*1000*wat_bal2_old%d_t + &
-                                                info_spat%theta(2)%fc%mat*1000*(wat_bal2%d_t-wat_bal2_old%d_t)
+                    where(pheno%cn_class==7 .and. pheno%k_cb>0) ! Paddy field correction (only during growth season)
+                        wat_bal2_old%h_soil = wat_bal2_old%t_soil*1000*wat_bal2_old%d_t +              &
+                                              theta2_rice%theta2_FC*1000*(wat_bal2%d_t-wat_bal2_old%d_t)
+                    else where                                  ! All other crops
+                        wat_bal2_old%h_soil = wat_bal2_old%t_soil*1000*wat_bal2_old%d_t +                  &
+                                              info_spat%theta(2)%fc%mat*1000*(wat_bal2%d_t-wat_bal2_old%d_t)
                     end where
+                !   If root depth decreased
                 else where
-                    wat_bal2_old%h_soil = wat_bal2_old%t_soil*1000*wat_bal2_old%d_t - &
-                                            wat_bal2_old%t_soil*1000*(wat_bal2_old%d_t-wat_bal2%d_t)
+                    wat_bal2_old%h_soil = wat_bal2_old%t_soil*1000*wat_bal2_old%d_t -            &
+                                          wat_bal2_old%t_soil*1000*(wat_bal2_old%d_t-wat_bal2%d_t)
                 end where
 
+                ! Set and constrain today's p value according to FAO56: https://www.fao.org/4/x0490e/x0490e0e.htm#readily%20available%20water%20(raw)
                 pheno%p_day = pheno%p + 0.04*(5.-(wat_bal1_old%h_eva_pot + wat_bal1_old%h_transp_pot + wat_bal2_old%h_transp_pot))
-                ! pheno%pday amendment if pday values are not in their allowed range [0.1 ; 0.8]
                 where (pheno%p_day <0.1) pheno%p_day=0.1
                 where (pheno%p_day >0.8) pheno%p_day=0.8 ! TODO: larger values will be permitted in order to consider stress irrigation
 
