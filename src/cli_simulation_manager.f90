@@ -128,7 +128,8 @@ module cli_simulation_manager!
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::fw_day, fw_old! fw daily updated
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::fc ! cover fraction - %RR%
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::a_loss, b_loss, c_loss, f_interception ! application losses model
-        real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::h_irr_sum, h_bypass
+        real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::h_irr_sum, h_bypass, h_met_use
+        real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::k_sat2_use, fact_n2_use
         
         !! TDx
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,pars_TDx%temp%n_ind)::tot_deficit      ! TDx sum
@@ -889,13 +890,24 @@ module cli_simulation_manager!
                         ! %EAC%: save irrigation units results
                         call save_irr_unit_debug_data(doy, out_tbl_list, irr_units)
 
+                        !%PS%: precompute tentative irrigation depth for rice so that USE mode can treat it as a fixed height 
+                        !      (whether irrigation can actually be supplied is decided in irrigation_use).
+                        h_met_use = info_spat%h_meth%mat
+                        where(pheno%irrigation_class==1 .and. pheno%cn_class==7 .and. pheno%k_cb>0.0D0)
+                            h_met_use = ((info_spat%h_meth%mat - wat_bal1_old%h_pond) +                                 &!<-- reach a pond level of h_meth
+                                         (info_spat%theta(1)%sat%mat*wat_bal1_old%d_e*1000.0D0 - wat_bal1_old%h_soil) + &!<-- replenish 1st layer up to saturation
+                                         (wat%layer(2)%h_sat - wat_bal2_old%h_soil) +                                   &!<-- replenish 2nd layer up to saturation
+                                         (wat_bal1_old%h_eva + wat_bal2_old%h_transp_pot)                               )!<-- add yesterday's evapotranspiration
+                        end where
+                        call irrigate_rice(h_met_use, pheno, wat_bal1%h_eff_rain, theta2_rice%k_sat_2)                   !<-- add expected percolation and subtract rain
+
                         call irrigation_use(info_spat%domain, info_spat%irr_unit_id, pheno%irrigation_class, info_spat%irr_meth_id, &
                                           & irr_units, (wat_bal1_old%h_transp_pot+wat_bal2_old%h_transp_pot), pheno%k_cb,           &
                                           & (wat_bal1_old%h_soil * pheno%RF_e + wat_bal2_old%h_soil * pheno%RF_t),                  & !%PS%: h_soil_old is now weighted according to RF
                                           & wat_bal2%h_raw_sup, wat_bal2%h_raw_inf, wat_bal2%h_raw, wat_bal2%h_raw_priv,            &
                                           & h_irr, doy, priv_irr, coll_irr, day_from_irr, esp_perc,                                 &
                                           & info_spat%a_perc, info_spat%b_perc, pars%sim%f_shapearea, info_spat%cell_area%mat,      &
-                                          & info_spat%h_meth%mat, info_spat%irr_starts%mat, info_spat%irr_ends%mat                  )
+                                          & h_met_use, info_spat%irr_starts%mat, info_spat%irr_ends%mat, pheno%cn_class             )
 
                         ! %EAC%: save irrigation units results
                         call save_irr_unit_data(doy, out_tbl_list, irr_units)
@@ -922,7 +934,7 @@ module cli_simulation_manager!
 
                     case (3) ! NEED mode with fixed volume
                         call irrigation_need_fixed(info_spat, h_irr, wat_bal2, wat_bal2_old, wat_bal1_old, pheno, &
-                            & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, day_from_irr, esp_perc)
+                            & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, wat%layer(2)%h_sat, day_from_irr, esp_perc)
                         ! update irrigation losses
                         call calc_irrigation_losses(a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min),irr_loss)
                         ! if outside the irrigation period, set irrigation height to zero
@@ -936,7 +948,7 @@ module cli_simulation_manager!
                         call irrigation_scheduled(info_spat, doy, current_year, irr_sch, pheno, &
                             & h_irr, day_from_irr, esp_perc, debug, wat_bal1_old, wat_bal2, wat_bal2_old, &
                             & a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min),irr_loss,&
-                            wat_bal1%h_eff_rain, theta2_rice%k_sat_2)
+                            wat_bal1%h_eff_rain, theta2_rice%k_sat_2, wat%layer(2)%h_sat)
                         ! if outside the irrigation period, set irrigation height to zero
                         ! and calculate net irrigation
                         do z=1, pars%sim%n_irr_meth
@@ -993,6 +1005,12 @@ module cli_simulation_manager!
                     & wat_bal1%h_runoff, out_cn_day, pars%sim%lambda_cn)
                 
                 ! HOURLY LOOP OF THE SIMULATION
+                k_sat2_use = info_spat%k_sat(2)%mat
+                fact_n2_use = info_spat%fact_n(2)%mat
+                where(pheno%cn_class==7 .and. pheno%k_cb>0.0D0)
+                    k_sat2_use = theta2_rice%k_sat_2
+                    fact_n2_use = theta2_rice%n_2
+                end where
                 
                 hr_loop: do hour = 1,24
                     ! init the variables to zero (except for f_eff_rain, h_net_av_water)
@@ -1043,7 +1061,7 @@ module cli_simulation_manager!
                                     & pheno%k_cb(i,j), pheno%p_day(i,j), pheno%cn_class(i,j), &
                                     & meteo%et0(i,j)*pars%fet0(hour), wat%layer(2)%h_sat(i,j), &
                                     & wat%layer(2)%h_fc(i,j), wat%layer(2)%h_wp(i,j), wat%layer(2)%h_r(i,j), &!
-                                    & info_spat%k_sat(2)%mat(i,j), info_spat%fact_n(2)%mat(i,j), &!
+                                    & k_sat2_use(i,j), fact_n2_use(i,j), &!
                                     & info_spat%a3%mat(i,j), info_spat%a4%mat(i,j), &!
                                     & info_spat%b1%mat(i,j), info_spat%b2%mat(i,j), &!
                                     & info_spat%b3%mat(i,j), info_spat%b4%mat(i,j), &!
