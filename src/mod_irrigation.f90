@@ -138,9 +138,10 @@ module mod_irrigation
                                 (h_sat2-bil2_old%h_soil) + & ! fill the soil layer to saturation
                                 (bil1_old%h_eva + bil2_old%h_transp_pot))/ & ! fill ET
                                 1.0 ! don't consider efficiency
-            ! TODO: %EAC%: small edit to manage submerged condition
-            else where ((info_spat%h_maxpond%mat>10.0D0) .and. (bil1_old%h_pond<(0.9*info_spat%h_maxpond%mat))) ! crop submerged, only if h_maxpond> 10 mm
-                h_irr_temp = info_spat%h_meth%mat
+            ! TODO: %EAC%: small edit to manage submerged condition !%PS%: removed, intent is not clear
+            !else where ((info_spat%h_maxpond%mat>10.0D0) .and. (bil1_old%h_pond<(0.9*info_spat%h_maxpond%mat))) ! crop submerged, only if h_maxpond> 10 mm
+            !    h_irr_temp = info_spat%h_meth%mat
+
             else where ((bil1_old%h_soil*pheno%RF_e + bil2_old%h_soil*pheno%RF_t) < bil2%h_raw_sup) ! all other crops
                 ! TODO: %AB% why only 2nd layer RAWbig?
                 ! else where (bil2_old%tmm<bil2%RAWbig)
@@ -341,7 +342,7 @@ module mod_irrigation
         !!
         ! init the minimum irrigation height (equal to infiltration)
         h_irr_min = 10.*24.*k_sat ! k_sat is in mm
-        where(pheno%irrigation_class==1 .and. pheno%cn_class==7)  
+        where(pheno%irrigation_class==1 .and. pheno%cn_class==7 .and. pheno%k_cb>0.0D0) !%PS%: added check on k_cb (otherwise irrigation triggers after harvest)
             h_irr = max(0.0D0,h_irr_min + h_irr - eff_rain)  ! %CG%: irrigation compensate ET and Percolation, minus effective rain 
             !where(h_irr<=h_irr_min) h_irr = h_irr_min       ! irrigation height at least equal to the minimum irrigation height
             !where(eff_rain>=h_irr) h_irr = 0.               ! if effective precipitation > irrigation height -> zero irrigation height
