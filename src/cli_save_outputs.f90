@@ -514,16 +514,17 @@ module cli_save_outputs!
         end if
     end subroutine close_cell_output_by_year!
     !
-    subroutine write_cell_info(info_spat,cell_info,mode,f_caprise)!
-        ! write parameters of each cells
-        type(spatial_info),intent(in)::info_spat!
-        type(cell_output),dimension(:),intent(in)::cell_info!
-        integer, intent(in)::mode
-        logical, intent(in)::f_caprise           ! if true, capillary rise is activated
-        integer::x,y!
-        integer::i!
-        integer::k
-        !!
+    subroutine write_cell_info(info_spat, cell_info, mode, f_caprise, ze_fix, zr_fix, sim_year)
+        ! write parameters of control cells to "cellinfo" files (one every year for each control cell)
+
+        type(spatial_info),intent(in) :: info_spat
+        type(cell_output),dimension(:),intent(in) :: cell_info
+        real(dp), intent(in) :: ze_fix, zr_fix ! depth of the 1st and 2nd soil layers
+        integer, intent(in) :: mode
+        logical, intent(in) :: f_caprise       ! if true, capillary rise is activated
+        integer, intent(in) :: sim_year        ! year this output file refers to
+        integer :: x, y, i, k
+
         do i=1,size(cell_info)!
             x=cell_info(i)%coord%row!
             y=cell_info(i)%coord%col!
@@ -583,6 +584,9 @@ module cli_save_outputs!
             write(cell_info(i)%file%unit,*)'ksat_II; ', info_spat%k_sat(2)%mat(x,y)!
             write(cell_info(i)%file%unit,*)'expn_I; ', info_spat%fact_n(1)%mat(x,y)!
             write(cell_info(i)%file%unit,*)'expn_II; ', info_spat%fact_n(2)%mat(x,y)!
+            write(cell_info(i)%file%unit,*)"1st layer's thickness; ", ze_fix
+            write(cell_info(i)%file%unit,*)"2nd layer's max thickness; ", zr_fix
+            write(cell_info(i)%file%unit,*)'Simulation year; ', sim_year
             if (f_caprise .eqv. .true.) then
                 write(cell_info(i)%file%unit,*)'CapFluxParam_a3; ', info_spat%a3%mat(x,y)!
                 write(cell_info(i)%file%unit,*)'CapFluxParam_a4; ', info_spat%a4%mat(x,y)!

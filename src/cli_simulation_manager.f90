@@ -594,7 +594,8 @@ module cli_simulation_manager!
                     & pars%sim%mode, pars%sim%f_out_cells, debug)!
             end if
             if(pars%sim%f_out_cells .eqv. .true.)then!
-                call write_cell_info(info_spat, out_tbl_list%cell_info, pars%sim%mode, pars%sim%f_cap_rise)
+                call write_cell_info(info_spat, out_tbl_list%cell_info, pars%sim%mode, pars%sim%f_cap_rise, &
+                                   & pars%depth%ze_fix, pars%depth%zr_fix, current_year                     )
             end if!
             if (out_yearly .eqv. .true.) then
                 call init_yearly_output_file(yr_map,pars%sim%path,s_years)
