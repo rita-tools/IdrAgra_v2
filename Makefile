@@ -13,6 +13,9 @@ WIN = 1
 # -DGIT_VERSION: sets the macro GIT_VERSION in the code (actually used only in cli_main.f90)
 # -g: enables debug with breakpoints 
 
+MINGW64_BINDIR ?= /mingw64/bin
+export PATH := $(MINGW64_BINDIR):$(PATH)
+
 CC = gfortran
 CPP = gfortran -cpp
 IS_RELEASE := false
