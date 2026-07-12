@@ -514,16 +514,17 @@ module cli_save_outputs!
         end if
     end subroutine close_cell_output_by_year!
     !
-    subroutine write_cell_info(info_spat,cell_info,mode,f_caprise)!
-        ! write parameters of each cells
-        type(spatial_info),intent(in)::info_spat!
-        type(cell_output),dimension(:),intent(in)::cell_info!
-        integer, intent(in)::mode
-        logical, intent(in)::f_caprise           ! if true, capillary rise is activated
-        integer::x,y!
-        integer::i!
-        integer::k
-        !!
+    subroutine write_cell_info(info_spat, cell_info, mode, f_caprise, ze_fix, zr_fix, sim_year)
+        ! write parameters of control cells to "cellinfo" files (one every year for each control cell)
+
+        type(spatial_info),intent(in) :: info_spat
+        type(cell_output),dimension(:),intent(in) :: cell_info
+        real(dp), intent(in) :: ze_fix, zr_fix ! depth of the 1st and 2nd soil layers
+        integer, intent(in) :: mode
+        logical, intent(in) :: f_caprise       ! if true, capillary rise is activated
+        integer, intent(in) :: sim_year        ! year this output file refers to
+        integer :: x, y, i, k
+
         do i=1,size(cell_info)!
             x=cell_info(i)%coord%row!
             y=cell_info(i)%coord%col!
@@ -583,6 +584,9 @@ module cli_save_outputs!
             write(cell_info(i)%file%unit,*)'ksat_II; ', info_spat%k_sat(2)%mat(x,y)!
             write(cell_info(i)%file%unit,*)'expn_I; ', info_spat%fact_n(1)%mat(x,y)!
             write(cell_info(i)%file%unit,*)'expn_II; ', info_spat%fact_n(2)%mat(x,y)!
+            write(cell_info(i)%file%unit,*)"1st layer's thickness; ", ze_fix
+            write(cell_info(i)%file%unit,*)"2nd layer's max thickness; ", zr_fix
+            write(cell_info(i)%file%unit,*)'Simulation year; ', sim_year
             if (f_caprise .eqv. .true.) then
                 write(cell_info(i)%file%unit,*)'CapFluxParam_a3; ', info_spat%a3%mat(x,y)!
                 write(cell_info(i)%file%unit,*)'CapFluxParam_a4; ', info_spat%a4%mat(x,y)!
@@ -814,7 +818,7 @@ module cli_save_outputs!
         integer,dimension(:),intent(in)::calendar!
         integer,intent(in)::init_total
         character(len=*),intent(in)::string
-        type(step_map),intent(out)::a_step_map!
+        type(step_map),intent(inout)::a_step_map!
         integer::i,total!
         character(len=33)::year,step!
         !!
@@ -856,7 +860,7 @@ module cli_save_outputs!
         integer,dimension(:),intent(in)::calendar!
         integer,intent(in)::init_total
         character(len=*),intent(in)::string
-        type(step_debug_map),intent(out)::a_dbg_map!
+        type(step_debug_map),intent(inout)::a_dbg_map!
         integer::i,total!
         character(len=33)::year,step!
         
@@ -942,7 +946,7 @@ module cli_save_outputs!
     !
     subroutine save_step_data(a_step_map,doy,domain,calendar, init_total)
         ! save the results aggregated by step if the current day (doy) is the last day of the step
-        type(step_map),intent(in)::a_step_map!
+        type(step_map),intent(inout)::a_step_map!
         integer,intent(in)::doy!
         type(grid_i),intent(in)::domain!
         integer,dimension(:),intent(in)::calendar!
@@ -1004,7 +1008,7 @@ module cli_save_outputs!
     subroutine save_step_irrigation(a_step_map,doy,domain,calendar, init_total)
         ! save only irrigation map
         implicit none!
-        type(step_map),intent(in)::a_step_map!
+        type(step_map),intent(inout)::a_step_map!
         integer,intent(in)::doy!
         type(grid_i),intent(in)::domain!
         integer,dimension(:),intent(in)::calendar!
@@ -1031,7 +1035,7 @@ module cli_save_outputs!
     !
     subroutine save_debug_step_data(a_debug_asc,doy,domain,calendar, total_init)
         ! save the results for debug aggregated by step if the current day (doy) is the last day of the step
-        type(step_debug_map),intent(in)::a_debug_asc!
+        type(step_debug_map),intent(inout)::a_debug_asc!
         integer,intent(in)::doy!
         type(grid_i),intent(in)::domain!
         integer,dimension(:),intent(in)::calendar!
