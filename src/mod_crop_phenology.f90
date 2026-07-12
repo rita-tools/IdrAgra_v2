@@ -114,7 +114,7 @@ module mod_crop_phenology
         type(grid_i),intent(in)::domain!
         integer,dimension(:,:),intent(in)::soiluse!
         type(crop_pheno_info),dimension(:),intent(in)::info_pheno!
-        type(crop_matrices),intent(out)::crop_mat
+        type(crop_matrices),intent(inout)::crop_mat
         integer,dimension(:,:),intent(in)::irandom
         integer,intent(in)::year_length
         
@@ -218,7 +218,7 @@ module mod_crop_phenology
         type(crop_pheno_info),dimension(:),intent(in)::info_pheno
         type(crop_pars_matrices),intent(inout)::crop_pars_mat
         integer,dimension(:,:),intent(inout)::irandom               ! pseudorandom parameter that shifts crop cycle
-        type(crop_matrices),intent(in)::crop_mat
+        type(crop_matrices),intent(inout)::crop_mat
 
         integer::i,j    
         integer::doy_s ! shifted day of the year 

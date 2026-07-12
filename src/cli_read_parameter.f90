@@ -389,6 +389,117 @@ module cli_read_parameter!
                         case('fc_ratio')
                             read(buffer, *, iostat=ios) xml%sim%fc_ratio
 
+                        ! set general options
+                        case ('prt_all')
+                            read(buffer, *, iostat=ios) xml%sim%prt_all
+                            ! call the function to set print option on/off (y/n)
+                            call print_all(xml%sim%prt_all, xml%sim)
+                        case ('prt_step')
+                            read(buffer, *, iostat=ios) xml%sim%prt_step
+                            ! call the function to set print option on/off (y/n)
+                            call print_step(xml%sim%prt_step, xml%sim)
+                        case ('prt_annual')
+                            read(buffer, *, iostat=ios) xml%sim%prt_annual
+                            ! call the function to set print option on/off (y/n)
+                            call print_annual(xml%sim%prt_annual, xml%sim)
+                        case ('prt_yield')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yield
+                            ! call the function to set print option on/off (y/n)
+                            call print_yield(xml%sim%prt_yield, xml%sim)
+                        case ('prt_debug')
+                            read(buffer, *, iostat=ios) xml%sim%prt_debug
+                            ! call the function to set print option on/off (y/n)
+                            call print_debug(xml%sim%prt_debug, xml%sim)
+                        ! set specific options for printing
+                        case ('prt_stp_rain')
+                            read(buffer, *, iostat=ios) xml%sim%prt_stp_rain
+                        case ('prt_stp_transp_act')
+                            read(buffer, *, iostat=ios) xml%sim%prt_stp_transp_act
+                        case ('prt_stp_transp_pot')
+                            read(buffer, *, iostat=ios) xml%sim%prt_stp_transp_pot
+                        case ('prt_stp_irr')
+                            read(buffer, *, iostat=ios) xml%sim%prt_stp_irr
+                        case ('prt_stp_irr_loss')
+                            read(buffer, *, iostat=ios) xml%sim%prt_stp_irr_loss
+                        case ('prt_stp_cap_rise')
+                            read(buffer, *, iostat=ios) xml%sim%prt_stp_cap_rise
+                        case ('prt_stp_irr_nm_priv')
+                            read(buffer, *, iostat=ios) xml%sim%prt_stp_irr_nm_priv
+                        case ('prt_stp_irr_nm_col')
+                            read(buffer, *, iostat=ios) xml%sim%prt_stp_irr_nm_col
+                        case ('prt_stp_deep_perc')
+                            read(buffer, *, iostat=ios) xml%sim%prt_stp_deep_perc
+                        case ('prt_stp_runoff')
+                            read(buffer, *, iostat=ios) xml%sim%prt_stp_runoff
+                        case ('prt_stp_et_pot')
+                            read(buffer, *, iostat=ios) xml%sim%prt_stp_et_pot
+                        case ('prt_stp_et_act')
+                            read(buffer, *, iostat=ios) xml%sim%prt_stp_et_act
+                        case ('prt_dbg_eva_act')
+                            read(buffer, *, iostat=ios) xml%sim%prt_dbg_eva_act
+                        case ('prt_dbg_eff_rain')
+                            read(buffer, *, iostat=ios) xml%sim%prt_dbg_eff_rain
+                        case ('prt_dbg_perc1')
+                            read(buffer, *, iostat=ios) xml%sim%prt_dbg_perc1
+                        case ('prt_dbg_perc2')
+                            read(buffer, *, iostat=ios) xml%sim%prt_dbg_perc2
+                        case ('prt_dbg_h_soil1')
+                            read(buffer, *, iostat=ios) xml%sim%prt_dbg_h_soil1
+                        case ('prt_dbg_h_soil2')
+                            read(buffer, *, iostat=ios) xml%sim%prt_dbg_h_soil2
+                        case ('prt_yr_rain')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_rain
+                        case ('prt_yr_rain_crop_season')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_rain_crop_season
+                        case ('prt_yr_irr')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_irr
+                        case ('prt_yr_irr_loss')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_irr_loss
+                        case ('prt_yr_eva_act_crop_season')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_eva_act_crop_season
+                        case ('prt_yr_eva_pot_crop_season')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_eva_pot_crop_season
+                        case ('prt_yr_transp_act')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_transp_act
+                        case ('prt_yr_transp_pot')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_transp_pot
+                        case ('prt_yr_runoff')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_runoff
+                        case ('prt_yr_net_flux_gw')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_net_flux_gw
+                        case ('prt_yr_total_eff')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_total_eff
+                        case ('prt_yr_n_irr_events')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_n_irr_events
+                        case ('prt_yr_h_irr_mean')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_h_irr_mean
+                        case ('prt_yr_biomass_pot')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_biomass_pot
+                        case ('prt_yr_yield_pot')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_yield_pot
+                        case ('prt_yr_yield_act')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_yield_act
+                        case ('prt_yr_T_act_sum')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_T_act_sum
+                        case ('prt_yr_T_pot_sum')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_T_pot_sum
+                        case ('prt_yr_f_WS_stage')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_f_WS_stage
+                        case ('prt_yr_f_WS')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_f_WS
+                        case ('prt_yr_f_HS')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_f_HS
+                        case ('prt_yr_f_HS_sum')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_f_HS_sum
+                        case ('prt_yr_dbg_eva_act_tot')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_dbg_eva_act_tot
+                        case ('prt_yr_dbg_rain_eff')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_dbg_rain_eff
+                        case ('prt_yr_dbg_iter1')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_dbg_iter1
+                        case ('prt_yr_dbg_iter2')
+                            read(buffer, *, iostat=ios) xml%sim%prt_yr_dbg_iter2
+                        
                         case default ! all other cases ... !
                             print *, 'Skipping invalid or obsolete label <',trim(label),'> at line', line, &
                                 & ' of file: ', trim(file_xml)
@@ -1246,5 +1357,130 @@ module cli_read_parameter!
         end if
         
     end subroutine init_irrigation_units!
+
+    subroutine print_all(flag, sim)
+        character, intent(in) :: flag
+        type(simulation), intent(inout) :: sim
+
+        ! assign the same value to all the prt conditions
+        sim%prt_stp_rain = flag
+        sim%prt_stp_transp_act = flag
+        sim%prt_stp_transp_pot = flag
+        sim%prt_stp_irr = flag
+        sim%prt_stp_irr_loss = flag
+        sim%prt_stp_cap_rise = flag
+        sim%prt_stp_irr_nm_priv = flag
+        sim%prt_stp_irr_nm_col = flag
+        sim%prt_stp_deep_perc = flag
+        sim%prt_stp_runoff = flag
+        sim%prt_stp_et_pot = flag
+        sim%prt_stp_et_act = flag
+        sim%prt_dbg_eva_act = flag
+        sim%prt_dbg_eff_rain = flag
+        sim%prt_dbg_perc1 = flag
+        sim%prt_dbg_perc2 = flag
+        sim%prt_dbg_h_soil1 = flag
+        sim%prt_dbg_h_soil2 = flag
+        sim%prt_yr_rain = flag
+        sim%prt_yr_rain_crop_season = flag
+        sim%prt_yr_irr = flag
+        sim%prt_yr_irr_loss = flag
+        sim%prt_yr_eva_act_crop_season = flag
+        sim%prt_yr_eva_pot_crop_season = flag
+        sim%prt_yr_transp_act = flag
+        sim%prt_yr_transp_pot = flag
+        sim%prt_yr_runoff = flag
+        sim%prt_yr_net_flux_gw = flag
+        sim%prt_yr_total_eff = flag
+        sim%prt_yr_n_irr_events = flag
+        sim%prt_yr_h_irr_mean = flag
+        sim%prt_yr_biomass_pot = flag
+        sim%prt_yr_yield_pot = flag
+        sim%prt_yr_yield_act = flag
+        sim%prt_yr_T_act_sum = flag
+        sim%prt_yr_T_pot_sum = flag
+        sim%prt_yr_f_WS_stage = flag
+        sim%prt_yr_f_WS = flag
+        sim%prt_yr_f_HS = flag
+        sim%prt_yr_f_HS_sum = flag
+        sim%prt_yr_dbg_eva_act_tot = flag
+        sim%prt_yr_dbg_rain_eff = flag
+        sim%prt_yr_dbg_iter1 = flag
+        sim%prt_yr_dbg_iter2 = flag
+    end subroutine
+
+    subroutine print_step(flag, sim)
+        character, intent(in) :: flag
+        type(simulation), intent(inout) :: sim
+
+        ! assign the same value to all the prt conditions
+        sim%prt_stp_rain = flag
+        sim%prt_stp_transp_act = flag
+        sim%prt_stp_transp_pot = flag
+        sim%prt_stp_irr = flag
+        sim%prt_stp_irr_loss = flag
+        sim%prt_stp_cap_rise = flag
+        sim%prt_stp_irr_nm_priv = flag
+        sim%prt_stp_irr_nm_col = flag
+        sim%prt_stp_deep_perc = flag
+        sim%prt_stp_runoff = flag
+        sim%prt_stp_et_pot = flag
+        sim%prt_stp_et_act = flag
+    end subroutine
+
+    subroutine print_annual(flag, sim)
+        character, intent(in) :: flag
+        type(simulation), intent(inout) :: sim
+
+        ! assign the same value to all the prt conditions
+        sim%prt_yr_rain = flag
+        sim%prt_yr_rain_crop_season = flag
+        sim%prt_yr_irr = flag
+        sim%prt_yr_irr_loss = flag
+        sim%prt_yr_eva_act_crop_season = flag
+        sim%prt_yr_eva_pot_crop_season = flag
+        sim%prt_yr_transp_act = flag
+        sim%prt_yr_transp_pot = flag
+        sim%prt_yr_runoff = flag
+        sim%prt_yr_net_flux_gw = flag
+        sim%prt_yr_total_eff = flag
+        sim%prt_yr_n_irr_events = flag
+        sim%prt_yr_h_irr_mean = flag
+    end subroutine
+
+    subroutine print_yield(flag, sim)
+        character, intent(in) :: flag
+        type(simulation), intent(inout) :: sim
+
+        ! assign the same value to all the prt conditions
+        sim%prt_yr_biomass_pot = flag
+        sim%prt_yr_yield_pot = flag
+        sim%prt_yr_yield_act = flag
+        sim%prt_yr_T_act_sum = flag
+        sim%prt_yr_T_pot_sum = flag
+        sim%prt_yr_f_WS_stage = flag
+        sim%prt_yr_f_WS = flag
+        sim%prt_yr_f_HS = flag
+        sim%prt_yr_f_HS_sum = flag
+        
+    end subroutine
+
+    subroutine print_debug(flag, sim)
+        character, intent(in) :: flag
+        type(simulation), intent(inout) :: sim
+
+        ! assign the same value to all the prt conditions
+        sim%prt_dbg_eva_act = flag
+        sim%prt_dbg_eff_rain = flag
+        sim%prt_dbg_perc1 = flag
+        sim%prt_dbg_perc2 = flag
+        sim%prt_dbg_h_soil1 = flag
+        sim%prt_dbg_h_soil2 = flag
+        sim%prt_yr_dbg_eva_act_tot = flag
+        sim%prt_yr_dbg_rain_eff = flag
+        sim%prt_yr_dbg_iter1 = flag
+        sim%prt_yr_dbg_iter2 = flag
+    end subroutine
+
 
 end module
