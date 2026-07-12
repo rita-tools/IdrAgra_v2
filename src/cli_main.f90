@@ -33,7 +33,7 @@ program main!
     character(len=50) :: arg
     integer :: i
     ! default settings
-    logical :: debug = .false.
+    logical :: verbose = .false.
     logical :: summary = .false.
     logical :: showpreview = .false.
     logical :: file_exists
