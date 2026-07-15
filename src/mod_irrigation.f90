@@ -142,7 +142,7 @@ module mod_irrigation
             ! TODO: temporary implementation for rice paddy
             else where ((info_spat%h_maxpond%mat>10.0D0) .and. (bil1_old%h_pond<(0.9*info_spat%h_maxpond%mat))) ! crop submerged, only if h_maxpond> 10 mm
                 h_irr_temp = info_spat%h_meth%mat
-            else where ((bil1_old%h_soil*pheno%RF_e + bil2_old%h_soil*pheno%RF_t) < bil2%h_raw_sup) ! all other crops
+            else where ((bil1_old%h_soil + bil2_old%h_soil) < bil2%h_raw_sup) ! all other crops
                 ! TODO: %AB% why only 2nd layer RAWbig?
                 ! else where (bil2_old%tmm<bil2%RAWbig)
                 h_irr_temp = info_spat%h_meth%mat
@@ -191,7 +191,7 @@ module mod_irrigation
                 !             (info_spat%eff_met%mat) ! consider also efficiency
 
 !~             else where (bil2_old%tmm<bil2%RAWbig)       !all other crops
-            else where ((bil1_old%h_soil*pheno%RF_e + bil2_old%h_soil*pheno%RF_t) < bil2%h_raw_sup)       !all other crops
+            else where ((bil1_old%h_soil + bil2_old%h_soil) < bil2%h_raw_sup)       !all other crops
                 ! TODO: %AB% why only 2nd layer RAWbig?
                 where(bil1_old%h_soil <= info_spat%theta(1)%FC%mat*bil1_old%d_e*1000)!
                     h_irr_temp = fc_ratio *(( info_spat%theta(1)%FC%mat * bil1_old%d_e * 1000 - bil1_old%h_soil) + &!
@@ -279,7 +279,7 @@ module mod_irrigation
                                         (h_sat2-bil2_old%h_soil) + & ! fill the soil layer to saturation
                                         (bil1_old%h_eva + bil2_old%h_transp_pot))/ & ! fill ET
                                         1.0 ! don't consider efficiency
-                        else where ((bil1_old%h_soil*pheno%RF_e + bil2_old%h_soil*pheno%RF_t) < bil2%h_raw_sup) ! all other crops
+                        else where ((bil1_old%h_soil + bil2_old%h_soil) < bil2%h_raw_sup) ! all other crops
                             ! TODO: %AB% why only 2nd layer RAWbig?
                             ! else where (bil2_old%tmm<bil2%RAWbig)
                             h_irr_temp = info_spat%h_meth%mat
@@ -299,7 +299,7 @@ module mod_irrigation
                                         (bil1_old%h_eva + bil2_old%h_transp_pot))/ & ! fill ET
                                         (info_spat%eff_met%mat) ! consider also efficiency
                             ! else where (bil2_old%tmm<bil2%RAWbig)       !all other crops
-                        else where ((bil1_old%h_soil*pheno%RF_e + bil2_old%h_soil*pheno%RF_t) < bil2%h_raw_sup)       !all other crops
+                        else where ((bil1_old%h_soil + bil2_old%h_soil) < bil2%h_raw_sup)       !all other crops
                             ! TODO: %AB% why only 2nd layer RAWbig?
                             where(bil1_old%h_soil <= info_spat%theta(1)%FC%mat*bil1_old%d_e*1000)!
                                 h_irr_temp = ((info_spat%theta(1)%FC%mat*bil1_old%d_e*1000-bil1_old%h_soil)+ &!
