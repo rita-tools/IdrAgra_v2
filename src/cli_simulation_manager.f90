@@ -193,7 +193,7 @@ module cli_simulation_manager!
         dir_phenofases(:,:) = int(info_spat%weight_ws(1)%mat(:,:))
         do j=1,size(info_spat%domain%mat,2)
             do i=1,size(info_spat%domain%mat,1)
-                if(info_spat%domain%mat(i,j)/=info_spat%domain%header%nan) then
+                if(info_spat%backup_domain%mat(i,j)/=info_spat%backup_domain%header%nan) then !%PS% changed from %domain to %backup_domain to avoid problems with cells that are not simulated in the first year but become part of the active domain later
                     code_pmeteo(i,j) = make_numbered_name(dir_phenofases(i,j),".dat")
                     dir_phenofases(i,j) = get_value_index(info_meteo%filename, code_pmeteo(i,j))
                 end if
@@ -206,7 +206,7 @@ module cli_simulation_manager!
             dir_meteo(:,:,k) = int(info_spat%weight_ws(k)%mat(:,:))
             do j=1,size(info_spat%domain%mat,2)
                 do i=1,size(info_spat%domain%mat,1)
-                    if(info_spat%domain%mat(i,j)/=info_spat%domain%header%nan) then
+                    if(info_spat%backup_domain%mat(i,j)/=info_spat%backup_domain%header%nan) then !%PS% changed from %domain to %backup_domain to avoid problems with cells that are not simulated in the first year but become part of the active domain later
                         code_pmeteo(i,j) = make_numbered_name(dir_meteo(i,j,k),".dat")
                         dir_meteo(i,j,k) = get_value_index(info_meteo%filename,code_pmeteo(i,j))
                         if (dir_meteo(i,j,k)==0) then
