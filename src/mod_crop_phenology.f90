@@ -342,11 +342,28 @@ module mod_crop_phenology
         type(crop_pars_matrices),intent(inout)::crop_par_mat
         
         ! populate pheno%RF_t & pheno%RF_e
-        crop_par_mat%RF_t = merge(crop_par_mat%RF_t_max * (d_t/crop_par_mat%d_t_max)*&
-                                 (1.0D0 / (crop_par_mat%RF_t_max*(d_t/crop_par_mat%d_t_max)+(1.0D0-crop_par_mat%RF_t_max))), &
-                                  crop_par_mat%RF_t, crop_par_mat%RF_t_max /= domain%header%nan)
+        where (domain%mat /= domain%header%nan .and. &
+               crop_par_mat%d_t_max > 0.0D0 .and. &
+               crop_par_mat%RF_t_max >= 0.0D0 .and. crop_par_mat%RF_t_max <= 1.0D0)
+            crop_par_mat%RF_t = d_t/crop_par_mat%d_t_max
+            where (crop_par_mat%RF_t_max*crop_par_mat%RF_t + &
+                   (1.0D0-crop_par_mat%RF_t_max) > tiny(1.0D0))
+                crop_par_mat%RF_t = crop_par_mat%RF_t_max*crop_par_mat%RF_t / &
+                    (crop_par_mat%RF_t_max*crop_par_mat%RF_t + (1.0D0-crop_par_mat%RF_t_max))
+            elsewhere
+                crop_par_mat%RF_t = 0.0D0
+            end where
+        elsewhere
+            crop_par_mat%RF_t = 0.0D0
+        end where
+
         crop_par_mat%RF_t = round_2darray(crop_par_mat%RF_t,6)
-        crop_par_mat%RF_e = merge(1-  crop_par_mat%RF_t, crop_par_mat%RF_e, crop_par_mat%RF_t_max /= domain%header%nan)
+        crop_par_mat%RF_e = 1.0D0-crop_par_mat%RF_t
+
+        where (domain%mat == domain%header%nan)
+            crop_par_mat%RF_t = dble(domain%header%nan)
+            crop_par_mat%RF_e = dble(domain%header%nan)
+        end where
 
     end subroutine calculate_RF_t!
     

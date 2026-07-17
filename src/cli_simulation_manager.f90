@@ -181,7 +181,13 @@ module cli_simulation_manager!
         ! Variables allocation
         call allocate_all (stp_map, yr_map, deb_map, yr_deb_map, wat_bal1, wat_bal1_old, wat_bal2, wat_bal2_old, wat_bal_hour, meteo, wat, pheno, &
             & info_spat%domain%header%imax,info_spat%domain%header%jmax, info_spat%domain%mat)
-        !!
+
+        ! Make sure that RF-related variables are nan outside the simulation domain
+        pheno%d_t_max  = dble(info_spat%domain%header%nan)
+        pheno%RF_t_max = dble(info_spat%domain%header%nan)
+        pheno%RF_t     = dble(info_spat%domain%header%nan)
+        pheno%RF_e     = dble(info_spat%domain%header%nan)
+
         ! dir_phenofases: for each cell the appropriate meteorological station is selected
         ! (by linking to its progressive number in meteorological stations list)
         dir_phenofases(:,:) = int(info_spat%weight_ws(1)%mat(:,:))
@@ -1942,13 +1948,12 @@ module cli_simulation_manager!
         real(dp),dimension(size(p,1),size(p,2))::f_c  !cover fraction [-]!
         real(dp),dimension(size(p,1),size(p,2))::calc_interception!
         !!
-        calc_interception = 0.!
-        where(p>0.)
-            where (pheno%lai>0.)
-                ! limit f_c to 1 in order to not have interception greater than precipitation
-                f_c=min(1.0d0, pheno%lai/3.) ! %EAC%: fix "Different type kinds" error
-                calc_interception = pheno%a * pheno%lai * (1.-(1./(1.+((f_c * p)/(pheno%a * pheno%lai)))))!
-            end where!
+        calc_interception = 0.0D0!
+        where (p > 0.0D0 .and. pheno%lai > 0.0D0 .and. pheno%a > 0.0D0)
+            ! Limit f_c to 1 in order to not have interception greater than precipitation.
+            f_c = min(1.0D0, pheno%lai/3.0D0)
+            calc_interception = (pheno%a * pheno%lai * f_c * p) / & !%PS%: Algebraically equivalent to the original formula, but avoids potentially unsafe division by a*LAI.
+                                (pheno%a * pheno%lai + f_c * p)
         end where
     end function calc_interception!
     !

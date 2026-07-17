@@ -18,12 +18,12 @@ export PATH := $(MINGW64_BINDIR):$(PATH)
 
 CC = gfortran
 CPP = gfortran -cpp
-IS_RELEASE := false
+IS_RELEASE := true
 
 # -g for gdb, -O0 zero optimization or -Og
 ### for debug ###
 TYPE := debug
-GFFLAGS = -cpp -DGIT_VERSION=\"$(VERSION)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -g -Wall  -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all -ffpe-trap=zero,overflow,underflow -finit-real=nan -c 
+GFFLAGS = -cpp -DGIT_VERSION=\"$(VERSION)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -g -Wall -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all,no-array-temps -ffpe-trap=zero,overflow,underflow -finit-real=nan -c 
 # nnnooo  GFFLAGS = -cpp -DGIT_VERSION=\"$(VERSION)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -g -Wall  -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all -ffpe-trap=denorm -funsafe-math-optimizations -finit-real=nan -c 
 #GFFLAGS = -g -O0 -Wall -Wextra -Wshadow -pedantic -static -c
 #GFFLAGS =  -cpp -DMY_VERSION=\"$(VERSION)\" -g -Wall -c
