@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 # on: workflow_dispatch
 
 jobs:
@@ -15,36 +18,33 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install dependencies
-        run: make
-
-      - name: Commit files
+      - name: Build
+        shell: pwsh
         run: |
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git commit -a -m "latest"
-      
-      - name: Push changes
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.ref }}
-          tags: true
-          force: true
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          make
 
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: idragra
-      #     path: release/idragra.exe
-      #     retention-days: 1
-    
-      # - uses: "marvinpinto/action-automatic-releases@latest"
-      #   with:
-      #     repo_token: "${{ secrets.GITHUB_TOKEN }}"
-      #     prerelease: false
-      #     automatic_release_tag: latest
+      - name: Package release
+        shell: pwsh
+        run: |
+          $packageDir = "release/IdrAgra_${{ github.ref_name }}_windows"
+          $zipPath = "$packageDir.zip"
 
-      # - uses: ncipollo/release-action@v1
-      #   with:
-      #     artifacts: "release.tar.gz,foo/*.txt"
-      #     bodyFile: "body.md"  
+          New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+          Copy-Item release/*.exe $packageDir/
+          Copy-Item Utilities $packageDir/Utilities -Recurse
+          Copy-Item demo $packageDir/demo -Recurse
+          Compress-Archive -Path "$packageDir/*" -DestinationPath $zipPath -Force
+
+      - name: Create GitHub release
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem release/*.exe | Select-Object -First 1
+          $zip = Get-ChildItem release/IdrAgra_${{ github.ref_name }}_windows.zip
+
+          gh release create "${{ github.ref_name }}" `
+            $exe.FullName `
+            $zip.FullName `
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
