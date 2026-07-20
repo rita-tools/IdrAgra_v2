@@ -5,6 +5,7 @@ LOG_FILE := $(shell git log --format=reference > ./release/git_idragra.log)
 
 # Windows OS variables & settings
 DEL = rm
+CP = cp
 EXE = .exe
 WIN = 1
 
@@ -38,6 +39,7 @@ endif
 LDFLAGS = 
 
 APPNAME = idragra_$(VERSION)_$(TYPE)
+APPALIAS = idragra_latest
 EXT = .f90
 SRCDIR = src
 OBJDIR = obj
@@ -73,6 +75,7 @@ $(APPNAME): $(patsubst %, $(OBJDIR)/%.o, $(FILES))
 	$(DEL) -f /$(OBJDIR)/cli_main.o
 	$(CC) -o $(OBJDIR)/cli_main.o -J$(OBJDIR) $(GFFLAGS) $(SRCDIR)/cli_main.f90
 	$(CPP) -g -o $(RELDIR)/$@$(EXE) $^ $(OBJDIR)/cli_main.o $(LDFLAGS) -static
+	$(CP) $(RELDIR)/$@$(EXE) $(RELDIR)/$(APPALIAS)$(EXE)
 
 # The following sets a function that creates makefile rules
 # Additionally:
