@@ -38,7 +38,7 @@ module cli_simulation_manager!
     use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data
     use mod_runoff
     use mod_crop_soil_water
-    use mod_crop_phenology, only: crop_pheno_info, crop_matrices
+    use mod_crop_phenology, only: crop_pheno_info, crop_matrices, populate_crop_pars_matrices
     use mod_TDx_index
     use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva
     use mod_common, only: wat_matrix, soil2_rice, hourly, unit_file_scratch
@@ -101,7 +101,8 @@ module cli_simulation_manager!
         type(yield_t)::yield
         type(irr_units_table),dimension(:),allocatable::irr_units      ! Allocated in mod_watsources
         type(scheduled_irrigation),dimension(:),allocatable::irr_sch ! Allocated in 'open_scheduled_irrigation' function
-        type(crop_matrices)::crop_map
+        type(crop_matrices)::crop_map, nxtyr_crop_map
+        type(grid_i) :: nxtyr_soil_use_id ! %PS% land-use map for next year (used to deicide what to sow in autumn)
         !!
         integer:: unit_crop
         integer::i,j,k,y,current_year,doy,hour,z,w                           ! for cycles
@@ -136,8 +137,8 @@ module cli_simulation_manager!
         type(unit_file_scratch),dimension(:),allocatable::unit_Dxi!
         integer::cont_td    ! cycles
         character(len=33)::str_td!
-        character(len=255)::str_delete, upfilename
-        character(len=55)::s_year,s_years,s_doy
+        character(len=255)::str_delete, landuse_file, upfilename
+        character(len=55)::s_year,s_years,s_next_years,s_doy
         logical :: file_exists
         !! percolation model
         integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::day_from_irr ! days past from the latest irrigation event
@@ -321,10 +322,13 @@ module cli_simulation_manager!
                 
                 write (s_year,*) current_year
                 write (s_years,*) current_year+1
+                write (s_next_years,*) current_year+2
+                write (s_next_years,*) adjustr(trim(s_years))//'-'//adjustl(trim(s_next_years))
                 write (s_years,*) adjustr(trim(s_year))//'-'//adjustl(trim(s_years))
             else
                 write (s_year,*) current_year
                 write (s_years,*) current_year
+                write (s_next_years,*) current_year+1
             end if
 
             ! Yearly irandom: change irandom map each year at the beginning, if the file exists
@@ -340,8 +344,16 @@ module cli_simulation_manager!
             if (pars%sim%f_soiluse .eqv. .true.) then
                 info_spat%domain = info_spat%backup_domain
                 info_spat%domain%mat = info_spat%backup_domain%mat
-                call read_grid (trim(pars%sim%input_path)//trim(pars%sim%soiluse_fn)//'_'//trim(adjustl(s_years))//".asc",&
-                    & info_spat%soil_use_id,pars%sim,boundaries)
+
+                ! %PS%: a missing landuse yearly file is allowed, in that case we reuse last year's
+                landuse_file = trim(pars%sim%input_path)//trim(pars%sim%soiluse_fn)//'_'//trim(adjustl(s_years))//'.asc'
+                inquire(file=trim(landuse_file), exist=file_exists)
+                if (file_exists) then
+                    call read_grid(trim(landuse_file), info_spat%soil_use_id, pars%sim, boundaries)
+                else
+                    print *, "Landuse file for year ", trim(adjustl(s_years)), " is missing. Relying on the previous year instead."
+                end if
+
                 if (minval(info_spat%soil_use_id%mat,info_spat%soil_use_id%mat/=info_spat%soil_use_id%header%nan) < 1 &
                     & .or. maxval(info_spat%soil_use_id%mat) > pars%sim%n_lus) then
                     print *,"Soil use maps have soil uses not defined in crop database"
@@ -356,7 +368,29 @@ module cli_simulation_manager!
                 
                 ! Soil uses that aren't simulated are removed from domain
                 call overlay_domain (info_spat%soil_use_id,info_spat%domain) 
-                
+
+                ! %PS% also load the landuse for the next year (if present); it is used to define what is actually sown this autumn
+                landuse_file = trim(pars%sim%input_path)//trim(pars%sim%soiluse_fn)//'_'// trim(adjustl(s_next_years))//'.asc'
+                inquire(file=trim(landuse_file),exist=file_exists)
+                if (file_exists) then
+                    call read_grid(trim(landuse_file),nxtyr_soil_use_id,pars%sim,boundaries)
+                    if (minval(nxtyr_soil_use_id%mat,nxtyr_soil_use_id%mat/=nxtyr_soil_use_id%header%nan) < 1 .or. &
+                      & maxval(nxtyr_soil_use_id%mat) > pars%sim%n_lus) then
+                        print *,"Soil use maps have soil uses not defined in crop database"
+                        print *,"Verify the maximum allowed crop uses (SoilUsesNum) and soil maps"
+                        print *, 'Execution will be aborted...'
+                        stop!
+                    end if
+                    if (any(info_spat%domain%mat /= info_spat%domain%header%nan .and. &
+                        & nxtyr_soil_use_id%mat == nxtyr_soil_use_id%header%nan)) then
+                        print *, 'Following-year soil-use context is missing cells active in the current year.'
+                        stop
+                    end if
+                else
+                    print *, "Landuse file for year ", trim(adjustl(s_next_years)), " is missing. Relying on the previous year instead."
+                    nxtyr_soil_use_id = info_spat%soil_use_id
+                end if
+
                 ! update irrigation related parameters map as they can change during the simulation period
                 ! TODO: add check if they exist
                 ! TODO: make a function for that
@@ -475,6 +509,9 @@ module cli_simulation_manager!
                         end if
                     case default
                 end select
+            else
+                ! %PS% Landuse is static: always set next year's landuse equal to the current year
+                nxtyr_soil_use_id = info_spat%soil_use_id
             end if ! end change soil use map condition
 
             ! Read all phenological tables and allocation of info_pheno%prm%tab(:,:)!
@@ -516,11 +553,14 @@ module cli_simulation_manager!
                 call get_uniform_sample(info_spat%irandom%mat,pars%sim%sowing_range,pars%sim%rand_symmetry,pars%sim%repeatable)!
             end if
 
-            call allocate_crop_map (crop_map,info_spat%domain%mat,pars%sim%n_crops,info_spat%domain%header%nan)
+            call allocate_crop_map (crop_map,       info_spat%domain%mat, pars%sim%n_crops, info_spat%domain%header%nan)
+            call allocate_crop_map (nxtyr_crop_map, info_spat%domain%mat, pars%sim%n_crops, info_spat%domain%header%nan)
             ! make_random_emergence calculates reference data to estimate crop emergence date
             ! which will be calculated in populate_crop_pars_matrices
-            call make_random_emergence(info_pheno,meteo_weight,dir_meteo,info_spat%domain,info_spat%soil_use_id%mat, &
-                & crop_map, info_spat%irandom%mat, pars%sim%year_step(y))!
+            call make_random_emergence(info_pheno,meteo_weight, dir_meteo,info_spat%domain, info_spat%soil_use_id%mat, &
+                                     &       crop_map, info_spat%irandom%mat, pars%sim%year_step(y))
+            call make_random_emergence(info_pheno,meteo_weight, dir_meteo, info_spat%domain,    nxtyr_soil_use_id%mat, &
+                                     & nxtyr_crop_map, info_spat%irandom%mat, pars%sim%year_step(y))
             
             if (pars%sim%prt_debug_out == 'y') then
                 ! write debug files of reference data for crop randomization
@@ -542,9 +582,11 @@ module cli_simulation_manager!
             ! Writing crop parameters in cult matrix
             call populate_crop_yield_matrices(info_pheno,dir_phenofases,info_spat%domain,info_spat%soil_use_id%mat,crop_map,y)
             
-            ! Inizialization of kcb_low, cult_switch and phase_switch
+            ! Inizialization of kcb_low, crop ID/slot and phenological phase
             pheno%k_cb_low = info_spat%domain%header%nan
             pheno%n_crop_in_year = 1
+            pheno%active_crop_id = 0
+            pheno%active_crop_slot = 0
             pheno%pheno_idx = 1
 
             ! Allocation of yield variables
@@ -686,13 +728,15 @@ module cli_simulation_manager!
                 pheno%k_cb_old = pheno%k_cb
                 if (y==pars%sim%start_simulation%year - info_meteo(1)%start%year + 1 &
                     & .and. (pars%sim%start_simulation%day > 1 .or. pars%sim%start_simulation%month > 1)) then
-                    call populate_crop_pars_matrices(pheno,info_pheno, info_spat%irandom%mat, &
-                        & doy + pars%sim%start_simulation%doy - calc_doy(1, 1, pars%sim%start_simulation%year), &
-                        & dir_phenofases,info_spat%domain,info_spat%soil_use_id, &
-                        & y, pars%sim%year_step(y), crop_map)!
+                    call populate_crop_pars_matrices(pheno, info_pheno, info_spat%irandom%mat,                                             &
+                                                   & doy + pars%sim%start_simulation%doy - calc_doy(1, 1, pars%sim%start_simulation%year), &
+                                                   & dir_phenofases, info_spat%domain, info_spat%soil_use_id, y,                           &
+                                                   & pars%sim%year_step(y), crop_map, nxtyr_crop_map, nxtyr_soil_use_id                    )
                 else
-                    call populate_crop_pars_matrices(pheno,info_pheno,info_spat%irandom%mat,doy,dir_phenofases,info_spat%domain,info_spat%soil_use_id, &
-                    & y, pars%sim%year_step(y), crop_map)!
+                    call populate_crop_pars_matrices(pheno, info_pheno, info_spat%irandom%mat,                         &
+                                                   & doy,                                                              &
+                                                   & dir_phenofases, info_spat%domain, info_spat%soil_use_id, y,       &
+                                                   & pars%sim%year_step(y), crop_map, nxtyr_crop_map, nxtyr_soil_use_id)
                 end if
                 
                 ! Output fc in debug %RR%
@@ -1314,33 +1358,33 @@ module cli_simulation_manager!
                                 & yield%biomass_pot%mat(i,j,z) * crop_map%HI(i,j,z)
                             
                             ! Calculate the reduction of the production from the water stress
-                            yield%f_WS%mat(i,j,z) = 1 - pheno%Ky_tot(i,j) * &
-                                & (1- sum(yield%T_act_sum%mat(i,j,:,z)) / &
+                            yield%f_WS%mat(i,j,z) = 1 - crop_map%Ky_tot(i,j,z) * & ! %PS% important bugfix: earlier version was using pheno%Ky_tot(i,j), i.e. whatever value was saved at year end.
+                                & (1- sum(yield%T_act_sum%mat(i,j,:,z)) / &        !                        This potentially gave the same Ky to both crops present in a year (e.g. maize was using wheat's Ky)
                                 & sum(yield%T_pot_sum%mat(i,j,:,z)))
 
                             if (yield%f_WS%mat(i,j,z) < 0) yield%f_WS%mat(i,j,z) = 0    ! limit to zero
                             
-                            yield%f_WS_stage%mat(i,j,z) = (1 - pheno%Ky_pheno(i,j,1) * &
+                            yield%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,1) * &
                                 & (1 - (yield%T_act_sum%mat(i,j,1,z) / &
                                 & yield%T_pot_sum%mat(i,j,1,z)))) &
                                 & ** (yield%dev_stage%mat(i,j,1,z) &
                                 & / sum(yield%dev_stage%mat(i,j,:,z)))
                             
-                            yield%f_WS_stage%mat(i,j,z) = (1 - pheno%Ky_pheno(i,j,2) * &
+                            yield%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,2) * &
                                 & (1 - (yield%T_act_sum%mat(i,j,2,z) / &
                                 & yield%T_pot_sum%mat(i,j,2,z)))) &
                                 & ** (yield%dev_stage%mat(i,j,2,z) &
                                 & / sum(yield%dev_stage%mat(i,j,:,z))) * &
                                 & yield%f_WS_stage%mat(i,j,z)
                             
-                            yield%f_WS_stage%mat(i,j,z) = (1 - pheno%Ky_pheno(i,j,3) * &
+                            yield%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,3) * &
                                 & (1 - (yield%T_act_sum%mat(i,j,3,z) / &
                                 & yield%T_pot_sum%mat(i,j,3,z)))) &
                                 & ** (yield%dev_stage%mat(i,j,3,z) &
                                 & / sum(yield%dev_stage%mat(i,j,:,z))) * &
                                 & yield%f_WS_stage%mat(i,j,z)
                             
-                            yield%f_WS_stage%mat(i,j,z) = (1 - pheno%Ky_pheno(i,j,4) * &
+                            yield%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,4) * &
                                 & (1 - (yield%T_act_sum%mat(i,j,4,z) / &
                                 & yield%T_pot_sum%mat(i,j,4,z)))) &
                                 & ** (yield%dev_stage%mat(i,j,4,z) &
@@ -1393,6 +1437,7 @@ module cli_simulation_manager!
             ! destroy annual variables
             call destroy_infofeno_tab(info_pheno)
             call destroy_crop(crop_map)
+            call destroy_crop(nxtyr_crop_map)
             if (pars%sim%mode ==1) call destroy_water_sources_duty(info_sources)
             call destroy_yield_output(yield)
         end do year_cycle!
@@ -1765,6 +1810,15 @@ module cli_simulation_manager!
         deallocate(crop_map%dij)
         deallocate(crop_map%TSP_high)
         deallocate(crop_map%TSP_low)
+        deallocate(crop_map%wp_adj)
+        deallocate(crop_map%HI)
+        deallocate(crop_map%Ky_tot)
+        deallocate(crop_map%Ky_pheno)
+        deallocate(crop_map%T_crit)
+        deallocate(crop_map%T_lim)
+        deallocate(crop_map%k_cb_min)
+        deallocate(crop_map%k_cb_mid)
+        deallocate(crop_map%k_cb_max)
     end subroutine destroy_crop
 
     subroutine init_wat_bal1(bil,a)
@@ -2388,6 +2442,8 @@ module cli_simulation_manager!
             allocate(pheno%wp_adj          (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%p_day           (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%n_crop_in_year    (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
+            allocate(pheno%active_crop_id    (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
+            allocate(pheno%active_crop_slot  (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
             allocate(pheno%pheno_idx   (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%Ky_pheno            (imax,jmax,phases),stat=checkstat) ; if(checkstat/=0) print*,errormessage! 3d matrix
             allocate(pheno%r_stress           (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
@@ -2419,6 +2475,8 @@ module cli_simulation_manager!
             deallocate(pheno%wp_adj          )!
             deallocate(pheno%p_day           )!
             deallocate(pheno%n_crop_in_year    )!
+            deallocate(pheno%active_crop_id)
+            deallocate(pheno%active_crop_slot)
             deallocate(pheno%pheno_idx   )!
             deallocate(pheno%r_stress   )!
         end if!

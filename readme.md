@@ -200,6 +200,7 @@ Capital letters are meaningful in Linux OS system (i.e. test.txt is different fr
 * CNvalue.dat
 * fc.dat (lowercase)
 * r_stress.dat (lowercase)
+* CropId.dat
 * WPadj.dat
 
 <b>from the spatial data folder</b>

@@ -244,6 +244,9 @@ module cli_crop_parameters!
 
                 select case (label)
                     case ('var') ! already initialized
+                    case ('cropid') ! %PS% global crop id aligned with each local static slot
+                        call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, &
+                            & unit_param%crop_id_by_slot)
                     case ('irrig')
                         call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%irrigation_class)
                     case ('cnclass')
@@ -344,6 +347,7 @@ module cli_crop_parameters!
             call open_daily_crop_par_file(info_pheno(i)%f_c%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"fc.dat",errorflag)
             ! EDIT: add support for seasonal p_raw
             call open_daily_crop_par_file(info_pheno(i)%r_stress%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"r_stress.dat",errorflag)
+            call open_daily_crop_par_file(info_pheno(i)%crop_id%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropId.dat",errorflag) ! %PS%
             !
             ! TODO - add tabulated ky
             
@@ -367,6 +371,9 @@ module cli_crop_parameters!
             allocate(info_pheno(i)%ii0            (sim%n_lus, sim%n_crops))
             allocate(info_pheno(i)%iie            (sim%n_lus, sim%n_crops))
             allocate(info_pheno(i)%iid            (sim%n_lus, sim%n_crops))
+            allocate(info_pheno(i)%crop_id_by_slot(sim%n_lus, sim%n_crops)) ! %PS%
+            allocate(info_pheno(i)%cycle_crop_id  (sim%n_lus, sim%n_crops)) ! %PS%
+            allocate(info_pheno(i)%cycle_crop_slot(sim%n_lus, sim%n_crops)) ! %PS%
             info_pheno(i)%n_crops_by_year     = n_crops_by_year
             info_pheno(i)%irrigation_class  = int(nan)
             info_pheno(i)%cn_class              = int(nan)
@@ -386,6 +393,9 @@ module cli_crop_parameters!
             info_pheno(i)%ii0             = 0!
             info_pheno(i)%iie             = 0!
             info_pheno(i)%iid             = 0!
+            info_pheno(i)%crop_id_by_slot = 0 ! %PS%
+            info_pheno(i)%cycle_crop_id   = 0 ! %PS%
+            info_pheno(i)%cycle_crop_slot = 0 ! %PS%
             call read_water_prod_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"WPadj.dat", &
                 & string_elements, n_crops_by_year, info_pheno(i)%wp_adj, ErrorFlag)
             call read_crop_par_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropParam.dat", &
@@ -406,6 +416,27 @@ module cli_crop_parameters!
     end subroutine init_crop_phenology_pars!
 
     subroutine read_all_crop_pars(n_days,n_crop,info_pheno,pars)!
+        ! %PS% Read one calendar year and derive crop cycles exclusively from CropId.
+        implicit none!
+        integer,intent(in)::n_days,n_crop
+        type(parameters),intent(in)::pars
+        type(crop_pheno_info),dimension(:),intent(inout)::info_pheno
+        integer::i
+
+        do i=1,size(info_pheno)
+            call read_crop_pars(info_pheno(i)%k_cb,n_days,n_crop)
+            call read_crop_pars(info_pheno(i)%h,n_days,n_crop)
+            call read_crop_pars(info_pheno(i)%z_r,n_days,n_crop)
+            call read_crop_pars(info_pheno(i)%lai,n_days,n_crop)
+            call read_crop_pars(info_pheno(i)%cn_day,n_days,n_crop)
+            call read_crop_pars(info_pheno(i)%f_c,n_days,n_crop)
+            call read_crop_pars(info_pheno(i)%r_stress,n_days,n_crop)
+            call read_crop_pars(info_pheno(i)%crop_id,n_days,n_crop)
+            call derive_crop_cycles(info_pheno(i),n_days,pars%depth%ze_fix)
+        end do
+    end subroutine read_all_crop_pars
+
+    subroutine read_all_crop_pars_legacy(n_days,n_crop,info_pheno,pars)!
         ! read all daily crop parameters by the number of days over the opened files
         implicit none!
         integer,intent(in)::n_days!
@@ -472,7 +503,7 @@ module cli_crop_parameters!
                 end if
             end do
         end do!
-        
+
         do i=1,size(info_pheno)
             ! Calculate max thickness of the transpirative layer
             info_pheno(i)%d_r_max(:,1) = maxval(info_pheno(i)%z_r%tab, dim=1)-pars%depth%ze_fix
@@ -594,7 +625,148 @@ module cli_crop_parameters!
                 end if
             end do
         end do!
-    end subroutine read_all_crop_pars!
+    end subroutine read_all_crop_pars_legacy!
+
+    subroutine derive_crop_cycles(pheno, n_days, ze_fix)
+        ! %PS% Build crop-cycle boundaries in completion order. A crop present at
+        ! both ends of the calendar is one crossing-year crop cycle.
+        type(crop_pheno_info), intent(inout) :: pheno
+        integer, intent(in) :: n_days
+        real(dp), intent(in) :: ze_fix
+        integer :: lu, slot, cycle_idx, day, start_day, end_day, crop_id, first_end, last_start
+        integer :: n_slots
+        logical, dimension(n_days) :: crop_mask
+        real(dp) :: low_value, high_value, mid_value
+
+        pheno%ii0 = 0
+        pheno%iie = 0
+        pheno%iid = 0
+        pheno%cycle_crop_id = 0
+        pheno%cycle_crop_slot = 0
+
+        do lu=1,size(pheno%crop_id%tab,2)
+            n_slots = pheno%n_crops_by_year(lu)
+            if (n_slots < 1) cycle
+
+            do slot=1,n_slots
+                crop_id = pheno%crop_id_by_slot(lu,slot)
+                if (crop_id <= 0) then
+                    print *, 'Missing or invalid CropId mapping for land-use class ', lu, ', slot ', slot
+                    print *, 'Execution will be aborted...'
+                    stop
+                end if
+                if (count(pheno%crop_id_by_slot(lu,1:n_slots) == crop_id) > 1) then
+                    print *, 'CropId ', crop_id, ' occurs in more than one slot of land-use class ', lu
+                    print *, 'Execution will be aborted...'
+                    stop
+                end if
+            end do
+
+            do day=1,n_days
+                crop_id = pheno%crop_id%tab(day,lu)
+                if (crop_id < 0) then
+                    print *, 'Negative CropId at day ', day, ', land-use class ', lu
+                    stop
+                end if
+                if (crop_id > 0 .and. .not. any(pheno%crop_id_by_slot(lu,1:n_slots) == crop_id)) then
+                    print *, 'Unknown CropId ', crop_id, ' at day ', day, ', land-use class ', lu
+                    print *, 'Execution will be aborted...'
+                    stop
+                end if
+            end do
+
+            ! Derive crop-specific Kcb phases and maximum root depth by static slot.
+            do slot=1,n_slots
+                crop_id = pheno%crop_id_by_slot(lu,slot)
+                crop_mask = pheno%crop_id%tab(:,lu) == crop_id
+                if (.not. any(crop_mask)) then
+                    print *, 'CropId ', crop_id, ' never occurs in land-use class ', lu
+                    print *, 'Execution will be aborted...'
+                    stop
+                end if
+                ! %PS% Preserve the existing annual/permanent convention: annual
+                ! land uses have a zero Kcb outside crop-in-field periods.
+                low_value = minval(pheno%k_cb%tab(:,lu))
+                high_value = maxval(pheno%k_cb%tab(:,lu), mask=crop_mask)
+                mid_value = high_value
+                do day=2,n_days
+                    if (crop_mask(day) .and. crop_mask(day-1)) then
+                        if (pheno%k_cb%tab(day,lu) == pheno%k_cb%tab(day-1,lu) .and. &
+                            & pheno%k_cb%tab(day,lu) > low_value .and. pheno%k_cb%tab(day,lu) < high_value) then
+                            mid_value = pheno%k_cb%tab(day,lu)
+                            exit
+                        end if
+                    end if
+                end do
+                pheno%kcb_phases%low(lu,slot) = low_value
+                pheno%kcb_phases%high(lu,slot) = high_value
+                pheno%kcb_phases%mid(lu,slot) = mid_value
+                pheno%d_r_max(lu,slot) = maxval(pheno%z_r%tab(:,lu), mask=crop_mask) - ze_fix
+            end do
+
+            cycle_idx = 0
+            first_end = 0
+            last_start = n_days + 1
+
+            if (pheno%crop_id%tab(1,lu) > 0 .and. &
+                & pheno%crop_id%tab(1,lu) == pheno%crop_id%tab(n_days,lu)) then
+                crop_id = pheno%crop_id%tab(1,lu)
+                first_end = 1
+                do while (first_end < n_days .and. pheno%crop_id%tab(first_end+1,lu) == crop_id)
+                    first_end = first_end + 1
+                end do
+                cycle_idx = 1
+                if (first_end == n_days) then
+                    ! %PS% A crop present every day is permanent, not a wrapped cycle.
+                    last_start = n_days + 1
+                    pheno%ii0(lu,cycle_idx) = 1
+                    pheno%iie(lu,cycle_idx) = n_days
+                    pheno%iid(lu,cycle_idx) = n_days
+                else
+                    last_start = n_days
+                    do while (last_start > 1 .and. pheno%crop_id%tab(last_start-1,lu) == crop_id)
+                        last_start = last_start - 1
+                    end do
+                    pheno%ii0(lu,cycle_idx) = last_start
+                    pheno%iie(lu,cycle_idx) = first_end
+                    pheno%iid(lu,cycle_idx) = n_days-last_start+1+first_end
+                end if
+                pheno%cycle_crop_id(lu,cycle_idx) = crop_id
+                pheno%cycle_crop_slot(lu,cycle_idx) = findloc(pheno%crop_id_by_slot(lu,1:n_slots), crop_id, dim=1)
+            end if
+
+            day = first_end + 1
+            do while (day <= min(n_days,last_start-1))
+                if (pheno%crop_id%tab(day,lu) == 0) then
+                    day = day + 1
+                    cycle
+                end if
+                crop_id = pheno%crop_id%tab(day,lu)
+                start_day = day
+                do while (day <= min(n_days,last_start-1) .and. pheno%crop_id%tab(day,lu) == crop_id)
+                    day = day + 1
+                end do
+                end_day = day - 1
+                cycle_idx = cycle_idx + 1
+                if (cycle_idx > size(pheno%ii0,2)) then
+                    print *, 'Too many crop cycles in land-use class ', lu
+                    stop
+                end if
+                pheno%ii0(lu,cycle_idx) = start_day
+                pheno%iie(lu,cycle_idx) = end_day
+                pheno%iid(lu,cycle_idx) = end_day-start_day+1
+                pheno%cycle_crop_id(lu,cycle_idx) = crop_id
+                pheno%cycle_crop_slot(lu,cycle_idx) = findloc(pheno%crop_id_by_slot(lu,1:n_slots), crop_id, dim=1)
+            end do
+
+            if (cycle_idx /= n_slots) then
+                print *, 'CropId defines ', cycle_idx, ' crop cycles for land-use class ', lu, &
+                    & ', but CropParam defines ', n_slots, ' slots.'
+                print *, 'Execution will be aborted...'
+                stop
+            end if
+        end do
+    end subroutine derive_crop_cycles
     !
     subroutine destroy_infofeno_tab(info_pheno)!
     ! dellaocate all crop phenological time series
@@ -609,6 +781,7 @@ module cli_crop_parameters!
             if(associated(info_pheno(i)%cn_day%tab)) deallocate(info_pheno(i)%cn_day%tab)!
             if(associated(info_pheno(i)%f_c%tab)) deallocate(info_pheno(i)%f_c%tab)!
             if(associated(info_pheno(i)%r_stress%tab)) deallocate(info_pheno(i)%r_stress%tab)!
+            if(associated(info_pheno(i)%crop_id%tab)) deallocate(info_pheno(i)%crop_id%tab)! %PS%
         end do!
         
     end subroutine destroy_infofeno_tab!
@@ -626,6 +799,10 @@ module cli_crop_parameters!
             close(info_pheno(i)%cn_day%unit)!
             close(info_pheno(i)%f_c%unit)!
             close(info_pheno(i)%r_stress%unit)!
+            close(info_pheno(i)%crop_id%unit)! %PS%
+            if(associated(info_pheno(i)%crop_id_by_slot)) deallocate(info_pheno(i)%crop_id_by_slot) ! %PS%
+            if(associated(info_pheno(i)%cycle_crop_id)) deallocate(info_pheno(i)%cycle_crop_id) ! %PS%
+            if(associated(info_pheno(i)%cycle_crop_slot)) deallocate(info_pheno(i)%cycle_crop_slot) ! %PS%
         end do!
         deallocate(info_pheno)!
     end subroutine close_pheno_file!
