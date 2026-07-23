@@ -46,7 +46,7 @@ module cli_crop_parameters!
         integer, intent(out) :: error_flag!
         integer :: free_unit
         integer :: ios
-        integer :: line, p
+        integer :: line, p, i, unique_count
         character(len=n_crop*20) :: buffer, label !EAC: use mcrop_max x 20
         character(len=10), dimension(:), allocatable :: dummy, dummy_clean
         !!
@@ -72,11 +72,30 @@ module cli_crop_parameters!
                 select case (label)
                     case ('var')
                         ! read the header line and divide elements
+                        ! %PS% CropCoef terminates this row with a tab. Remove it
+                        ! so split_string does not create an additional empty column.
+                        if (len_trim(buffer) > 0) then
+                            if (buffer(len_trim(buffer):len_trim(buffer)) == achar(9)) then
+                                buffer = buffer(1:len_trim(buffer)-1)
+                            end if
+                        end if
                         allocate(dummy(n_crop*2))    ! TODO: to add 3 crops, edit 2 to 3
                         call split_string(buffer, achar(9), dummy, string_elements)
                         allocate(dummy_clean(string_elements))
                         dummy_clean = dummy(1:string_elements)
                         deallocate(dummy)
+                        unique_count = 0
+                        do i=1,string_elements
+                            if (len_trim(dummy_clean(i)) == 0) cycle
+                            if (i == 1 .or. .not. any(dummy_clean(1:i-1) == dummy_clean(i))) then
+                                unique_count = unique_count + 1
+                            end if
+                        end do
+                        if (unique_count /= n_crop) then
+                            print *, 'CropParam.dat defines ', unique_count, ' land-use classes, but SoilUsesNum is ', n_crop
+                            print *, 'Execution will be aborted...'
+                            stop
+                        end if
                         n_crops_by_year = 0
                         ! find and count duplicates
                         call count_element(dummy_clean,n_crops_by_year)
@@ -245,8 +264,7 @@ module cli_crop_parameters!
                 select case (label)
                     case ('var') ! already initialized
                     case ('cropid') ! %PS% global crop id aligned with each local static slot
-                        call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, &
-                            & unit_param%crop_id_by_slot)
+                        call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%crop_id_by_slot)
                     case ('irrig')
                         call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%irrigation_class)
                     case ('cnclass')
@@ -255,6 +273,8 @@ module cli_crop_parameters!
                          call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%p_raw_const)
                     case('aint')
                         call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%a)
+                    case('maxsr')
+                        call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%d_r_max)
                     case('tlim')
                         call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%T_lim)
                     case('tcrit')
@@ -274,8 +294,7 @@ module cli_crop_parameters!
                     case('rft')
                          call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%max_RF_t)
                     case default
-                        print *, 'Skipping invalid or obsolete label <',trim(label),'> at line', line, &
-                            & ' of file: ', file_name
+                        print *, 'Skipping invalid or obsolete label <',trim(label),'> at line', line, ' of file: ', file_name
                 end select
             end if
         end do
@@ -373,7 +392,6 @@ module cli_crop_parameters!
             allocate(info_pheno(i)%iid            (sim%n_lus, sim%n_crops))
             allocate(info_pheno(i)%crop_id_by_slot(sim%n_lus, sim%n_crops)) ! %PS%
             allocate(info_pheno(i)%cycle_crop_id  (sim%n_lus, sim%n_crops)) ! %PS%
-            allocate(info_pheno(i)%cycle_crop_slot(sim%n_lus, sim%n_crops)) ! %PS%
             info_pheno(i)%n_crops_by_year     = n_crops_by_year
             info_pheno(i)%irrigation_class  = int(nan)
             info_pheno(i)%cn_class              = int(nan)
@@ -393,9 +411,8 @@ module cli_crop_parameters!
             info_pheno(i)%ii0             = 0!
             info_pheno(i)%iie             = 0!
             info_pheno(i)%iid             = 0!
-            info_pheno(i)%crop_id_by_slot = 0 ! %PS%
-            info_pheno(i)%cycle_crop_id   = 0 ! %PS%
-            info_pheno(i)%cycle_crop_slot = 0 ! %PS%
+            info_pheno(i)%crop_id_by_slot = 0
+            info_pheno(i)%cycle_crop_id   = 0
             call read_water_prod_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"WPadj.dat", &
                 & string_elements, n_crops_by_year, info_pheno(i)%wp_adj, ErrorFlag)
             call read_crop_par_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropParam.dat", &
@@ -432,7 +449,10 @@ module cli_crop_parameters!
             call read_crop_pars(info_pheno(i)%f_c,n_days,n_crop)
             call read_crop_pars(info_pheno(i)%r_stress,n_days,n_crop)
             call read_crop_pars(info_pheno(i)%crop_id,n_days,n_crop)
-            call derive_crop_cycles(info_pheno(i),n_days,pars%depth%ze_fix)
+            if (.not. allocated(info_pheno(i)%static)) then
+                call build_crop_static_registry(info_pheno(i), pars%depth%ze_fix) ! %PS%
+            end if
+            call derive_crop_cycles(info_pheno(i),n_days)
         end do
     end subroutine read_all_crop_pars
 
@@ -627,12 +647,11 @@ module cli_crop_parameters!
         end do!
     end subroutine read_all_crop_pars_legacy!
 
-    subroutine derive_crop_cycles(pheno, n_days, ze_fix)
+    subroutine derive_crop_cycles(pheno, n_days)
         ! %PS% Build crop-cycle boundaries in completion order. A crop present at
         ! both ends of the calendar is one crossing-year crop cycle.
         type(crop_pheno_info), intent(inout) :: pheno
         integer, intent(in) :: n_days
-        real(dp), intent(in) :: ze_fix
         integer :: lu, slot, cycle_idx, day, start_day, end_day, crop_id, first_end, last_start
         integer :: n_slots
         logical, dimension(n_days) :: crop_mask
@@ -642,7 +661,6 @@ module cli_crop_parameters!
         pheno%iie = 0
         pheno%iid = 0
         pheno%cycle_crop_id = 0
-        pheno%cycle_crop_slot = 0
 
         do lu=1,size(pheno%crop_id%tab,2)
             n_slots = pheno%n_crops_by_year(lu)
@@ -701,7 +719,6 @@ module cli_crop_parameters!
                 pheno%kcb_phases%low(lu,slot) = low_value
                 pheno%kcb_phases%high(lu,slot) = high_value
                 pheno%kcb_phases%mid(lu,slot) = mid_value
-                pheno%d_r_max(lu,slot) = maxval(pheno%z_r%tab(:,lu), mask=crop_mask) - ze_fix
             end do
 
             cycle_idx = 0
@@ -732,7 +749,6 @@ module cli_crop_parameters!
                     pheno%iid(lu,cycle_idx) = n_days-last_start+1+first_end
                 end if
                 pheno%cycle_crop_id(lu,cycle_idx) = crop_id
-                pheno%cycle_crop_slot(lu,cycle_idx) = findloc(pheno%crop_id_by_slot(lu,1:n_slots), crop_id, dim=1)
             end if
 
             day = first_end + 1
@@ -756,7 +772,6 @@ module cli_crop_parameters!
                 pheno%iie(lu,cycle_idx) = end_day
                 pheno%iid(lu,cycle_idx) = end_day-start_day+1
                 pheno%cycle_crop_id(lu,cycle_idx) = crop_id
-                pheno%cycle_crop_slot(lu,cycle_idx) = findloc(pheno%crop_id_by_slot(lu,1:n_slots), crop_id, dim=1)
             end do
 
             if (cycle_idx /= n_slots) then
@@ -802,7 +817,6 @@ module cli_crop_parameters!
             close(info_pheno(i)%crop_id%unit)! %PS%
             if(associated(info_pheno(i)%crop_id_by_slot)) deallocate(info_pheno(i)%crop_id_by_slot) ! %PS%
             if(associated(info_pheno(i)%cycle_crop_id)) deallocate(info_pheno(i)%cycle_crop_id) ! %PS%
-            if(associated(info_pheno(i)%cycle_crop_slot)) deallocate(info_pheno(i)%cycle_crop_slot) ! %PS%
         end do!
         deallocate(info_pheno)!
     end subroutine close_pheno_file!

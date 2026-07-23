@@ -581,12 +581,12 @@ module cli_simulation_manager!
             end if
             ! Writing crop parameters in cult matrix
             call populate_crop_yield_matrices(info_pheno,dir_phenofases,info_spat%domain,info_spat%soil_use_id%mat,crop_map,y)
+            call populate_crop_yield_matrices(info_pheno,dir_phenofases,info_spat%domain,nxtyr_soil_use_id%mat,nxtyr_crop_map,y) ! %PS%
             
-            ! Inizialization of kcb_low, crop ID/slot and phenological phase
+            ! Inizialization of kcb_low, crop ID and phenological phase
             pheno%k_cb_low = info_spat%domain%header%nan
             pheno%n_crop_in_year = 1
             pheno%active_crop_id = 0
-            pheno%active_crop_slot = 0
             pheno%pheno_idx = 1
 
             ! Allocation of yield variables
@@ -2443,7 +2443,6 @@ module cli_simulation_manager!
             allocate(pheno%p_day           (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%n_crop_in_year    (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%active_crop_id    (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-            allocate(pheno%active_crop_slot  (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
             allocate(pheno%pheno_idx   (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
             allocate(pheno%Ky_pheno            (imax,jmax,phases),stat=checkstat) ; if(checkstat/=0) print*,errormessage! 3d matrix
             allocate(pheno%r_stress           (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage!
@@ -2476,7 +2475,6 @@ module cli_simulation_manager!
             deallocate(pheno%p_day           )!
             deallocate(pheno%n_crop_in_year    )!
             deallocate(pheno%active_crop_id)
-            deallocate(pheno%active_crop_slot)
             deallocate(pheno%pheno_idx   )!
             deallocate(pheno%r_stress   )!
         end if!

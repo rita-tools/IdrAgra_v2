@@ -19,7 +19,7 @@ export PATH := $(MINGW64_BINDIR):$(PATH)
 
 CC = gfortran
 CPP = gfortran -cpp
-IS_RELEASE := true
+IS_RELEASE := false
 
 # -g for gdb, -O0 zero optimization or -Og
 ### for debug ###

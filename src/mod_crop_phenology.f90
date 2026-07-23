@@ -19,6 +19,24 @@ module mod_crop_phenology
         real(dp), dimension(:,:), pointer::mid  ! kcb between the 1st and 2nd stage
     end type k_cb_matrices
 
+    ! %PS% Static parameters are identified by CropId, independently of the
+    ! land-use column and crop-list position in which the crop occurs.
+    type static_crop_params
+        integer::crop_id = 0
+        integer::irrigation_class = 0
+        integer::cn_class = 0
+        real(dp)::p_raw_const = 0.0D0
+        real(dp)::a = 0.0D0
+        real(dp)::d_r_max = 0.0D0
+        real(dp)::max_RF_t = 0.0D0
+        real(dp)::T_lim = 0.0D0
+        real(dp)::T_crit = 0.0D0
+        real(dp)::HI = 0.0D0
+        real(dp)::Ky_tot = 0.0D0
+        real(dp),dimension(:),allocatable::Ky_pheno
+        real(dp),dimension(:),allocatable::wp_adj
+    end type static_crop_params
+
     type crop_pheno_info!
         ! include all crop parameters for each calculation cell
         integer,dimension(:,:),pointer::ii0                 ! start growing day of the crop [doy]
@@ -35,7 +53,7 @@ module mod_crop_phenology
         type(file_phenology_i)::crop_id                     ! %PS% global daily crop id (0 = no crop)
         integer,dimension(:,:),pointer::crop_id_by_slot     ! %PS% global id for each land-use/static slot
         integer,dimension(:,:),pointer::cycle_crop_id       ! %PS% crop id for each crop cycle in completion order
-        integer,dimension(:,:),pointer::cycle_crop_slot     ! %PS% static slot used by each crop cycle
+        type(static_crop_params),dimension(:),allocatable::static ! %PS% static parameters by CropId, read from CropParams.dat
         type(k_cb_matrices)::kcb_phases                     ! k_cb change points during phenology
         real(dp),dimension(:,:),pointer::p_raw_const        ! readily available water factor [-]
         real(dp),dimension(:,:),pointer::a                  ! interception coefficient according to the Von Hoyningen-Hune & Braden method [-]
@@ -82,7 +100,6 @@ module mod_crop_phenology
         real(dp),dimension(:,:),pointer::k_cb_old           ! k_cb of previous day
         integer,dimension(:,:),pointer::n_crop_in_year
         integer,dimension(:,:),pointer::active_crop_id      ! %PS% global crop id of the currently-in-field crop: todo: rename to just "id"?
-        integer,dimension(:,:),pointer::active_crop_slot    ! %PS% local static-parameter slot todo: rename to just "slot"?
         integer,dimension(:,:),pointer::pheno_idx           ! phenological stage index
         real(dp),dimension(:,:),pointer::r_stress           ! plant resistance to (water) stress
     end type crop_pars_matrices!
@@ -110,6 +127,105 @@ module mod_crop_phenology
     end type crop_matrices
 
     contains
+
+    subroutine build_crop_static_registry(pheno, ze_fix)
+        ! %PS% Convert the land-use/slot input layout into one static record per CropId.
+        type(crop_pheno_info), intent(inout) :: pheno
+        real(dp), intent(in) :: ze_fix
+        integer, dimension(:), allocatable :: crop_ids
+        logical, dimension(:), allocatable :: populated
+        integer :: lu, slot, crop_id, crop_idx, unique_count, total_slots
+
+        total_slots = sum(pheno%n_crops_by_year)
+        allocate(crop_ids(total_slots))
+        crop_ids = 0
+        unique_count = 0
+
+        do lu = 1, size(pheno%crop_id_by_slot, 1)
+            do slot = 1, pheno%n_crops_by_year(lu)
+                crop_id = pheno%crop_id_by_slot(lu, slot)
+                if (crop_id <= 0) then
+                    print *, 'Missing or invalid CropId mapping for land-use class ', lu, ', slot ', slot
+                    print *, 'Execution will be aborted...'
+                    stop
+                end if
+                if (unique_count == 0) then
+                    crop_idx = 0
+                else
+                    crop_idx = findloc(crop_ids(1:unique_count), crop_id, dim=1)
+                end if
+                if (crop_idx == 0) then
+                    unique_count = unique_count + 1
+                    crop_ids(unique_count) = crop_id
+                end if
+            end do
+        end do
+
+        if (allocated(pheno%static)) deallocate(pheno%static)
+        allocate(pheno%static(unique_count))
+        allocate(populated(unique_count))
+        populated = .false.
+
+        do crop_idx = 1, unique_count
+            pheno%static(crop_idx)%crop_id = crop_ids(crop_idx)
+            allocate(pheno%static(crop_idx)%Ky_pheno(size(pheno%Ky_pheno, 3)))
+            allocate(pheno%static(crop_idx)%wp_adj(size(pheno%wp_adj, 3)))
+        end do
+
+        do lu = 1, size(pheno%crop_id_by_slot, 1)
+            do slot = 1, pheno%n_crops_by_year(lu)
+                crop_id = pheno%crop_id_by_slot(lu, slot)
+                crop_idx = crop_static_index(pheno, crop_id)
+                if (.not. populated(crop_idx)) then
+                    pheno%static(crop_idx)%irrigation_class = pheno%irrigation_class(lu, slot)
+                    pheno%static(crop_idx)%cn_class         = pheno%cn_class(lu, slot)
+                    pheno%static(crop_idx)%p_raw_const      = pheno%p_raw_const(lu, slot)
+                    pheno%static(crop_idx)%a                = pheno%a(lu, slot)
+                    pheno%static(crop_idx)%d_r_max          = pheno%d_r_max(lu, slot) - ze_fix
+                    pheno%static(crop_idx)%max_RF_t         = pheno%max_RF_t(lu, slot)
+                    pheno%static(crop_idx)%T_lim            = pheno%T_lim(lu, slot)
+                    pheno%static(crop_idx)%T_crit           = pheno%T_crit(lu, slot)
+                    pheno%static(crop_idx)%HI               = pheno%HI(lu, slot)
+                    pheno%static(crop_idx)%Ky_tot           = pheno%Ky_tot(lu, slot)
+                    pheno%static(crop_idx)%Ky_pheno         = pheno%Ky_pheno(lu, slot, :)
+                    pheno%static(crop_idx)%wp_adj           = pheno%wp_adj(lu, slot, :)
+                    populated(crop_idx) = .true.
+                else if (pheno%static(crop_idx)%irrigation_class /= pheno%irrigation_class(lu, slot) .or. &
+                    & pheno%static(crop_idx)%cn_class /= pheno%cn_class(lu, slot) .or. &
+                    & pheno%static(crop_idx)%p_raw_const /= pheno%p_raw_const(lu, slot) .or. &
+                    & pheno%static(crop_idx)%a /= pheno%a(lu, slot) .or. &
+                    & pheno%static(crop_idx)%d_r_max /= pheno%d_r_max(lu, slot) - ze_fix .or. &
+                    & pheno%static(crop_idx)%max_RF_t /= pheno%max_RF_t(lu, slot) .or. &
+                    & pheno%static(crop_idx)%T_lim /= pheno%T_lim(lu, slot) .or. &
+                    & pheno%static(crop_idx)%T_crit /= pheno%T_crit(lu, slot) .or. &
+                    & pheno%static(crop_idx)%HI /= pheno%HI(lu, slot) .or. &
+                    & pheno%static(crop_idx)%Ky_tot /= pheno%Ky_tot(lu, slot) .or. &
+                    & any(pheno%static(crop_idx)%Ky_pheno /= pheno%Ky_pheno(lu, slot, :)) .or. &
+                    & any(pheno%static(crop_idx)%wp_adj /= pheno%wp_adj(lu, slot, :))) then
+                    print *, 'CropId ', crop_id, ' has inconsistent static parameters in land-use class ', lu, &
+                        & ', slot ', slot
+                    print *, 'A CropId must identify the same crop parameter file everywhere.'
+                    print *, 'Execution will be aborted...'
+                    stop
+                end if
+            end do
+        end do
+    end subroutine build_crop_static_registry
+
+    integer function crop_static_index(pheno, crop_id)
+        ! %PS% Resolve a global CropId to its weather-station static record.
+        type(crop_pheno_info), intent(in) :: pheno
+        integer, intent(in) :: crop_id
+        integer :: idx
+
+        crop_static_index = 0
+        do idx = 1, size(pheno%static)
+            if (pheno%static(idx)%crop_id == crop_id) then
+                crop_static_index = idx
+                return
+            end if
+        end do
+    end function crop_static_index
 
     subroutine make_random_emergence(info_pheno,meteo_weight,dir_meteo,domain,soiluse,crop_mat,irandom,year_length)!
         !randomization of emergence date from phenological series at meteorological stations
@@ -202,20 +318,33 @@ module mod_crop_phenology
         integer,dimension(:,:),intent(in)::soil_use
         type(crop_matrices),intent(inout)::crop_mat
         integer,intent(in)::year
-        integer::i,j,z,slot
+        integer::i,j,z,slot,crop_id,crop_idx
         
         do j=1,size(domain%mat,2)!
             do i=1,size(domain%mat,1)!
                 if(domain%mat(i,j)/=domain%header%nan)then!
                     do z=1,size(crop_mat%ii0,3)
-                        slot = info_pheno(dir_phenofases(i,j))%cycle_crop_slot(soil_use(i,j),z) ! %PS%
-                        if (slot <= 0) cycle
-                        crop_mat%wp_adj(i,j,z) = info_pheno(dir_phenofases(i,j))%wp_adj(soil_use(i,j),slot,year)
-                        crop_mat%HI(i,j,z) = info_pheno(dir_phenofases(i,j))%HI(soil_use(i,j),slot)
-                        crop_mat%Ky_tot(i,j,z) = info_pheno(dir_phenofases(i,j))%Ky_tot(soil_use(i,j),slot)
-                        crop_mat%Ky_pheno(i,j,z,:) = info_pheno(dir_phenofases(i,j))%Ky_pheno(soil_use(i,j),slot,:)
-                        crop_mat%T_crit(i,j,z) = info_pheno(dir_phenofases(i,j))%T_crit(soil_use(i,j),slot)
-                        crop_mat%T_lim(i,j,z) = info_pheno(dir_phenofases(i,j))%T_lim(soil_use(i,j),slot)
+                        crop_id = info_pheno(dir_phenofases(i,j))%cycle_crop_id(soil_use(i,j),z)
+                        if (crop_id <= 0) cycle
+                        crop_idx = crop_static_index(info_pheno(dir_phenofases(i,j)), crop_id) ! %PS%
+                        if (crop_idx <= 0) then
+                            print *, 'No static parameters found for CropId ', crop_id
+                            print *, 'Execution will be aborted...'
+                            stop
+                        end if
+                        slot = findloc(info_pheno(dir_phenofases(i,j))%crop_id_by_slot(soil_use(i,j),:), &
+                            & crop_id, dim=1)
+                        if (slot <= 0) then
+                            print *, 'CropId ', crop_id, ' is not declared for land-use class ', soil_use(i,j)
+                            print *, 'Execution will be aborted...'
+                            stop
+                        end if
+                        crop_mat%wp_adj(i,j,z) = info_pheno(dir_phenofases(i,j))%static(crop_idx)%wp_adj(year)
+                        crop_mat%HI(i,j,z) = info_pheno(dir_phenofases(i,j))%static(crop_idx)%HI
+                        crop_mat%Ky_tot(i,j,z) = info_pheno(dir_phenofases(i,j))%static(crop_idx)%Ky_tot
+                        crop_mat%Ky_pheno(i,j,z,:) = info_pheno(dir_phenofases(i,j))%static(crop_idx)%Ky_pheno
+                        crop_mat%T_crit(i,j,z) = info_pheno(dir_phenofases(i,j))%static(crop_idx)%T_crit
+                        crop_mat%T_lim(i,j,z) = info_pheno(dir_phenofases(i,j))%static(crop_idx)%T_lim
                         crop_mat%k_cb_min(i,j,z) = info_pheno(dir_phenofases(i,j))%kcb_phases%low(soil_use(i,j),slot)
                         crop_mat%k_cb_mid(i,j,z) = info_pheno(dir_phenofases(i,j))%kcb_phases%mid(soil_use(i,j),slot)
                         crop_mat%k_cb_max(i,j,z) = info_pheno(dir_phenofases(i,j))%kcb_phases%high(soil_use(i,j),slot)
@@ -380,9 +509,9 @@ module mod_crop_phenology
         type(crop_pheno_info), dimension(:), intent(in) :: info_pheno
         type(crop_pars_matrices), intent(inout) :: crop_pars_mat
         type(crop_matrices), intent(in) :: crop_mat, nxtyr_crop_mat
-        integer :: cycle_idx, active_cycle, nxtyr_active_cycle, slot, lu, doy_s
+        integer :: cycle_idx, active_cycle, nxtyr_active_cycle, crop_idx, lu, doy_s
         integer :: expected_crop_id, read_crop_id
-        real(dp) :: autumn_scale
+        real(dp) :: autumn_scale, cycle_kcb_low, cycle_kcb_mid, cycle_kcb_high
         logical :: use_next_year
         integer :: ii0, iie         ! Spatialized start and end dates of a crop cycle (i.e. in this cell)
         integer :: ref_ii0, ref_iie ! Reference start and end dates of a crop cycle (i.e. at the closest weather station, as generated by CropCoef)
@@ -429,7 +558,6 @@ module mod_crop_phenology
         ! Explicitly clears crop parameters during baresoil periods
         if (active_cycle == 0) then
             crop_pars_mat%active_crop_id(i,j)   = 0
-            crop_pars_mat%active_crop_slot(i,j) = 0
             crop_pars_mat%pheno_idx(i,j)        = 0
             crop_pars_mat%k_cb(i,j)             = 0.0D0
             crop_pars_mat%h(i,j)                = 0.0D0
@@ -458,8 +586,13 @@ module mod_crop_phenology
 
         if (crop_pars_mat%n_crop_in_year(i, j) /= active_cycle) crop_pars_mat%pheno_idx(i, j) = 1
         crop_pars_mat%n_crop_in_year(i, j) = active_cycle
-        slot = info_pheno(ws_idx(i, j))%cycle_crop_slot(lu, active_cycle)
         expected_crop_id = info_pheno(ws_idx(i, j))%cycle_crop_id(lu, active_cycle)
+        crop_idx = crop_static_index(info_pheno(ws_idx(i, j)), expected_crop_id) ! %PS%
+        if (crop_idx <= 0) then
+            print *, 'No static parameters found for CropId ', expected_crop_id
+            print *, 'Execution will be aborted...'
+            stop
+        end if
 
         if (use_next_year) then
             ii0 = max(1, min(year_length, nxtyr_crop_mat%ii0(i, j, active_cycle) + irandom(i, j)))
@@ -467,12 +600,18 @@ module mod_crop_phenology
             ref_ii0 = nxtyr_crop_mat%ii0_ref(i, j, active_cycle)
             ref_iie = nxtyr_crop_mat%iie_ref(i, j, active_cycle)
             cycle_dij = nxtyr_crop_mat%dij(i, j, active_cycle)
+            cycle_kcb_low = nxtyr_crop_mat%k_cb_min(i, j, active_cycle)
+            cycle_kcb_mid = nxtyr_crop_mat%k_cb_mid(i, j, active_cycle)
+            cycle_kcb_high = nxtyr_crop_mat%k_cb_max(i, j, active_cycle)
         else if (doy <= iie) then
             ii0 = max(1, min(year_length, crop_mat%ii0(i, j, active_cycle) + irandom(i, j)))
             iie = max(1, min(year_length, crop_mat%iie(i, j, active_cycle) + irandom(i, j)))
             ref_ii0 = crop_mat%ii0_ref(i, j, active_cycle)
             ref_iie = crop_mat%iie_ref(i, j, active_cycle)
             cycle_dij = crop_mat%dij(i, j, active_cycle)
+            cycle_kcb_low = crop_mat%k_cb_min(i, j, active_cycle)
+            cycle_kcb_mid = crop_mat%k_cb_mid(i, j, active_cycle)
+            cycle_kcb_high = crop_mat%k_cb_max(i, j, active_cycle)
         end if
 
         if ((.not. use_next_year) .and. &
@@ -496,7 +635,6 @@ module mod_crop_phenology
         end if
 
         crop_pars_mat%active_crop_id(i,j) = read_crop_id
-        crop_pars_mat%active_crop_slot(i,j) = slot
         crop_pars_mat%k_cb(i,j)           = info_pheno(ws_idx(i,j))%k_cb%tab(doy_s,lu)
         crop_pars_mat%h(i,j)              = info_pheno(ws_idx(i,j))%h%tab(doy_s,lu)
         crop_pars_mat%d_r(i,j)            = info_pheno(ws_idx(i,j))%z_r%tab(doy_s,lu)
@@ -504,21 +642,21 @@ module mod_crop_phenology
         crop_pars_mat%cn_day(i,j)         = info_pheno(ws_idx(i,j))%cn_day%tab(doy_s,lu)
         crop_pars_mat%f_c(i,j)            = info_pheno(ws_idx(i,j))%f_c%tab(doy_s,lu)
         crop_pars_mat%r_stress(i,j)       = info_pheno(ws_idx(i,j))%r_stress%tab(doy_s,lu)
-        crop_pars_mat%irrigation_class(i,j)=info_pheno(ws_idx(i,j))%irrigation_class(lu,slot)
-        crop_pars_mat%cn_class(i,j)       = info_pheno(ws_idx(i,j))%cn_class(lu,slot)
-        crop_pars_mat%p(i,j)              = info_pheno(ws_idx(i,j))%p_raw_const(lu,slot)
-        crop_pars_mat%a(i,j)              = info_pheno(ws_idx(i,j))%a(lu,slot)
-        crop_pars_mat%d_t_max(i,j)        = info_pheno(ws_idx(i,j))%d_r_max(lu,slot)
-        crop_pars_mat%RF_t_max(i,j)       = info_pheno(ws_idx(i,j))%max_RF_t(lu,slot)
-        crop_pars_mat%T_lim(i,j)          = info_pheno(ws_idx(i,j))%T_lim(lu,slot)
-        crop_pars_mat%T_crit(i,j)         = info_pheno(ws_idx(i,j))%T_crit(lu,slot)
-        crop_pars_mat%HI(i,j)             = info_pheno(ws_idx(i,j))%HI(lu,slot)
-        crop_pars_mat%Ky_tot(i,j)         = info_pheno(ws_idx(i,j))%Ky_tot(lu,slot)
-        crop_pars_mat%Ky_pheno(i,j,:)     = info_pheno(ws_idx(i,j))%Ky_pheno(lu,slot,:)
-        crop_pars_mat%k_cb_low(i,j)       = info_pheno(ws_idx(i,j))%kcb_phases%low(lu,slot)
-        crop_pars_mat%k_cb_mid(i,j)       = info_pheno(ws_idx(i,j))%kcb_phases%mid(lu,slot)
-        crop_pars_mat%k_cb_high(i,j)      = info_pheno(ws_idx(i,j))%kcb_phases%high(lu,slot)
-        crop_pars_mat%wp_adj(i,j)         = info_pheno(ws_idx(i,j))%wp_adj(lu,slot,y)
+        crop_pars_mat%irrigation_class(i,j)=info_pheno(ws_idx(i,j))%static(crop_idx)%irrigation_class
+        crop_pars_mat%cn_class(i,j)       = info_pheno(ws_idx(i,j))%static(crop_idx)%cn_class
+        crop_pars_mat%p(i,j)              = info_pheno(ws_idx(i,j))%static(crop_idx)%p_raw_const
+        crop_pars_mat%a(i,j)              = info_pheno(ws_idx(i,j))%static(crop_idx)%a
+        crop_pars_mat%d_t_max(i,j)        = info_pheno(ws_idx(i,j))%static(crop_idx)%d_r_max
+        crop_pars_mat%RF_t_max(i,j)       = info_pheno(ws_idx(i,j))%static(crop_idx)%max_RF_t
+        crop_pars_mat%T_lim(i,j)          = info_pheno(ws_idx(i,j))%static(crop_idx)%T_lim
+        crop_pars_mat%T_crit(i,j)         = info_pheno(ws_idx(i,j))%static(crop_idx)%T_crit
+        crop_pars_mat%HI(i,j)             = info_pheno(ws_idx(i,j))%static(crop_idx)%HI
+        crop_pars_mat%Ky_tot(i,j)         = info_pheno(ws_idx(i,j))%static(crop_idx)%Ky_tot
+        crop_pars_mat%Ky_pheno(i,j,:)     = info_pheno(ws_idx(i,j))%static(crop_idx)%Ky_pheno
+        crop_pars_mat%k_cb_low(i,j)       = cycle_kcb_low
+        crop_pars_mat%k_cb_mid(i,j)       = cycle_kcb_mid
+        crop_pars_mat%k_cb_high(i,j)      = cycle_kcb_high
+        crop_pars_mat%wp_adj(i,j)         = info_pheno(ws_idx(i,j))%static(crop_idx)%wp_adj(y)
     end subroutine populate_crop_cell
     
     subroutine calculate_RF_t(d_t, crop_par_mat,domain)!
