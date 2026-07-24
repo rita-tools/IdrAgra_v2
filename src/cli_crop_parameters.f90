@@ -469,8 +469,8 @@ module cli_crop_parameters!
                 crop_mask = pheno%crop_id%tab(:,lu) == slot
                 if (.not. any(crop_mask)) then
                     if (.not. missing_crop_slot_warned(lu)) then
-                        print *, 'WARNING: Crop slot ', slot, ' never occurs in land-use class ', lu
-                        print *, 'CropCoef likely overwrote an entire crop due to overlapping sow/harvest dates.'
+                        print *, 'Warning: Crop slot ', slot, ' never occurs in land-use class ', lu, &
+                                &'. CropCoef likely overwrote an entire crop due to overlapping sow/harvest dates.'
                         missing_crop_slot_warned(lu) = .true.
                     end if
                     cycle
@@ -509,7 +509,6 @@ module cli_crop_parameters!
                 end do
                 cycle_idx = 1
                 if (first_end == n_days) then
-                    ! %PS% A crop present every day is permanent, not a wrapped cycle.
                     last_start = n_days + 1
                     pheno%ii0(lu,cycle_idx) = 1
                     pheno%iie(lu,cycle_idx) = n_days

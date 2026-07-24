@@ -122,11 +122,13 @@ module mod_crop_phenology
         
         real(dp),dimension(size(crop_mat%ii0,1),size(crop_mat%ii0,2),size(crop_mat%ii0,3))::ii0_r
         real(dp),dimension(size(crop_mat%iie,1),size(crop_mat%iie,2),size(crop_mat%iie,3))::iie_r
-        integer::i,j,k,z,reference_ws
+        real(dp),dimension(size(crop_mat%iid,1),size(crop_mat%iid,2),size(crop_mat%iid,3))::weight_sum
+        integer::i,j,k,z,reference_ws,reference_slot,neighbor_cycle,cycle_idx
         
         ! initialization
         ii0_r = 0.d0
         iie_r = 0.d0
+        weight_sum = 0.d0
         
         ! spatial distribution of emergence date and phenological cycle duration by using meteorological weights
         do k=1,size(meteo_weight,3)!
@@ -134,34 +136,57 @@ module mod_crop_phenology
                 do i=1,size(domain%mat,1)!
                     if(domain%mat(i,j)/=domain%header%nan)then!
                         reference_ws = dir_meteo(i,j,1)
-                        if (any(info_pheno(dir_meteo(i,j,k))%cycle_crop_slot(soiluse(i,j),:) /= &
-                            & info_pheno(reference_ws)%cycle_crop_slot(soiluse(i,j),:))) then
-                            print *, 'Crop-slot cycle order differs between weather stations at cell ', i, j
-                            print *, 'Execution will be aborted...'
-                            stop
-                        end if
-                        ii0_r(i,j,:)   =info_pheno(dir_meteo(i,j,k))%ii0(soiluse(i,j),:)*meteo_weight(i,j,k) + ii0_r(i,j,:)
-                        iie_r(i,j,:)   =info_pheno(dir_meteo(i,j,k))%iie(soiluse(i,j),:)*meteo_weight(i,j,k) + iie_r(i,j,:)
-                        crop_mat%iid(i,j,:)=info_pheno(dir_meteo(i,j,k))%iid(soiluse(i,j),:)*meteo_weight(i,j,k) &
-                                             + crop_mat%iid(i,j,:)  ! crop cycle length (real)
+                        do z=1,size(crop_mat%ii0,3)
+                            reference_slot = info_pheno(reference_ws)%cycle_crop_slot(soiluse(i,j),z)
+                            if (reference_slot <= 0) cycle
+
+                            ! %PS% Physical cycle order can differ between stations when a
+                            ! crossing-year crop finishes before January at only some stations.
+                            ! Match spatialized dates by crop slot, using the reference station's
+                            ! cycle order for this cell.
+                            neighbor_cycle = 0
+                            do cycle_idx=1,size(info_pheno(dir_meteo(i,j,k))%cycle_crop_slot,2)
+                                if (info_pheno(dir_meteo(i,j,k))%cycle_crop_slot(soiluse(i,j),cycle_idx) == &
+                                    & reference_slot) then
+                                    neighbor_cycle = cycle_idx
+                                    exit
+                                end if
+                            end do
+                            if (neighbor_cycle == 0) cycle
+
+                            ii0_r(i,j,z) = info_pheno(dir_meteo(i,j,k))%ii0(soiluse(i,j),neighbor_cycle) * &
+                                & meteo_weight(i,j,k) + ii0_r(i,j,z)
+                            iie_r(i,j,z) = info_pheno(dir_meteo(i,j,k))%iie(soiluse(i,j),neighbor_cycle) * &
+                                & meteo_weight(i,j,k) + iie_r(i,j,z)
+                            crop_mat%iid(i,j,z) = info_pheno(dir_meteo(i,j,k))%iid(soiluse(i,j),neighbor_cycle) * &
+                                & meteo_weight(i,j,k) + crop_mat%iid(i,j,z)
+                            weight_sum(i,j,z) = weight_sum(i,j,z) + meteo_weight(i,j,k)
+                        end do
                     end if!
                 end do!                
             end do!
         end do!
 
-        do z=1,size(crop_mat%ii0,3)
-            crop_mat%ii0(:,:,z)=merge(nint(ii0_r(:,:,z)),domain%header%nan,domain%mat/=domain%header%nan)   ! emergence date
-            crop_mat%iie(:,:,z)=merge(nint(iie_r(:,:,z)),domain%header%nan,domain%mat/=domain%header%nan)   ! harvest date
-        end do
-        
         do j=1,size(domain%mat,2)!
             do i=1,size(domain%mat,1)!
                 if(domain%mat(i,j)/=domain%header%nan)then!
+                    reference_ws = dir_meteo(i,j,1)
+                    crop_mat%ii0_ref(i,j,:) = info_pheno(reference_ws)%ii0(soiluse(i,j),:)
+                    crop_mat%iie_ref(i,j,:) = info_pheno(reference_ws)%iie(soiluse(i,j),:)
+                    crop_mat%iid_ref(i,j,:) = info_pheno(reference_ws)%iid(soiluse(i,j),:)
                     do z=1,size(crop_mat%ii0,3)
-                        crop_mat%ii0_ref(i,j,:) = info_pheno(dir_meteo(i,j,1))%ii0(soiluse(i,j),:)   ! emergence date in meteorological reference series
-                        crop_mat%iie_ref(i,j,:) = info_pheno(dir_meteo(i,j,1))%iie(soiluse(i,j),:)   ! harvest date in meteorological reference series
-                        crop_mat%iid_ref(i,j,:) = info_pheno(dir_meteo(i,j,1))%iid(soiluse(i,j),:)   ! crop cycle length in meteorological reference series
-                        crop_mat%dij(i,j,:)     = crop_mat%iid_ref(i,j,:)/crop_mat%iid(i,j,:)        ! coefficient of crop cycle expansion in relation to meteorological reference series
+                        if (weight_sum(i,j,z) > 0.d0) then
+                            ii0_r(i,j,z) = ii0_r(i,j,z) / weight_sum(i,j,z)
+                            iie_r(i,j,z) = iie_r(i,j,z) / weight_sum(i,j,z)
+                            crop_mat%iid(i,j,z) = crop_mat%iid(i,j,z) / weight_sum(i,j,z)
+                        end if
+                        crop_mat%ii0(i,j,z) = nint(ii0_r(i,j,z))
+                        crop_mat%iie(i,j,z) = nint(iie_r(i,j,z))
+                        if (crop_mat%iid(i,j,z) > 0.d0 .and. crop_mat%iid_ref(i,j,z) > 0.d0) then
+                            crop_mat%dij(i,j,z) = crop_mat%iid_ref(i,j,z) / crop_mat%iid(i,j,z)
+                        else
+                            crop_mat%dij(i,j,z) = 0.d0
+                        end if
                     end do
                 end if
             end do
@@ -383,7 +408,6 @@ module mod_crop_phenology
         real(dp) :: autumn_scale
         integer :: ii0, iie         ! Spatialized start and end dates of a crop cycle (i.e. in this cell)
         integer :: ref_ii0, ref_iie ! Reference start and end dates of a crop cycle (i.e. at the closest weather station, as generated by CropCoef)
-        real(dp) :: cycle_dij       ! Reference duration divided by spatialized duration of a crop cycle
 
         lu = soil_use%mat(i, j)
         active_cycle = 0
@@ -435,10 +459,15 @@ module mod_crop_phenology
         iie = max(1, min(year_length, crop_mat%iie(i, j, active_cycle) + irandom(i, j)))
         ref_ii0 = crop_mat%ii0_ref(i, j, active_cycle)
         ref_iie = crop_mat%iie_ref(i, j, active_cycle)
-        cycle_dij = crop_mat%dij(i, j, active_cycle)
 
         if (crop_mat%ii0(i, j, active_cycle) <= crop_mat%iie(i, j, active_cycle)) then
-            doy_s = ref_ii0 + nint((doy - ii0) * cycle_dij)
+            ! %PS% Map endpoints rather than inclusive crop lengths: a local harvest
+            ! day must map exactly to the reference harvest day, not the following bare-soil day.
+            if (iie > ii0) then
+                doy_s = ref_ii0 + nint(dble(doy - ii0) * dble(ref_iie - ref_ii0) / dble(iie - ii0))
+            else
+                doy_s = ref_ii0
+            end if
         else if (doy <= iie) then
             doy_s = nint(dble(doy) * ref_iie / dble(max(1, iie)))
         else
