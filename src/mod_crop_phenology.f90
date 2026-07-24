@@ -32,6 +32,8 @@ module mod_crop_phenology
         type(file_phenology_r)::f_c                         ! cover fraction
         type(file_phenology_r)::r_stress                    ! plant resistance to water stress
         type(file_phenology_i)::cn_day                      ! %AB% soil moisture adjusted cn value 
+        type(file_phenology_i)::crop_id                     ! %PS% daily rotation slot (0 = no crop)
+        integer,dimension(:,:),pointer::cycle_crop_slot     ! %PS% rotation slot for each crop cycle in completion order
         type(k_cb_matrices)::kcb_phases                     ! k_cb change points during phenology
         real(dp),dimension(:,:),pointer::p_raw_const        ! readily available water factor [-]
         real(dp),dimension(:,:),pointer::a                  ! interception coefficient according to the Von Hoyningen-Hune & Braden method [-]
@@ -83,13 +85,13 @@ module mod_crop_phenology
 
     type crop_matrices
     ! crop_pheno_info for details    
-        integer,dimension(:,:,:),pointer::ii0
-        integer,dimension(:,:,:),pointer::iie
+        integer,dimension(:,:,:),pointer::ii0               ! sowing date
+        integer,dimension(:,:,:),pointer::iie               ! harvest date
         real(dp),dimension(:,:,:),pointer::iid
-        integer,dimension(:,:,:),pointer::ii0_ref           ! harvest date in meteorological reference series
+        integer,dimension(:,:,:),pointer::ii0_ref           ! sowing date in meteorological reference series
         integer,dimension(:,:,:),pointer::iie_ref           ! harvest date in meteorological reference series
         real(dp),dimension(:,:,:),pointer::iid_ref          ! crop cycle length in meteorological reference series
-        real(dp),dimension(:,:,:),pointer::dij              ! coefficient of crop cycle expansion in relation to meteorological reference series
+        real(dp),dimension(:,:,:),pointer::dij              ! coefficient of crop cycle expansion in relation to meteorological reference series (e.g. 0.95-->cycle 5% shorter; 1.10-->cycle 9% longer)
         integer,dimension(:,:,:),pointer::TSP_high
         integer,dimension(:,:,:),pointer::TSP_low
         real(dp),dimension(:,:,:),pointer::wp_adj
@@ -120,7 +122,7 @@ module mod_crop_phenology
         
         real(dp),dimension(size(crop_mat%ii0,1),size(crop_mat%ii0,2),size(crop_mat%ii0,3))::ii0_r
         real(dp),dimension(size(crop_mat%iie,1),size(crop_mat%iie,2),size(crop_mat%iie,3))::iie_r
-        integer::i,j,k,z
+        integer::i,j,k,z,reference_ws
         
         ! initialization
         ii0_r = 0.d0
@@ -131,6 +133,13 @@ module mod_crop_phenology
             do j=1,size(domain%mat,2)!
                 do i=1,size(domain%mat,1)!
                     if(domain%mat(i,j)/=domain%header%nan)then!
+                        reference_ws = dir_meteo(i,j,1)
+                        if (any(info_pheno(dir_meteo(i,j,k))%cycle_crop_slot(soiluse(i,j),:) /= &
+                            & info_pheno(reference_ws)%cycle_crop_slot(soiluse(i,j),:))) then
+                            print *, 'Crop-slot cycle order differs between weather stations at cell ', i, j
+                            print *, 'Execution will be aborted...'
+                            stop
+                        end if
                         ii0_r(i,j,:)   =info_pheno(dir_meteo(i,j,k))%ii0(soiluse(i,j),:)*meteo_weight(i,j,k) + ii0_r(i,j,:)
                         iie_r(i,j,:)   =info_pheno(dir_meteo(i,j,k))%iie(soiluse(i,j),:)*meteo_weight(i,j,k) + iie_r(i,j,:)
                         crop_mat%iid(i,j,:)=info_pheno(dir_meteo(i,j,k))%iid(soiluse(i,j),:)*meteo_weight(i,j,k) &
@@ -189,27 +198,53 @@ module mod_crop_phenology
         integer,dimension(:,:),intent(in)::soil_use
         type(crop_matrices),intent(inout)::crop_mat
         integer,intent(in)::year
-        integer::i,j
+        integer::i,j,z,slot
         
         do j=1,size(domain%mat,2)!
             do i=1,size(domain%mat,1)!
                 if(domain%mat(i,j)/=domain%header%nan)then!
-                    crop_mat%wp_adj(i,j,:) = info_pheno(dir_phenofases(i,j))%wp_adj(soil_use(i,j),:,year)
-                    crop_mat%HI(i,j,:) = info_pheno(dir_phenofases(i,j))%HI(soil_use(i,j),:)
-                    crop_mat%Ky_tot(i,j,:) = info_pheno(dir_phenofases(i,j))%Ky_tot(soil_use(i,j),:)
-                    crop_mat%Ky_pheno(i,j,:,:) = info_pheno(dir_phenofases(i,j))%Ky_pheno(soil_use(i,j),:,:)
-                    crop_mat%T_crit(i,j,:) = info_pheno(dir_phenofases(i,j))%T_crit(soil_use(i,j),:)
-                    crop_mat%T_lim(i,j,:) = info_pheno(dir_phenofases(i,j))%T_lim(soil_use(i,j),:)
-                    crop_mat%k_cb_min(i,j,:) = info_pheno(dir_phenofases(i,j))%kcb_phases%low(soil_use(i,j),:)
-                    crop_mat%k_cb_mid(i,j,:) = info_pheno(dir_phenofases(i,j))%kcb_phases%mid(soil_use(i,j),:)
-                    crop_mat%k_cb_max(i,j,:) = info_pheno(dir_phenofases(i,j))%kcb_phases%high(soil_use(i,j),:)
+                    do z=1,size(crop_mat%ii0,3)
+                        slot = info_pheno(dir_phenofases(i,j))%cycle_crop_slot(soil_use(i,j),z)
+                        if (slot <= 0) then
+                            cycle
+                        end if
+                        crop_mat%wp_adj(i,j,z)     = info_pheno(dir_phenofases(i,j))%wp_adj(soil_use(i,j),slot,year)
+                        crop_mat%HI(i,j,z)         = info_pheno(dir_phenofases(i,j))%HI(soil_use(i,j),slot)
+                        crop_mat%Ky_tot(i,j,z)     = info_pheno(dir_phenofases(i,j))%Ky_tot(soil_use(i,j),slot)
+                        crop_mat%Ky_pheno(i,j,z,:) = info_pheno(dir_phenofases(i,j))%Ky_pheno(soil_use(i,j),slot,:)
+                        crop_mat%T_crit(i,j,z)     = info_pheno(dir_phenofases(i,j))%T_crit(soil_use(i,j),slot)
+                        crop_mat%T_lim(i,j,z)      = info_pheno(dir_phenofases(i,j))%T_lim(soil_use(i,j),slot)
+                        crop_mat%k_cb_min(i,j,z)   = info_pheno(dir_phenofases(i,j))%kcb_phases%low(soil_use(i,j),slot)
+                        crop_mat%k_cb_mid(i,j,z)   = info_pheno(dir_phenofases(i,j))%kcb_phases%mid(soil_use(i,j),slot)
+                        crop_mat%k_cb_max(i,j,z)   = info_pheno(dir_phenofases(i,j))%kcb_phases%high(soil_use(i,j),slot)
+                    end do
                 end if
             end do
         end do
 
     end subroutine populate_crop_yield_matrices
 
-    subroutine populate_crop_pars_matrices(crop_pars_mat,info_pheno,irandom,doy,ws_idx,&
+    subroutine populate_crop_pars_matrices(crop_pars_mat, info_pheno, irandom, doy, ws_idx, domain, &
+                                         & soil_use, y, year_length, crop_mat)
+        integer,intent(in) :: doy, year_length, y
+        type(grid_i),intent(in) :: domain, soil_use
+        integer,dimension(:,:),intent(in) :: ws_idx, irandom
+        type(crop_pheno_info),dimension(:),intent(in) :: info_pheno
+        type(crop_pars_matrices),intent(inout) :: crop_pars_mat
+        type(crop_matrices),intent(in) :: crop_mat
+        integer :: i, j
+
+        do j=1,size(domain%mat,2)
+            do i=1,size(domain%mat,1)
+                if(domain%mat(i,j) /= domain%header%nan) then
+                    call populate_crop_cell(i,j,crop_pars_mat,info_pheno,irandom,doy,ws_idx, &
+                        & soil_use,y,year_length,crop_mat)
+                end if
+            end do
+        end do
+    end subroutine populate_crop_pars_matrices
+
+    subroutine populate_crop_pars_matrices_legacy(crop_pars_mat,info_pheno,irandom,doy,ws_idx,&
                                            & domain,soil_use,y, year_length, crop_mat)!
         ! populate crop parameters matrices from weather stations time series
         integer,intent(in)::doy,year_length,y!
@@ -333,7 +368,117 @@ module mod_crop_phenology
                 end if scans_domain
             end do!
         end do!
-    end subroutine populate_crop_pars_matrices!
+    end subroutine populate_crop_pars_matrices_legacy!
+
+    subroutine populate_crop_cell(i, j, crop_pars_mat, info_pheno, irandom, doy, ws_idx, &
+                                & soil_use, y, year_length, crop_mat)
+        integer, intent(in) :: i, j, doy, y, year_length
+        integer, dimension(:,:), intent(in) :: irandom, ws_idx
+        type(grid_i), intent(in) :: soil_use
+        type(crop_pheno_info), dimension(:), intent(in) :: info_pheno
+        type(crop_pars_matrices), intent(inout) :: crop_pars_mat
+        type(crop_matrices), intent(in) :: crop_mat
+        integer :: cycle_idx, active_cycle, slot, lu, doy_s
+        integer :: read_crop_slot
+        real(dp) :: autumn_scale
+        integer :: ii0, iie         ! Spatialized start and end dates of a crop cycle (i.e. in this cell)
+        integer :: ref_ii0, ref_iie ! Reference start and end dates of a crop cycle (i.e. at the closest weather station, as generated by CropCoef)
+        real(dp) :: cycle_dij       ! Reference duration divided by spatialized duration of a crop cycle
+
+        lu = soil_use%mat(i, j)
+        active_cycle = 0
+        do cycle_idx = 1, size(crop_mat%ii0, 3)
+            if (info_pheno(ws_idx(i, j))%cycle_crop_slot(lu, cycle_idx) <= 0) cycle
+            ii0 = max(1, min(year_length, crop_mat%ii0(i, j, cycle_idx) + irandom(i, j)))
+            iie = max(1, min(year_length, crop_mat%iie(i, j, cycle_idx) + irandom(i, j)))
+            if (crop_mat%ii0(i, j, cycle_idx) <= crop_mat%iie(i, j, cycle_idx)) then
+                if (doy >= ii0 .and. doy <= iie) active_cycle = cycle_idx
+            else
+                if (doy <= iie .or. doy >= ii0) active_cycle = cycle_idx
+            end if
+            if (active_cycle > 0) exit
+        end do
+
+        ! Explicitly clears crop parameters during baresoil periods
+        if (active_cycle == 0) then
+            crop_pars_mat%pheno_idx(i,j)        = 0
+            crop_pars_mat%k_cb(i,j)             = 0.0D0
+            crop_pars_mat%h(i,j)                = 0.0D0
+            crop_pars_mat%d_r(i,j)              = 0.0D0
+            crop_pars_mat%lai(i,j)              = 0.0D0
+            crop_pars_mat%cn_day(i,j)           = 0
+            crop_pars_mat%f_c(i,j)              = 0.0D0
+            crop_pars_mat%r_stress(i,j)         = 0.0D0
+            crop_pars_mat%irrigation_class(i,j) = 0
+            crop_pars_mat%cn_class(i,j)         = 0
+            crop_pars_mat%p(i,j)                = 0.0D0
+            crop_pars_mat%a(i,j)                = 0.0D0
+            crop_pars_mat%d_t_max(i,j)          = 0.0D0
+            crop_pars_mat%RF_t_max(i,j)         = 0.0D0
+            crop_pars_mat%T_lim(i,j)            = 0.0D0
+            crop_pars_mat%T_crit(i,j)           = 0.0D0
+            crop_pars_mat%HI(i,j)               = 0.0D0
+            crop_pars_mat%Ky_tot(i,j)           = 0.0D0
+            crop_pars_mat%Ky_pheno(i,j,:)       = 0.0D0
+            crop_pars_mat%k_cb_low(i,j)         = 0.0D0
+            crop_pars_mat%k_cb_mid(i,j)         = 0.0D0
+            crop_pars_mat%k_cb_high(i,j)        = 0.0D0
+            crop_pars_mat%wp_adj(i,j)           = 0.0D0
+            return
+        end if
+
+        if (crop_pars_mat%n_crop_in_year(i, j) /= active_cycle) crop_pars_mat%pheno_idx(i, j) = 1
+        crop_pars_mat%n_crop_in_year(i, j) = active_cycle
+        slot = info_pheno(ws_idx(i, j))%cycle_crop_slot(lu, active_cycle)
+
+        ii0 = max(1, min(year_length, crop_mat%ii0(i, j, active_cycle) + irandom(i, j)))
+        iie = max(1, min(year_length, crop_mat%iie(i, j, active_cycle) + irandom(i, j)))
+        ref_ii0 = crop_mat%ii0_ref(i, j, active_cycle)
+        ref_iie = crop_mat%iie_ref(i, j, active_cycle)
+        cycle_dij = crop_mat%dij(i, j, active_cycle)
+
+        if (crop_mat%ii0(i, j, active_cycle) <= crop_mat%iie(i, j, active_cycle)) then
+            doy_s = ref_ii0 + nint((doy - ii0) * cycle_dij)
+        else if (doy <= iie) then
+            doy_s = nint(dble(doy) * ref_iie / dble(max(1, iie)))
+        else
+            autumn_scale = dble(year_length - ref_ii0) / &
+                & dble(max(1, year_length - ii0))
+            doy_s = ref_ii0 + nint(dble(doy - ii0) * autumn_scale)
+        end if
+        doy_s = max(1, min(year_length, doy_s))
+
+        read_crop_slot = info_pheno(ws_idx(i, j))%crop_id%tab(doy_s, lu)
+        if (read_crop_slot /= slot) then
+            print *, 'Shifted crop-slot mismatch at cell/day ', i, j, doy
+            print *, 'Expected/read slot: ', slot, read_crop_slot, '; shifted day: ', doy_s
+            print *, 'Execution will be aborted...'
+            stop
+        end if
+
+        crop_pars_mat%k_cb(i,j)           = info_pheno(ws_idx(i,j))%k_cb%tab(doy_s,lu)
+        crop_pars_mat%h(i,j)              = info_pheno(ws_idx(i,j))%h%tab(doy_s,lu)
+        crop_pars_mat%d_r(i,j)            = info_pheno(ws_idx(i,j))%z_r%tab(doy_s,lu)
+        crop_pars_mat%lai(i,j)            = info_pheno(ws_idx(i,j))%lai%tab(doy_s,lu)
+        crop_pars_mat%cn_day(i,j)         = info_pheno(ws_idx(i,j))%cn_day%tab(doy_s,lu)
+        crop_pars_mat%f_c(i,j)            = info_pheno(ws_idx(i,j))%f_c%tab(doy_s,lu)
+        crop_pars_mat%r_stress(i,j)       = info_pheno(ws_idx(i,j))%r_stress%tab(doy_s,lu)
+        crop_pars_mat%irrigation_class(i,j)=info_pheno(ws_idx(i,j))%irrigation_class(lu,slot)
+        crop_pars_mat%cn_class(i,j)       = info_pheno(ws_idx(i,j))%cn_class(lu,slot)
+        crop_pars_mat%p(i,j)              = info_pheno(ws_idx(i,j))%p_raw_const(lu,slot)
+        crop_pars_mat%a(i,j)              = info_pheno(ws_idx(i,j))%a(lu,slot)
+        crop_pars_mat%d_t_max(i,j)        = info_pheno(ws_idx(i,j))%d_r_max(lu,slot)
+        crop_pars_mat%RF_t_max(i,j)       = info_pheno(ws_idx(i,j))%max_RF_t(lu,slot)
+        crop_pars_mat%T_lim(i,j)          = info_pheno(ws_idx(i,j))%T_lim(lu,slot)
+        crop_pars_mat%T_crit(i,j)         = info_pheno(ws_idx(i,j))%T_crit(lu,slot)
+        crop_pars_mat%HI(i,j)             = info_pheno(ws_idx(i,j))%HI(lu,slot)
+        crop_pars_mat%Ky_tot(i,j)         = info_pheno(ws_idx(i,j))%Ky_tot(lu,slot)
+        crop_pars_mat%Ky_pheno(i,j,:)     = info_pheno(ws_idx(i,j))%Ky_pheno(lu,slot,:)
+        crop_pars_mat%k_cb_low(i,j)       = info_pheno(ws_idx(i,j))%kcb_phases%low(lu,slot)
+        crop_pars_mat%k_cb_mid(i,j)       = info_pheno(ws_idx(i,j))%kcb_phases%mid(lu,slot)
+        crop_pars_mat%k_cb_high(i,j)      = info_pheno(ws_idx(i,j))%kcb_phases%high(lu,slot)
+        crop_pars_mat%wp_adj(i,j)         = info_pheno(ws_idx(i,j))%wp_adj(lu,slot,y)
+    end subroutine populate_crop_cell
     
     subroutine calculate_RF_t(d_t, crop_par_mat,domain)!
         ! calculate root fraction in both evaporative and transpirative layer 

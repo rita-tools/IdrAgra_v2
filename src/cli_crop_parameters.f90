@@ -8,6 +8,8 @@ module cli_crop_parameters!
     
     implicit none!
 
+    logical, dimension(:), allocatable, save :: missing_crop_slot_warned ! %PS%
+
     interface read_crop_pars!
         module procedure read_crop_pars_r, read_crop_pars_i
     end interface!
@@ -228,7 +230,7 @@ module cli_crop_parameters!
         open(unit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios )!
         if (ios /= 0 ) then
             print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. &
-                & Execution will be aborted..."
+                & The CropCoef version you used to generate inputs might be outdated. Execution will be aborted..."
             stop
         end if
         
@@ -271,8 +273,7 @@ module cli_crop_parameters!
                     case('rft')
                          call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%max_RF_t)
                     case default
-                        print *, 'Skipping invalid or obsolete label <',trim(label),'> at line', line, &
-                            & ' of file: ', file_name
+                        print *, 'Skipping invalid or obsolete label <',trim(label),'> at line', line, ' of file: ', file_name
                 end select
             end if
         end do
@@ -344,6 +345,7 @@ module cli_crop_parameters!
             call open_daily_crop_par_file(info_pheno(i)%f_c%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"fc.dat",errorflag)
             ! EDIT: add support for seasonal p_raw
             call open_daily_crop_par_file(info_pheno(i)%r_stress%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"r_stress.dat",errorflag)
+            call open_daily_crop_par_file(info_pheno(i)%crop_id%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropId.dat",errorflag)
             !
             ! TODO - add tabulated ky
             
@@ -367,6 +369,7 @@ module cli_crop_parameters!
             allocate(info_pheno(i)%ii0            (sim%n_lus, sim%n_crops))
             allocate(info_pheno(i)%iie            (sim%n_lus, sim%n_crops))
             allocate(info_pheno(i)%iid            (sim%n_lus, sim%n_crops))
+            allocate(info_pheno(i)%cycle_crop_slot(sim%n_lus, sim%n_crops))
             info_pheno(i)%n_crops_by_year     = n_crops_by_year
             info_pheno(i)%irrigation_class  = int(nan)
             info_pheno(i)%cn_class              = int(nan)
@@ -386,6 +389,7 @@ module cli_crop_parameters!
             info_pheno(i)%ii0             = 0!
             info_pheno(i)%iie             = 0!
             info_pheno(i)%iid             = 0!
+            info_pheno(i)%cycle_crop_slot = 0
             call read_water_prod_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"WPadj.dat", &
                 & string_elements, n_crops_by_year, info_pheno(i)%wp_adj, ErrorFlag)
             call read_crop_par_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropParam.dat", &
@@ -406,196 +410,154 @@ module cli_crop_parameters!
     end subroutine init_crop_phenology_pars!
 
     subroutine read_all_crop_pars(n_days,n_crop,info_pheno,pars)!
-        ! read all daily crop parameters by the number of days over the opened files
+        ! %PS% Read one calendar year and derive crop cycles exclusively from CropId.
         implicit none!
-        integer,intent(in)::n_days!
-        integer,intent(in)::n_crop!
-        type(parameters),intent(in)::pars!
-        type(crop_pheno_info),dimension(:),intent(inout)::info_pheno!
-        integer:: i, doy!
-        integer:: crop_idx ! current crop index
-        integer:: m, cs, ii_idx, ij_idx
-        logical, dimension(n_days)::dummy_array
-        !!
-        do i=1,size(info_pheno)!
-            call read_crop_pars(info_pheno(i)%k_cb,n_days,n_crop)!
-            call read_crop_pars(info_pheno(i)%h,n_days,n_crop)!
-            call read_crop_pars(info_pheno(i)%z_r,n_days,n_crop)!
-            call read_crop_pars(info_pheno(i)%lai,n_days,n_crop)!
-            call read_crop_pars(info_pheno(i)%cn_day,n_days,n_crop)!
-            call read_crop_pars(info_pheno(i)%f_c,n_days,n_crop)! %RR%
-            call read_crop_pars(info_pheno(i)%r_stress,n_days,n_crop)! %EAC%
-        
-            ! find minimum and maximum k_cb value to define stages
-            info_pheno(i)%kcb_phases%low(:,1) = minval(info_pheno(i)%k_cb%tab, dim=1) ! low not to be re-calculated
-            info_pheno(i)%kcb_phases%high(:,1) = maxval(info_pheno(i)%k_cb%tab, dim=1)
-            
-            do crop_idx = 1, size(info_pheno(i)%k_cb%tab, 2)
-                if (info_pheno(i)%n_crops_by_year(crop_idx) > 1) then   ! if there are more crops, populate also the other row
-                    ij_idx = 1 ! init the index to the beginning of the serie
-                    do cs = 1, info_pheno(i)%n_crops_by_year(crop_idx)
-                        ! low
-                        info_pheno(i)%kcb_phases%low(crop_idx,cs) = info_pheno(i)%kcb_phases%low(crop_idx,1) ! low not to be recalculated
-                        ! definition of stages
-                        do ii_idx = ij_idx, size(info_pheno(i)%k_cb%tab, 1)
-                            if (info_pheno(i)%k_cb%tab(ii_idx,crop_idx) > 0) exit ! find the first value > 0 (start crop)
-                        end do
-                        do ij_idx = ii_idx, size(info_pheno(i)%k_cb%tab, 1)
-                            if (info_pheno(i)%k_cb%tab(ij_idx,crop_idx) == 0) exit ! find the following first value == 0 (end crop)
-                        end do
-                        ! high
-                        dummy_array = .false.
-                        ! limit to the maximum number of days in the year
-                        if (ij_idx > n_days) ij_idx = n_days
-                        dummy_array(ii_idx:ij_idx) = .true.
-                        info_pheno(i)%kcb_phases%high(crop_idx,cs) = &
-                            & maxval(info_pheno(i)%k_cb%tab(:,crop_idx), dim=1, mask=dummy_array) ! select the greatest between ii_idx and ij_idx
-                        ! mid
-                        do m = ii_idx+1, ij_idx
-                            if (info_pheno(i)%k_cb%tab(m,crop_idx) /= info_pheno(i)%kcb_phases%low(crop_idx,1) &
-                                & .and. info_pheno(i)%k_cb%tab(m,crop_idx) /= info_pheno(i)%kcb_phases%high(crop_idx,cs) &
-                                & .and. info_pheno(i)%k_cb%tab(m,crop_idx) == info_pheno(i)%k_cb%tab(m-1,crop_idx)) then
-                                info_pheno(i)%kcb_phases%mid(crop_idx,cs) = info_pheno(i)%k_cb%tab(m,crop_idx) ! find the mid value between ii_idx and ij_idx
-                                exit
-                            end if
-                        end do
-                    end do
-                else
-                    do m = 2, size(info_pheno(i)%k_cb%tab, 1)
-                        if (info_pheno(i)%k_cb%tab(m,crop_idx) /= info_pheno(i)%kcb_phases%low(crop_idx,1) &
-                            & .and. info_pheno(i)%k_cb%tab(m,crop_idx) /= info_pheno(i)%kcb_phases%high(crop_idx,1) &
-                            & .and. info_pheno(i)%k_cb%tab(m,crop_idx) == info_pheno(i)%k_cb%tab(m-1,crop_idx)) then
-                            info_pheno(i)%kcb_phases%mid(crop_idx,1) = info_pheno(i)%k_cb%tab(m,crop_idx)
+        integer,intent(in)::n_days,n_crop
+        type(parameters),intent(in)::pars
+        type(crop_pheno_info),dimension(:),intent(inout)::info_pheno
+        integer::i
+
+        do i=1,size(info_pheno)
+            call read_crop_pars(info_pheno(i)%k_cb,n_days,n_crop)
+            call read_crop_pars(info_pheno(i)%h,n_days,n_crop)
+            call read_crop_pars(info_pheno(i)%z_r,n_days,n_crop)
+            call read_crop_pars(info_pheno(i)%lai,n_days,n_crop)
+            call read_crop_pars(info_pheno(i)%cn_day,n_days,n_crop)
+            call read_crop_pars(info_pheno(i)%f_c,n_days,n_crop)
+            call read_crop_pars(info_pheno(i)%r_stress,n_days,n_crop)
+            call read_crop_pars(info_pheno(i)%crop_id,n_days,n_crop)
+            call derive_crop_cycles(info_pheno(i), n_days, pars%depth%ze_fix)
+        end do
+    end subroutine read_all_crop_pars
+
+    subroutine derive_crop_cycles(pheno, n_days, ze_fix)
+        type(crop_pheno_info), intent(inout) :: pheno
+        integer, intent(in) :: n_days
+        real(dp), intent(in) :: ze_fix
+        integer :: lu, slot, cycle_idx, day, start_day, end_day, crop_slot, first_end, last_start
+        integer :: n_slots, n_present_slots
+        logical, dimension(n_days) :: crop_mask
+        real(dp) :: low_value, high_value, mid_value
+
+        pheno%ii0 = 0
+        pheno%iie = 0
+        pheno%iid = 0
+        pheno%cycle_crop_slot = 0
+
+        if (.not. allocated(missing_crop_slot_warned)) then
+            allocate(missing_crop_slot_warned(size(pheno%crop_id%tab,2)))
+            missing_crop_slot_warned = .false.
+        end if
+
+        do lu=1,size(pheno%crop_id%tab,2)
+            n_slots = pheno%n_crops_by_year(lu)
+            if (n_slots < 1) cycle
+
+            do day=1,n_days
+                crop_slot = pheno%crop_id%tab(day,lu)
+                if (crop_slot < 0 .or. crop_slot > n_slots) then
+                    print *, 'Invalid crop slot ', crop_slot, ' at day ', day, ', land-use class ', lu
+                    print *, 'Expected a value between 0 and ', n_slots
+                    print *, 'Execution will be aborted...'
+                    stop
+                end if
+            end do
+
+            ! Derive crop-specific daily-series parameters by rotation slot.
+            n_present_slots = 0
+            do slot=1,n_slots
+                crop_mask = pheno%crop_id%tab(:,lu) == slot
+                if (.not. any(crop_mask)) then
+                    if (.not. missing_crop_slot_warned(lu)) then
+                        print *, 'WARNING: Crop slot ', slot, ' never occurs in land-use class ', lu
+                        print *, 'CropCoef likely overwrote an entire crop due to overlapping sow/harvest dates.'
+                        missing_crop_slot_warned(lu) = .true.
+                    end if
+                    cycle
+                end if
+                n_present_slots = n_present_slots + 1
+                ! %PS% Preserve the existing annual/permanent convention: annual
+                ! land uses have a zero Kcb outside crop-in-field periods.
+                low_value = minval(pheno%k_cb%tab(:,lu))
+                high_value = maxval(pheno%k_cb%tab(:,lu), mask=crop_mask)
+                mid_value = high_value
+                do day=2,n_days
+                    if (crop_mask(day) .and. crop_mask(day-1)) then
+                        if (pheno%k_cb%tab(day,lu) == pheno%k_cb%tab(day-1,lu) .and. &
+                            & pheno%k_cb%tab(day,lu) > low_value .and. pheno%k_cb%tab(day,lu) < high_value) then
+                            mid_value = pheno%k_cb%tab(day,lu)
                             exit
                         end if
-                    end do
-                end if
+                    end if
+                end do
+                pheno%kcb_phases%low(lu,slot) = low_value
+                pheno%kcb_phases%high(lu,slot) = high_value
+                pheno%kcb_phases%mid(lu,slot) = mid_value
+                pheno%d_r_max(lu,slot) = maxval(pheno%z_r%tab(:,lu), mask=crop_mask) - ze_fix
             end do
-        end do!
-        
-        do i=1,size(info_pheno)
-            ! Calculate max thickness of the transpirative layer
-            info_pheno(i)%d_r_max(:,1) = maxval(info_pheno(i)%z_r%tab, dim=1)-pars%depth%ze_fix
-            
-            do crop_idx = 1, size(info_pheno(i)%z_r%tab, 2)
-                if (info_pheno(i)%n_crops_by_year(crop_idx) > 1) then
-                    ij_idx = 1 ! index initialization
-                    do cs = 1, info_pheno(i)%n_crops_by_year(crop_idx)
-                        do ii_idx = ij_idx, size(info_pheno(i)%z_r%tab, 1)
-                            if (info_pheno(i)%z_r%tab(ii_idx,crop_idx) > 0) exit
-                        end do
-                        do ij_idx = ii_idx, size(info_pheno(i)%z_r%tab, 1)
-                            if (info_pheno(i)%z_r%tab(ij_idx,crop_idx) == 0) exit
-                        end do
-                        dummy_array = .false.
-                        if (ij_idx > n_days) ij_idx = n_days
-                        dummy_array(ii_idx:ij_idx) = .true.
-                        info_pheno(i)%d_r_max(crop_idx,cs) = maxval(info_pheno(i)%z_r%tab(:,crop_idx), dim=1, mask=dummy_array)-pars%depth%ze_fix
+
+            cycle_idx = 0
+            first_end = 0
+            last_start = n_days + 1
+
+            if (pheno%crop_id%tab(1,lu) > 0 .and. &
+                & pheno%crop_id%tab(1,lu) == pheno%crop_id%tab(n_days,lu)) then
+                crop_slot = pheno%crop_id%tab(1,lu)
+                first_end = 1
+                do while (first_end < n_days .and. pheno%crop_id%tab(first_end+1,lu) == crop_slot)
+                    first_end = first_end + 1
+                end do
+                cycle_idx = 1
+                if (first_end == n_days) then
+                    ! %PS% A crop present every day is permanent, not a wrapped cycle.
+                    last_start = n_days + 1
+                    pheno%ii0(lu,cycle_idx) = 1
+                    pheno%iie(lu,cycle_idx) = n_days
+                    pheno%iid(lu,cycle_idx) = n_days
+                else
+                    last_start = n_days
+                    do while (last_start > 1 .and. pheno%crop_id%tab(last_start-1,lu) == crop_slot)
+                        last_start = last_start - 1
                     end do
+                    pheno%ii0(lu,cycle_idx) = last_start
+                    pheno%iie(lu,cycle_idx) = first_end
+                    pheno%iid(lu,cycle_idx) = n_days-last_start+1+first_end
                 end if
+                pheno%cycle_crop_slot(lu,cycle_idx) = crop_slot
+            end if
+
+            day = first_end + 1
+            do while (day <= min(n_days,last_start-1))
+                if (pheno%crop_id%tab(day,lu) == 0) then
+                    day = day + 1
+                    cycle
+                end if
+                crop_slot = pheno%crop_id%tab(day,lu)
+                start_day = day
+                do while (day <= min(n_days,last_start-1) .and. pheno%crop_id%tab(day,lu) == crop_slot)
+                    day = day + 1
+                end do
+                end_day = day - 1
+                cycle_idx = cycle_idx + 1
+                if (cycle_idx > size(pheno%ii0,2)) then
+                    print *, 'Too many crop cycles in land-use class ', lu
+                    stop
+                end if
+                pheno%ii0(lu,cycle_idx) = start_day
+                pheno%iie(lu,cycle_idx) = end_day
+                pheno%iid(lu,cycle_idx) = end_day-start_day+1
+                pheno%cycle_crop_slot(lu,cycle_idx) = crop_slot
             end do
+
+            if (cycle_idx /= n_present_slots) then
+                print *, 'CropId.dat defines ', cycle_idx, ' crop cycles for land-use class ', lu, &
+                    & ', but ', n_present_slots, ' declared slots occur in the daily series.'
+                print *, 'Execution will be aborted...'
+                stop
+            end if
         end do
-        
-        do i=1,size(info_pheno)  ! loop over phenological dataset
-            do crop_idx=1,size(info_pheno(i)%k_cb%tab,2)  ! loop over crops
-                if (info_pheno(i)%n_crops_by_year(crop_idx) == 1) then   ! permanent or annual single crops  (also winter wheat)
-                    if (info_pheno(i)%kcb_phases%low(crop_idx,1) == 0) then                ! not permanent crops
-                        ! calculate the length of the crop cycle
-                        info_pheno(i)%iid(crop_idx,1)= &
-                            & count(info_pheno(i)%k_cb%tab(:,crop_idx)>info_pheno(i)%kcb_phases%low(crop_idx,1)) + 1
-                        
-                        ! calculate the emergence day of the crop
-                        do doy=1,size(info_pheno(i)%k_cb%tab,1)        ! loop over days 
-                            if(info_pheno(i)%k_cb%tab(doy,crop_idx) >  info_pheno(i)%kcb_phases%low(crop_idx,1)) then!
-                                info_pheno(i)%ii0(crop_idx,1)=doy       ! ii0: crop emergence doy
-                                ! ii0 = 0 in case of winter crop
-                                exit
-                            end if
-                        end do
-                        
-                        ! calculate the harvest day
-                        do doy=n_days-1,1,-1 ! loop over days starting from the last
-                            if(info_pheno(i)%k_cb%tab(doy,crop_idx) >  info_pheno(i)%kcb_phases%low(crop_idx,1)) then!
-                                info_pheno(i)%iie(crop_idx,1)=doy       ! iee: crop harvest doy
-                                exit
-                            end if
-                        end do
-                        
-                        if (info_pheno(i)%ii0(crop_idx,1)==1) then                         ! winter crop (ii0==1, TODO: ?)
-                            do doy=1,size(info_pheno(i)%k_cb%tab,1)    ! loop over days
-                                if(info_pheno(i)%k_cb%tab(doy,crop_idx) ==  0.)then!
-                                    info_pheno(i)%iie(crop_idx,1)=doy   ! iie: harvest doy = 1st day with k_cb = 0 after the crop period
-                                    info_pheno(i)%ii0(crop_idx,1)= &
-                                        & n_days - info_pheno(i)%iid(crop_idx,1) + info_pheno(i)%iie(crop_idx,1) + 1 ! update ii0
-                                    exit
-                                end if
-                            end do
-                        end if
-                    else ! permanent crops                                                                
-                        ! calculate the emergence day
-                        do doy=1,size(info_pheno(i)%k_cb%tab,1)    ! loop over days
-                            if (info_pheno(i)%k_cb%tab(doy,crop_idx) > info_pheno(i)%kcb_phases%low(crop_idx,1)) then
-                                info_pheno(i)%ii0(crop_idx,1)=doy   ! ii0: day of emergence or the end of vernalization
-                                exit
-                            end if
-                        end do
-                        
-                        ! calculate harvest day
-                        do doy=n_days,1,-1 ! loop over days starting from the last
-                            if (info_pheno(i)%k_cb%tab(doy,crop_idx) > info_pheno(i)%kcb_phases%low(crop_idx,1)) then
-                                info_pheno(i)%iie(crop_idx,1)=doy   ! iie: day of harvest/ beginning of vernalization
-                                exit
-                            end if
-                        end do
-                        
-                        ! calculate the crop period
-                        info_pheno(i)%iid(crop_idx,1) = info_pheno(i)%iie(crop_idx,1) - info_pheno(i)%ii0(crop_idx,1) + 1
-                    end if
-                else   ! alternate crops
-                    ii_idx = 1 ! init the day index at the beginning of the year
-                    do cs = 1, info_pheno(i)%n_crops_by_year(crop_idx)
-                        ! update the day index for the alternative crop
-                        if (cs > 1) then
-                            ii_idx = info_pheno(i)%iie(crop_idx,cs-1) + 1 
-                        end if
-                        ! calculate emergence day
-                        do doy = ii_idx,size(info_pheno(i)%k_cb%tab,1)    ! loop over the days
-                            if(info_pheno(i)%k_cb%tab(doy,crop_idx) > info_pheno(i)%kcb_phases%low(crop_idx,cs)) then   ! use cs as reference
-                                info_pheno(i)%ii0(crop_idx,cs)=doy
-                                exit
-                            end if
-                        end do
-                        
-                        ! calculate harvest day
-                        do doy = ii_idx, size(info_pheno(i)%k_cb%tab,1)
-                            if (info_pheno(i)%k_cb%tab(doy,crop_idx) == info_pheno(i)%kcb_phases%high(crop_idx,cs)) then ! find the first "high" k_cb
-                                ii_idx = doy
-                                exit
-                            end if
-                        end do
-                        do doy = ii_idx,size(info_pheno(i)%k_cb%tab,1)    ! loop over the following days
-                            if(info_pheno(i)%k_cb%tab(doy,crop_idx) == info_pheno(i)%kcb_phases%low(crop_idx,cs)) then   ! the first "low" after the first "high" is the harvest date
-                                info_pheno(i)%iie(crop_idx,cs)=doy-1
-                                exit
-                            end if
-                        end do
-                        
-                        ! calculate the duration of the crop cycle
-                        info_pheno(i)%iid(crop_idx,cs)=info_pheno(i)%iie(crop_idx,cs) - info_pheno(i)%ii0(crop_idx,cs) + 1
-                    end do
-                    
-                    ! adjust the duration of the crop cycle and the emergence day of the first crop in case ii0==1
-                    if (info_pheno(i)%ii0(crop_idx,1) == 1) then
-                        ii_idx = count(info_pheno(i)%k_cb%tab(:,crop_idx)>info_pheno(i)%kcb_phases%low(crop_idx,1)) ! sum the duration of the crop cycles
-                        ii_idx = ii_idx - sum(info_pheno(i)%iid(crop_idx,:)) + info_pheno(i)%iid(crop_idx,1)        ! duration of the first crop cycle
-                        info_pheno(i)%ii0(crop_idx,1) = n_days - ii_idx + info_pheno(i)%iid(crop_idx,1) + 3         ! emergence of the first crop (consider also n_days and xii_idx)
-                        info_pheno(i)%iid(crop_idx,1) = ii_idx - 1
-                    end if
-                end if
-            end do
-        end do!
-    end subroutine read_all_crop_pars!
-    !
+    end subroutine derive_crop_cycles
+
     subroutine destroy_infofeno_tab(info_pheno)!
     ! dellaocate all crop phenological time series
         type(crop_pheno_info),dimension(:),intent(inout)::info_pheno!
@@ -609,6 +571,7 @@ module cli_crop_parameters!
             if(associated(info_pheno(i)%cn_day%tab)) deallocate(info_pheno(i)%cn_day%tab)!
             if(associated(info_pheno(i)%f_c%tab)) deallocate(info_pheno(i)%f_c%tab)!
             if(associated(info_pheno(i)%r_stress%tab)) deallocate(info_pheno(i)%r_stress%tab)!
+            if(associated(info_pheno(i)%crop_id%tab)) deallocate(info_pheno(i)%crop_id%tab)! %PS%
         end do!
         
     end subroutine destroy_infofeno_tab!
@@ -626,6 +589,8 @@ module cli_crop_parameters!
             close(info_pheno(i)%cn_day%unit)!
             close(info_pheno(i)%f_c%unit)!
             close(info_pheno(i)%r_stress%unit)!
+            close(info_pheno(i)%crop_id%unit)
+            if(associated(info_pheno(i)%cycle_crop_slot)) deallocate(info_pheno(i)%cycle_crop_slot)
         end do!
         deallocate(info_pheno)!
     end subroutine close_pheno_file!

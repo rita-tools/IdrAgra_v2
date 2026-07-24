@@ -38,7 +38,7 @@ module cli_simulation_manager!
     use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data
     use mod_runoff
     use mod_crop_soil_water
-    use mod_crop_phenology, only: crop_pheno_info, crop_matrices
+    use mod_crop_phenology, only: crop_pheno_info, crop_matrices, populate_crop_pars_matrices
     use mod_TDx_index
     use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva
     use mod_common, only: wat_matrix, soil2_rice, hourly, unit_file_scratch
@@ -136,7 +136,7 @@ module cli_simulation_manager!
         type(unit_file_scratch),dimension(:),allocatable::unit_Dxi!
         integer::cont_td    ! cycles
         character(len=33)::str_td!
-        character(len=255)::str_delete, upfilename
+        character(len=255)::str_delete, landuse_file, upfilename
         character(len=55)::s_year,s_years,s_doy
         logical :: file_exists
         !! percolation model
@@ -340,8 +340,16 @@ module cli_simulation_manager!
             if (pars%sim%f_soiluse .eqv. .true.) then
                 info_spat%domain = info_spat%backup_domain
                 info_spat%domain%mat = info_spat%backup_domain%mat
-                call read_grid (trim(pars%sim%input_path)//trim(pars%sim%soiluse_fn)//'_'//trim(adjustl(s_years))//".asc",&
-                    & info_spat%soil_use_id,pars%sim,boundaries)
+
+                ! %PS%: a missing landuse yearly file is allowed, in that case we reuse last year's
+                landuse_file = trim(pars%sim%input_path)//trim(pars%sim%soiluse_fn)//'_'//trim(adjustl(s_years))//'.asc'
+                inquire(file=trim(landuse_file), exist=file_exists)
+                if (file_exists) then
+                    call read_grid(trim(landuse_file), info_spat%soil_use_id, pars%sim, boundaries)
+                else
+                    print *, "Landuse file for year ", trim(adjustl(s_years)), " is missing. Relying on the previous year instead."
+                end if
+
                 if (minval(info_spat%soil_use_id%mat,info_spat%soil_use_id%mat/=info_spat%soil_use_id%header%nan) < 1 &
                     & .or. maxval(info_spat%soil_use_id%mat) > pars%sim%n_lus) then
                     print *,"Soil use maps have soil uses not defined in crop database"
@@ -542,7 +550,7 @@ module cli_simulation_manager!
             ! Writing crop parameters in cult matrix
             call populate_crop_yield_matrices(info_pheno,dir_phenofases,info_spat%domain,info_spat%soil_use_id%mat,crop_map,y)
             
-            ! Inizialization of kcb_low, cult_switch and phase_switch
+            ! Inizialization of kcb_low and phenological phase
             pheno%k_cb_low = info_spat%domain%header%nan
             pheno%n_crop_in_year = 1
             pheno%pheno_idx = 1
@@ -686,13 +694,15 @@ module cli_simulation_manager!
                 pheno%k_cb_old = pheno%k_cb
                 if (y==pars%sim%start_simulation%year - info_meteo(1)%start%year + 1 &
                     & .and. (pars%sim%start_simulation%day > 1 .or. pars%sim%start_simulation%month > 1)) then
-                    call populate_crop_pars_matrices(pheno,info_pheno, info_spat%irandom%mat, &
-                        & doy + pars%sim%start_simulation%doy - calc_doy(1, 1, pars%sim%start_simulation%year), &
-                        & dir_phenofases,info_spat%domain,info_spat%soil_use_id, &
-                        & y, pars%sim%year_step(y), crop_map)!
+                    call populate_crop_pars_matrices(pheno, info_pheno, info_spat%irandom%mat,                                             &
+                                                   & doy + pars%sim%start_simulation%doy - calc_doy(1, 1, pars%sim%start_simulation%year), &
+                                                   & dir_phenofases, info_spat%domain, info_spat%soil_use_id, y,                           &
+                                                   & pars%sim%year_step(y), crop_map)
                 else
-                    call populate_crop_pars_matrices(pheno,info_pheno,info_spat%irandom%mat,doy,dir_phenofases,info_spat%domain,info_spat%soil_use_id, &
-                    & y, pars%sim%year_step(y), crop_map)!
+                    call populate_crop_pars_matrices(pheno, info_pheno, info_spat%irandom%mat,                         &
+                                                   & doy,                                                              &
+                                                   & dir_phenofases, info_spat%domain, info_spat%soil_use_id, y,       &
+                                                   & pars%sim%year_step(y), crop_map)
                 end if
                 
                 ! Output fc in debug %RR%
@@ -1299,6 +1309,9 @@ module cli_simulation_manager!
                 do i=1,size(info_spat%domain%mat,1)
                     do z=1, size(crop_map%TSP_high,3)
                         if(info_spat%domain%mat(i,j) /= info_spat%domain%header%nan) then
+                            ! %PS% A declared crop slot may be absent from CropId.dat.
+                            if (crop_map%ii0(i,j,z) == 0 .and. crop_map%iie(i,j,z) == 0) cycle
+
                             ! TODO: check zero conditions
                             if ((crop_map%TSP_high(i,j,z) - crop_map%TSP_low(i,j,z))/=0.0D0) then
                                 yield%f_HS%mat(i,j,z) = yield%f_HS_sum%mat(i,j,z) / &
@@ -1314,33 +1327,33 @@ module cli_simulation_manager!
                                 & yield%biomass_pot%mat(i,j,z) * crop_map%HI(i,j,z)
                             
                             ! Calculate the reduction of the production from the water stress
-                            yield%f_WS%mat(i,j,z) = 1 - pheno%Ky_tot(i,j) * &
-                                & (1- sum(yield%T_act_sum%mat(i,j,:,z)) / &
+                            yield%f_WS%mat(i,j,z) = 1 - crop_map%Ky_tot(i,j,z) * & ! %PS% important bugfix: earlier version was using pheno%Ky_tot(i,j), i.e. whatever value was saved at year end.
+                                & (1- sum(yield%T_act_sum%mat(i,j,:,z)) / &        !                        This potentially gave the same Ky to both crops present in a year (e.g. maize was using wheat's Ky)
                                 & sum(yield%T_pot_sum%mat(i,j,:,z)))
 
                             if (yield%f_WS%mat(i,j,z) < 0) yield%f_WS%mat(i,j,z) = 0    ! limit to zero
                             
-                            yield%f_WS_stage%mat(i,j,z) = (1 - pheno%Ky_pheno(i,j,1) * &
+                            yield%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,1) * &
                                 & (1 - (yield%T_act_sum%mat(i,j,1,z) / &
                                 & yield%T_pot_sum%mat(i,j,1,z)))) &
                                 & ** (yield%dev_stage%mat(i,j,1,z) &
                                 & / sum(yield%dev_stage%mat(i,j,:,z)))
                             
-                            yield%f_WS_stage%mat(i,j,z) = (1 - pheno%Ky_pheno(i,j,2) * &
+                            yield%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,2) * &
                                 & (1 - (yield%T_act_sum%mat(i,j,2,z) / &
                                 & yield%T_pot_sum%mat(i,j,2,z)))) &
                                 & ** (yield%dev_stage%mat(i,j,2,z) &
                                 & / sum(yield%dev_stage%mat(i,j,:,z))) * &
                                 & yield%f_WS_stage%mat(i,j,z)
                             
-                            yield%f_WS_stage%mat(i,j,z) = (1 - pheno%Ky_pheno(i,j,3) * &
+                            yield%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,3) * &
                                 & (1 - (yield%T_act_sum%mat(i,j,3,z) / &
                                 & yield%T_pot_sum%mat(i,j,3,z)))) &
                                 & ** (yield%dev_stage%mat(i,j,3,z) &
                                 & / sum(yield%dev_stage%mat(i,j,:,z))) * &
                                 & yield%f_WS_stage%mat(i,j,z)
                             
-                            yield%f_WS_stage%mat(i,j,z) = (1 - pheno%Ky_pheno(i,j,4) * &
+                            yield%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,4) * &
                                 & (1 - (yield%T_act_sum%mat(i,j,4,z) / &
                                 & yield%T_pot_sum%mat(i,j,4,z)))) &
                                 & ** (yield%dev_stage%mat(i,j,4,z) &
@@ -1765,6 +1778,15 @@ module cli_simulation_manager!
         deallocate(crop_map%dij)
         deallocate(crop_map%TSP_high)
         deallocate(crop_map%TSP_low)
+        deallocate(crop_map%wp_adj)
+        deallocate(crop_map%HI)
+        deallocate(crop_map%Ky_tot)
+        deallocate(crop_map%Ky_pheno)
+        deallocate(crop_map%T_crit)
+        deallocate(crop_map%T_lim)
+        deallocate(crop_map%k_cb_min)
+        deallocate(crop_map%k_cb_mid)
+        deallocate(crop_map%k_cb_max)
     end subroutine destroy_crop
 
     subroutine init_wat_bal1(bil,a)
