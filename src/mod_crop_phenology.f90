@@ -37,7 +37,7 @@ module mod_crop_phenology
         type(k_cb_matrices)::kcb_phases                     ! k_cb change points during phenology
         real(dp),dimension(:,:),pointer::p_raw_const        ! readily available water factor [-]
         real(dp),dimension(:,:),pointer::a                  ! interception coefficient according to the Von Hoyningen-Hune & Braden method [-]
-        real(dp),dimension(:,:),pointer::d_r_max            ! maximum root depth [m]
+        real(dp),dimension(:,:),pointer::d_r_max            ! maximum transpirative-layer depth [m]
         real(dp),dimension(:,:),pointer::max_RF_t           ! maximum fraction of active roots in transpirative layer [-]
         real(dp),dimension(:,:),pointer::T_lim              ! limit temperature threshold - thermic stress [°C]
         real(dp),dimension(:,:),pointer::T_crit             ! critical temperature threshold - thermic stress [°C]

@@ -1,7 +1,7 @@
 module cli_crop_parameters!
     use mod_constants, only: sp, dp
     use mod_utility, only: seek_un, lower_case, string_to_integers, string_to_reals, split_string, count_element
-    use mod_parameters, only: simulation,parameters
+    use mod_parameters, only: simulation
     use mod_meteo, only: meteo_info
     use mod_crop_phenology
     use mod_system
@@ -211,13 +211,14 @@ module cli_crop_parameters!
                 & dummy(sum(string_space(1:i-1))+1:sum(string_space(1:i)))
         end do
     end subroutine spread_col_r
-                                    
-    subroutine read_crop_par_file(file_name, string_elements, unit_param, error_flag)!
+
+    subroutine read_crop_par_file(file_name, string_elements, ze_fix, unit_param, error_flag)
         ! read static crop parameters file
         ! TODO: merge with init_crop_par_from_file ?
         implicit none
         character(len=*), intent(in) :: file_name!
         integer, intent(in) :: string_elements
+        real(dp), intent(in) :: ze_fix
         type(crop_pheno_info) :: unit_param
         integer, intent(out) :: error_flag!
         integer :: free_unit
@@ -272,6 +273,9 @@ module cli_crop_parameters!
                         call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%Ky_pheno(:,:,4))
                     case('rft')
                          call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%max_RF_t)
+                    case('maxsr')
+                        call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%d_r_max)
+                        unit_param%d_r_max = unit_param%d_r_max - ze_fix
                     case default
                         print *, 'Skipping invalid or obsolete label <',trim(label),'> at line', line, ' of file: ', file_name
                 end select
@@ -308,10 +312,11 @@ module cli_crop_parameters!
         !
     end subroutine read_crop_pars_i!
 
-    subroutine init_crop_phenology_pars(sim,info_pheno,info_meteo, verbose)!
+    subroutine init_crop_phenology_pars(sim, info_pheno, info_meteo, ze_fix, verbose)
         ! init crop parameters and file references for daily parameters
         type(simulation),intent(inout)::sim!
         type(meteo_info),dimension(:),intent(in)::info_meteo!
+        real(dp),intent(in) :: ze_fix
         logical,intent(in)::verbose
 
         type(crop_pheno_info),dimension(:),allocatable::info_pheno!
@@ -390,10 +395,10 @@ module cli_crop_parameters!
             info_pheno(i)%iie             = 0!
             info_pheno(i)%iid             = 0!
             info_pheno(i)%cycle_crop_slot = 0
-            call read_water_prod_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"WPadj.dat", &
-                & string_elements, n_crops_by_year, info_pheno(i)%wp_adj, ErrorFlag)
+            call read_water_prod_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"WPadj.dat",  &
+                                    & string_elements, n_crops_by_year, info_pheno(i)%wp_adj, ErrorFlag)
             call read_crop_par_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropParam.dat", &
-                & string_elements, info_pheno(i), ErrorFlag)
+                                  & string_elements, ze_fix, info_pheno(i), ErrorFlag                   )
             
             ! TODO
             ! EAC: overwrite p values if exits
@@ -409,9 +414,8 @@ module cli_crop_parameters!
         end if
     end subroutine init_crop_phenology_pars!
 
-    subroutine read_all_crop_pars(n_days,n_crop,info_pheno,pars)!
+    subroutine read_all_crop_pars(n_days, n_crop, info_pheno)
         integer,intent(in)::n_days,n_crop
-        type(parameters),intent(in)::pars
         type(crop_pheno_info),dimension(:),intent(inout)::info_pheno
         integer::i
 
@@ -424,14 +428,13 @@ module cli_crop_parameters!
             call read_crop_pars(info_pheno(i)%f_c,n_days,n_crop)
             call read_crop_pars(info_pheno(i)%r_stress,n_days,n_crop)
             call read_crop_pars(info_pheno(i)%crop_slot,n_days,n_crop)
-            call derive_crop_cycles(info_pheno(i), n_days, pars%depth%ze_fix)
+            call derive_crop_cycles(info_pheno(i), n_days)
         end do
     end subroutine read_all_crop_pars
 
-    subroutine derive_crop_cycles(pheno, n_days, ze_fix)
+    subroutine derive_crop_cycles(pheno, n_days)
         type(crop_pheno_info), intent(inout) :: pheno
         integer, intent(in) :: n_days
-        real(dp), intent(in) :: ze_fix
         integer :: lu, slot, cycle_idx, day, start_day, end_day, crop_slot, first_end, last_start
         integer :: n_slots, n_present_slots
         logical, dimension(n_days) :: crop_mask
@@ -490,7 +493,6 @@ module cli_crop_parameters!
                 pheno%kcb_phases%low(lu,slot) = low_value
                 pheno%kcb_phases%high(lu,slot) = high_value
                 pheno%kcb_phases%mid(lu,slot) = mid_value
-                pheno%d_r_max(lu,slot) = maxval(pheno%z_r%tab(:,lu), mask=crop_mask) - ze_fix ! %PS%; TODO: read max root depth from cropParams.dat
             end do
 
             cycle_idx = 0

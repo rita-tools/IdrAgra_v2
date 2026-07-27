@@ -114,7 +114,7 @@ program main!
         print*, 'Variable "info_meteo" has been initialized'
 
         ! Initializes info_pheno matrices (by associating file units to files)
-        call init_crop_phenology_pars(xml%sim,info_pheno,info_meteo, verbose)!
+        call init_crop_phenology_pars(xml%sim, info_pheno, info_meteo, xml%depth%ze_fix, verbose)
         print*, 'Variable "info_pheno" has been initialized'
 
         ! Initializes watsources and info_sources matrices
@@ -160,7 +160,7 @@ program main!
     print*, 'Variable "info_meteo" has been initialized'
 
     ! Initializes info_pheno matrices (by associating file units to files)
-    call init_crop_phenology_pars(xml%sim,info_pheno,info_meteo, verbose)!
+    call init_crop_phenology_pars(xml%sim, info_pheno, info_meteo, xml%depth%ze_fix, verbose)
     print*, 'Variable "info_pheno" has been initialized'
 
     ! Initializes watsources and info_sources matrices

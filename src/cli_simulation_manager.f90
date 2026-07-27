@@ -486,7 +486,7 @@ module cli_simulation_manager!
             end if ! end change soil use map condition
 
             ! Read all phenological tables and allocation of info_pheno%prm%tab(:,:)!
-            call read_all_crop_pars(pars%sim%year_step(y),pars%sim%n_lus,info_pheno,pars)!
+            call read_all_crop_pars(pars%sim%year_step(y), pars%sim%n_lus, info_pheno)
             if (pars%sim%prt_debug_out == 'y') then
                 call check_pheno_parameters(info_pheno,info_meteo)!
                 call seek_un(error_flag,unit_crop)!
