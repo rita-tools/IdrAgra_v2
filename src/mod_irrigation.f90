@@ -683,8 +683,8 @@ module mod_irrigation
         
     end subroutine irrigation_use!
 
-    subroutine calc_daily_duty(cur_doy,irr_units,sources_info,wat_sources,irr_units_map,domain_map,par,&!
-        & irrigation_class, k_cb, h_soil_old,h_transp_pot,raw,h_fc,zr)!
+    subroutine calc_daily_duty(cur_doy, irr_units, sources_info, wat_sources, irr_units_map, domain_map, &
+                             & par, irrigation_class, k_cb, h_soil_old, h_transp_pot, raw, h_fc          )
         ! estimate the water volume for irrigation available in each irrigation units
         integer,intent(in)::cur_doy ! current day of simulation
         type(irr_units_table), dimension(:),intent(inout)::irr_units!
@@ -693,7 +693,7 @@ module mod_irrigation
         type(grid_i),intent(in)::irr_units_map,domain_map!
         type(parameters),intent(in)::par!
         integer,dimension(:,:),intent(in)::irrigation_class!
-        real(dp),dimension(:,:),intent(in)::k_cb, h_soil_old, h_transp_pot, raw,h_fc, zr!
+        real(dp),dimension(:,:),intent(in) :: k_cb, h_soil_old, h_transp_pot, raw, h_fc
 
         integer,dimension(:,:),allocatable::cells_un_coll       ! map of the cells irrigated by unmonitored collective water sources
         real(dp)::frac_rel_un_coll                              ! fraction of water released respect to the maximum water available
@@ -743,8 +743,9 @@ module mod_irrigation
                     irr_units(j)%q_act_fld(3) = wat_sources(i)%duty_frc * sources_info%int_reuse_tbl%q_daily(cur_doy,k) * irr_units(j)%int_distr_eff + irr_units(j)%q_act_fld(3)
 
                 case(4) ! collective unmonitored sources
-                    frac_rel_un_coll = deliverable_ratio_unm_coll(cells_un_coll,h_soil_old,h_transp_pot,raw,h_fc,zr,irrigation_class,par, &
-                                        & domain_map%header%imax, domain_map%header%jmax, k)!
+                    frac_rel_un_coll = deliverable_ratio_unm_coll(cells_un_coll, h_soil_old, h_transp_pot,         &
+                                                                & raw, h_fc, irrigation_class, par,                &
+                                                                & domain_map%header%imax, domain_map%header%jmax, k)
                     n_cells_irr_un_coll = count(cells_un_coll==k .and. irrigation_class==1)!
                     n_cells_un_coll = count(cells_un_coll==k)
                     if(n_cells_un_coll==0) cycle
@@ -770,13 +771,13 @@ module mod_irrigation
 
     end subroutine calc_daily_duty!
 
-    function deliverable_ratio_unm_coll(cells_un_coll, h_soil, h_transp_pot, h_raw, theta_fc, &
-                                & d_r, irr_class, pars, imax, jmax, wat_src_idx)!
+    function deliverable_ratio_unm_coll(cells_un_coll, h_soil, h_transp_pot, h_raw,   &
+                                      & h_fc, irr_class, pars, imax, jmax, wat_src_idx)
         ! calculate the actual deliverable ratio from unmonitored water sources (e.g. collective wells plan)
         ! deliverable ratio is calculated from average water deficit of the served cells
         integer,intent(in)::imax,jmax!
         integer,dimension(:,:),intent(in)::cells_un_coll     ! map of cells irrigated by unmonitored collective sources
-        real(dp),dimension(:,:),intent(in)::h_soil, h_transp_pot, h_raw, theta_fc, d_r
+        real(dp),dimension(:,:),intent(in) :: h_soil, h_transp_pot, h_raw, h_fc
         integer,dimension(:,:),intent(in)::irr_class!
         type(parameters),intent(in)::pars
         integer,intent(in)::wat_src_idx
@@ -791,9 +792,8 @@ module mod_irrigation
         !!
         deliverable_ratio_unm_coll=0
         deficit_slp= (h_soil - h_raw) * h_transp_pot!
-        raw_slp=(theta_fc*1000*d_r-h_raw)*h_transp_pot!
-        ! %AB% for rice, wat%layer(2)%fc=1000*xriso%tetaII_FC*zr
-        
+        raw_slp = (h_fc - h_raw) * h_transp_pot
+
         transp_un_coll=sum(h_transp_pot, cells_un_coll == wat_src_idx .and. irr_class==1)!
 
         if(transp_un_coll/=0.)then
