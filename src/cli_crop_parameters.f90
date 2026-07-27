@@ -451,6 +451,7 @@ module cli_crop_parameters!
             n_slots = pheno%n_crops_by_year(lu)
             if (n_slots < 1) cycle
 
+            ! CropId.dat uses 0 for bare soil and 1:n_slots for the declared rotation slots
             do day=1,n_days
                 crop_slot = pheno%crop_slot%tab(day,lu)
                 if (crop_slot < 0 .or. crop_slot > n_slots) then
@@ -461,7 +462,7 @@ module cli_crop_parameters!
                 end if
             end do
 
-            ! Derive crop-specific daily-series parameters by rotation slot.
+            ! Derive crop-specific daily time-series by rotation slot
             n_present_slots = 0
             do slot=1,n_slots
                 crop_mask = pheno%crop_slot%tab(:,lu) == slot
@@ -489,13 +490,14 @@ module cli_crop_parameters!
                 pheno%kcb_phases%low(lu,slot) = low_value
                 pheno%kcb_phases%high(lu,slot) = high_value
                 pheno%kcb_phases%mid(lu,slot) = mid_value
-                pheno%d_r_max(lu,slot) = maxval(pheno%z_r%tab(:,lu), mask=crop_mask) - ze_fix
+                pheno%d_r_max(lu,slot) = maxval(pheno%z_r%tab(:,lu), mask=crop_mask) - ze_fix ! %PS%; TODO: read max root depth from cropParams.dat
             end do
 
             cycle_idx = 0
             first_end = 0
             last_start = n_days + 1
 
+            ! Matching nonzero slots at both year ends are treated as one crop cycle crossing New Year.
             if (pheno%crop_slot%tab(1,lu) > 0 .and. &
                 & pheno%crop_slot%tab(1,lu) == pheno%crop_slot%tab(n_days,lu)) then
                 crop_slot = pheno%crop_slot%tab(1,lu)
@@ -521,6 +523,7 @@ module cli_crop_parameters!
                 pheno%cycle_crop_slot(lu,cycle_idx) = crop_slot
             end if
 
+            ! Store the remaining contiguous crop periods as cycles in calendar order
             day = first_end + 1
             do while (day <= min(n_days,last_start-1))
                 if (pheno%crop_slot%tab(day,lu) == 0) then

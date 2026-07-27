@@ -456,6 +456,7 @@ module mod_crop_phenology
         ref_ii0 = crop_mat%ii0_ref(i, j, active_cycle)
         ref_iie = crop_mat%iie_ref(i, j, active_cycle)
 
+        ! Map the local calendar day proportionally into the same cycle at the reference station
         if (crop_mat%ii0(i, j, active_cycle) <= crop_mat%iie(i, j, active_cycle)) then
             if (iie > ii0) then
                 doy_s = ref_ii0 + nint(dble(doy - ii0) * dble(ref_iie - ref_ii0) / dble(iie - ii0))
@@ -471,6 +472,7 @@ module mod_crop_phenology
         end if
         doy_s = max(1, min(year_length, doy_s))
 
+        ! Confirm that the shifted reference day still belongs to the selected crop slot
         read_crop_slot = info_pheno(ws_idx(i, j))%crop_slot%tab(doy_s, lu)
         if (read_crop_slot /= slot) then
             print *, 'Shifted crop-slot mismatch at cell/day ', i, j, doy

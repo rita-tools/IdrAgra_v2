@@ -1309,7 +1309,7 @@ module cli_simulation_manager!
                 do i=1,size(info_spat%domain%mat,1)
                     do z=1, size(crop_map%TSP_high,3)
                         if(info_spat%domain%mat(i,j) /= info_spat%domain%header%nan) then
-                            ! %PS% A declared crop slot may be absent from CropId.dat
+                            !%PS% Skip yield calculations for declared slots absent from the daily crop series (can happen due to cropcoef crop overwriting)
                             if (crop_map%ii0(i,j,z) == 0 .and. crop_map%iie(i,j,z) == 0) cycle
 
                             ! TODO: check zero conditions
