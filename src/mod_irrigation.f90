@@ -128,7 +128,7 @@ module mod_irrigation
         ! the irrigation event is estimated only during the irrigation season
         h_irr_temp = 0.!
 
-        where(pheno%irrigation_class==1 .and. pheno%k_cb>0)
+        where(pheno%irrigation_class == 1)
             !!! %RR% %CG% %EAC% %AB% (feb-23) network efficiency no more considered in need mode [info_spat%eff_rete%mat]
             where(pheno%cn_class==7)                   ! irrigation matrix for rice
                 !h_irr_temp = (bil1_old%h_eva + bil2_old%h_transp_pot)!
@@ -179,7 +179,7 @@ module mod_irrigation
         h_irr = 0.
         h_irr_temp = 0.
         !!! %RR% %CG% %EAC% %AB% (feb-23) network efficiency no more considered in need mode [info_spat%eff_rete%mat]
-        where (pheno%irrigation_class==1 .and. pheno%k_cb>0)
+        where (pheno%irrigation_class == 1)
             where (pheno%cn_class==7)                      ! %AB% irrigation matrix for rice
                 h_irr_temp = (bil1_old%h_eva + bil2_old%h_transp_pot)/(info_spat%eff_met%mat)
 
@@ -346,7 +346,7 @@ module mod_irrigation
         !!
         ! init the minimum irrigation height (equal to infiltration)
         h_irr_min = 10.*24.*k_sat ! k_sat is in mm
-        where(pheno%irrigation_class==1 .and. pheno%cn_class==7 .and. pheno%k_cb>0.0D0) !%PS%: added check on k_cb (otherwise irrigation triggers after harvest)
+        where(pheno%irrigation_class == 1 .and. pheno%cn_class == 7)
             h_irr = max(0.0D0,h_irr_min + h_irr - eff_rain)  ! %CG%: irrigation compensate ET and Percolation, minus effective rain 
             !where(h_irr<=h_irr_min) h_irr = h_irr_min       ! irrigation height at least equal to the minimum irrigation height
             !where(eff_rain>=h_irr) h_irr = 0.               ! if effective precipitation > irrigation height -> zero irrigation height
@@ -355,15 +355,14 @@ module mod_irrigation
         end where!
     end subroutine irrigate_rice!
 
-    subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, transp_pot, k_cb, h_soil_old,       &
+    subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, transp_pot, h_soil_old,             &
                             & h_raw_coll, h_raw_half, h_raw, h_raw_priv, h_irr, doy, priv_irr, coll_irr, day_from_irr, &
-                            & esp_perc, am_perc,bm_perc, f_shape_area, cell_area, h_met, irr_starts, irr_ends, cn_class )
+                            & esp_perc, am_perc,bm_perc, f_shape_area, cell_area, h_met, irr_starts, irr_ends, cn_class)
         ! calculate irrigation heights in "USE" mode
         type(grid_i),intent(in)::domain, irr_units_map, method
         integer,dimension(:,:),intent(in)::irr_class, cn_class
         type(irr_units_table),dimension(:),intent(inout)::irr_units
         real(dp),dimension(:,:),intent(in)::h_soil_old                 ! average soil water content of previous day [mm]
-        real(dp),dimension(:,:),intent(in)::k_cb                       ! crop coefficient
         real(dp),dimension(:,:),intent(in)::transp_pot                 ! potential transpiration of previous day [mm]
         real(dp),dimension(:,:),intent(in)::h_raw, h_raw_half          ! soil water content at RAW and half RAW [mm]
         real(dp),dimension(:,:),intent(in)::h_raw_coll                 ! irrigation threshold for collective water sources [mm]
@@ -447,8 +446,7 @@ module mod_irrigation
             irr_mask=(irr_units_map%mat==irr_units(k)%id &
                      .and. irr_class==1 &
                      .and. irr_starts<=doy &
-                     .and. irr_ends>=doy &
-                     .and. k_cb > 0.0D0) !%PS% ensure crop is growing (safer than irrigation_class, which is sometimes not switched off: TODO: check)
+                     .and. irr_ends>=doy)
 
             n_cells_tobe_irr = count(irr_mask)!
             
@@ -572,7 +570,7 @@ module mod_irrigation
                 irr_units(k)%q_surplus = irr_units(k)%q_day - Q_tot_act
 
                 ! Store the amount of water surplus for the next day if:
-                ! 1 - the IU has at least a cell eligible for irrigation (irr_class == 1, k_cb > 0, in-season)
+                ! 1 - the IU has at least a cell eligible for irrigation (irr_class == 1, in-season)
                 ! 2 - at least one eligible cell requires collective-source irrigation !%PS%: Used to be "at least one cell was irrigated". Now surplus can be carried over to the next day if we are waiting for it to reach a "usable" threshold;
                 ! 3 - not all cells in the IU were evaluated today                                                                        ! ; with this condition it is acceptable to simulate a IU receiving x m3/s every n days using a x/n m3/s daily flow,
                 if (n_cells_tobe_irr/=0 .and. n_cells_req_irr /= 0 .and. irr_units(k)%n_irrigated_cells /= n_cells_tobe_irr) then         ! , even when the resulting flow is insufficient to trigger one irrigation event per day (as per original IdrAgra v1 behaviour)
@@ -684,7 +682,7 @@ module mod_irrigation
     end subroutine irrigation_use!
 
     subroutine calc_daily_duty(cur_doy, irr_units, sources_info, wat_sources, irr_units_map, domain_map, &
-                             & par, irrigation_class, k_cb, h_soil_old, h_transp_pot, raw, h_fc          )
+                             & par, irrigation_class, h_soil_old, h_transp_pot, raw, h_fc                )
         ! estimate the water volume for irrigation available in each irrigation units
         integer,intent(in)::cur_doy ! current day of simulation
         type(irr_units_table), dimension(:),intent(inout)::irr_units!
@@ -693,7 +691,7 @@ module mod_irrigation
         type(grid_i),intent(in)::irr_units_map,domain_map!
         type(parameters),intent(in)::par!
         integer,dimension(:,:),intent(in)::irrigation_class!
-        real(dp),dimension(:,:),intent(in) :: k_cb, h_soil_old, h_transp_pot, raw, h_fc
+        real(dp),dimension(:,:),intent(in) :: h_soil_old, h_transp_pot, raw, h_fc
 
         integer,dimension(:,:),allocatable::cells_un_coll       ! map of the cells irrigated by unmonitored collective water sources
         real(dp)::frac_rel_un_coll                              ! fraction of water released respect to the maximum water available
@@ -718,8 +716,7 @@ module mod_irrigation
                 if (wat_sources(i)%type_id == 4) then
                     where (irr_units_map%mat == wat_sources(i)%id_irr_unit &
                         & .and. domain_map%mat /= domain_map%header%nan &
-                        & .and. irrigation_class == 1 &
-                        & .and. k_cb > 0.0D0) & !%PS% ensure crop is growing (safer than irrigation_class, which is sometimes not switched off: TODO: check)
+                        & .and. irrigation_class == 1) &
                         & cells_un_coll = wat_sources(i)%wat_src_idx
                 end if
             end do

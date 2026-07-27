@@ -904,7 +904,7 @@ module cli_simulation_manager!
 
                         ! calculate the daily water duty for each irrigation unit, considering the water distribution efficiency 
                         call calc_daily_duty(doy, irr_units, info_sources, wat_src_tbl, info_spat%irr_unit_id, &
-                                           & info_spat%domain, pars, pheno%irrigation_class, pheno%k_cb,       &
+                                           & info_spat%domain, pars, pheno%irrigation_class,                   &
                                            & (wat_bal1_old%h_soil + wat_bal2_old%h_soil),                      &
                                            & (wat_bal1_old%h_transp_pot + wat_bal2_old%h_transp_pot),          &
                                            & wat_bal2%h_raw, (wat%layer(1)%h_fc + wat%layer(2)%h_fc)           )
@@ -915,7 +915,7 @@ module cli_simulation_manager!
                         !%PS%: precompute tentative irrigation depth for rice so that USE mode can treat it as a fixed height 
                         !      (whether irrigation can actually be supplied is decided in irrigation_use).
                         h_met_use = info_spat%h_meth%mat
-                        where(pheno%irrigation_class==1 .and. pheno%cn_class==7 .and. pheno%k_cb>0.0D0)
+                        where(pheno%irrigation_class == 1 .and. pheno%cn_class == 7)
                             h_met_use = ((info_spat%h_meth%mat - wat_bal1_old%h_pond) +                                 &!<-- reach a pond level of h_meth
                                          (info_spat%theta(1)%sat%mat*wat_bal1_old%d_e*1000.0D0 - wat_bal1_old%h_soil) + &!<-- replenish 1st layer up to saturation
                                          (wat%layer(2)%h_sat - wat_bal2_old%h_soil) +                                   &!<-- replenish 2nd layer up to saturation
@@ -924,7 +924,7 @@ module cli_simulation_manager!
                         call irrigate_rice(h_met_use, pheno, wat_bal1%h_eff_rain, theta2_rice%k_sat_2)                   !<-- add expected percolation and subtract rain
 
                         call irrigation_use(info_spat%domain, info_spat%irr_unit_id, pheno%irrigation_class, info_spat%irr_meth_id, &
-                                          & irr_units, (wat_bal1_old%h_transp_pot+wat_bal2_old%h_transp_pot), pheno%k_cb,           &
+                                          & irr_units, (wat_bal1_old%h_transp_pot+wat_bal2_old%h_transp_pot),                       &
                                           & (wat_bal1_old%h_soil + wat_bal2_old%h_soil),                                            &
                                           & wat_bal2%h_raw_sup, wat_bal2%h_raw_inf, wat_bal2%h_raw, wat_bal2%h_raw_priv,            &
                                           & h_irr, doy, priv_irr, coll_irr, day_from_irr, esp_perc,                                 &
