@@ -905,7 +905,7 @@ module cli_simulation_manager!
                         ! calculate the daily water duty for each irrigation unit, considering the water distribution efficiency 
                         call calc_daily_duty(doy, irr_units, info_sources, wat_src_tbl, info_spat%irr_unit_id,      &
                                            & info_spat%domain, pars, pheno%irrigation_class, pheno%k_cb,            &
-                                           & (wat_bal1_old%h_soil * pheno%RF_e + wat_bal2_old%h_soil * pheno%RF_t), & !%PS%: h_soil_old is now weighted according to RF
+                                           & (wat_bal1_old%h_soil * pheno%RF_e + wat_bal2_old%h_soil * pheno%RF_t), & !%PS%: h_soil_old is now weighted according to RF TODO: currently wrong as after commit 3bfe151, should be unweighted
                                            & (wat_bal1_old%h_transp_pot + wat_bal2_old%h_transp_pot),               &
                                            & wat_bal2%h_raw, info_spat%theta(2)%fc%mat, wat_bal2_old%d_t            )
 
@@ -925,7 +925,7 @@ module cli_simulation_manager!
 
                         call irrigation_use(info_spat%domain, info_spat%irr_unit_id, pheno%irrigation_class, info_spat%irr_meth_id, &
                                           & irr_units, (wat_bal1_old%h_transp_pot+wat_bal2_old%h_transp_pot), pheno%k_cb,           &
-                                          & (wat_bal1_old%h_soil * pheno%RF_e + wat_bal2_old%h_soil * pheno%RF_t),                  & !%PS%: h_soil_old is now weighted according to RF
+                                          & (wat_bal1_old%h_soil * pheno%RF_e + wat_bal2_old%h_soil * pheno%RF_t),                  & !%PS%: h_soil_old is now weighted according to RF TODO: currently wrong as after commit 3bfe151, should be unweighted
                                           & wat_bal2%h_raw_sup, wat_bal2%h_raw_inf, wat_bal2%h_raw, wat_bal2%h_raw_priv,            &
                                           & h_irr, doy, priv_irr, coll_irr, day_from_irr, esp_perc,                                 &
                                           & info_spat%a_perc, info_spat%b_perc, pars%sim%f_shapearea, info_spat%cell_area%mat,      &
@@ -1309,7 +1309,7 @@ module cli_simulation_manager!
                 do i=1,size(info_spat%domain%mat,1)
                     do z=1, size(crop_map%TSP_high,3)
                         if(info_spat%domain%mat(i,j) /= info_spat%domain%header%nan) then
-                            ! %PS% A declared crop slot may be absent from CropId.dat.
+                            ! %PS% A declared crop slot may be absent from CropId.dat
                             if (crop_map%ii0(i,j,z) == 0 .and. crop_map%iie(i,j,z) == 0) cycle
 
                             ! TODO: check zero conditions

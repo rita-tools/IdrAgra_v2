@@ -32,7 +32,7 @@ module mod_crop_phenology
         type(file_phenology_r)::f_c                         ! cover fraction
         type(file_phenology_r)::r_stress                    ! plant resistance to water stress
         type(file_phenology_i)::cn_day                      ! %AB% soil moisture adjusted cn value 
-        type(file_phenology_i)::crop_id                     ! %PS% daily rotation slot (0 = no crop)
+        type(file_phenology_i)::crop_slot                   ! %PS% daily rotation slot (0 = no crop) read from CropId.dat
         integer,dimension(:,:),pointer::cycle_crop_slot     ! %PS% rotation slot for each crop cycle in completion order
         type(k_cb_matrices)::kcb_phases                     ! k_cb change points during phenology
         real(dp),dimension(:,:),pointer::p_raw_const        ! readily available water factor [-]
@@ -140,10 +140,6 @@ module mod_crop_phenology
                             reference_slot = info_pheno(reference_ws)%cycle_crop_slot(soiluse(i,j),z)
                             if (reference_slot <= 0) cycle
 
-                            ! %PS% Physical cycle order can differ between stations when a
-                            ! crossing-year crop finishes before January at only some stations.
-                            ! Match spatialized dates by crop slot, using the reference station's
-                            ! cycle order for this cell.
                             neighbor_cycle = 0
                             do cycle_idx=1,size(info_pheno(dir_meteo(i,j,k))%cycle_crop_slot,2)
                                 if (info_pheno(dir_meteo(i,j,k))%cycle_crop_slot(soiluse(i,j),cycle_idx) == &
@@ -461,8 +457,6 @@ module mod_crop_phenology
         ref_iie = crop_mat%iie_ref(i, j, active_cycle)
 
         if (crop_mat%ii0(i, j, active_cycle) <= crop_mat%iie(i, j, active_cycle)) then
-            ! %PS% Map endpoints rather than inclusive crop lengths: a local harvest
-            ! day must map exactly to the reference harvest day, not the following bare-soil day.
             if (iie > ii0) then
                 doy_s = ref_ii0 + nint(dble(doy - ii0) * dble(ref_iie - ref_ii0) / dble(iie - ii0))
             else
@@ -477,7 +471,7 @@ module mod_crop_phenology
         end if
         doy_s = max(1, min(year_length, doy_s))
 
-        read_crop_slot = info_pheno(ws_idx(i, j))%crop_id%tab(doy_s, lu)
+        read_crop_slot = info_pheno(ws_idx(i, j))%crop_slot%tab(doy_s, lu)
         if (read_crop_slot /= slot) then
             print *, 'Shifted crop-slot mismatch at cell/day ', i, j, doy
             print *, 'Expected/read slot: ', slot, read_crop_slot, '; shifted day: ', doy_s

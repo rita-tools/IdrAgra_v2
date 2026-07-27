@@ -8,7 +8,7 @@ module cli_crop_parameters!
     
     implicit none!
 
-    logical, dimension(:), allocatable, save :: missing_crop_slot_warned ! %PS%
+    logical, dimension(:), allocatable, save :: missing_crop_slot_warned
 
     interface read_crop_pars!
         module procedure read_crop_pars_r, read_crop_pars_i
@@ -345,7 +345,7 @@ module cli_crop_parameters!
             call open_daily_crop_par_file(info_pheno(i)%f_c%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"fc.dat",errorflag)
             ! EDIT: add support for seasonal p_raw
             call open_daily_crop_par_file(info_pheno(i)%r_stress%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"r_stress.dat",errorflag)
-            call open_daily_crop_par_file(info_pheno(i)%crop_id%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropId.dat",errorflag)
+            call open_daily_crop_par_file(info_pheno(i)%crop_slot%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropId.dat",errorflag)
             !
             ! TODO - add tabulated ky
             
@@ -410,8 +410,6 @@ module cli_crop_parameters!
     end subroutine init_crop_phenology_pars!
 
     subroutine read_all_crop_pars(n_days,n_crop,info_pheno,pars)!
-        ! %PS% Read one calendar year and derive crop cycles exclusively from CropId.
-        implicit none!
         integer,intent(in)::n_days,n_crop
         type(parameters),intent(in)::pars
         type(crop_pheno_info),dimension(:),intent(inout)::info_pheno
@@ -425,7 +423,7 @@ module cli_crop_parameters!
             call read_crop_pars(info_pheno(i)%cn_day,n_days,n_crop)
             call read_crop_pars(info_pheno(i)%f_c,n_days,n_crop)
             call read_crop_pars(info_pheno(i)%r_stress,n_days,n_crop)
-            call read_crop_pars(info_pheno(i)%crop_id,n_days,n_crop)
+            call read_crop_pars(info_pheno(i)%crop_slot,n_days,n_crop)
             call derive_crop_cycles(info_pheno(i), n_days, pars%depth%ze_fix)
         end do
     end subroutine read_all_crop_pars
@@ -445,16 +443,16 @@ module cli_crop_parameters!
         pheno%cycle_crop_slot = 0
 
         if (.not. allocated(missing_crop_slot_warned)) then
-            allocate(missing_crop_slot_warned(size(pheno%crop_id%tab,2)))
+            allocate(missing_crop_slot_warned(size(pheno%crop_slot%tab,2)))
             missing_crop_slot_warned = .false.
         end if
 
-        do lu=1,size(pheno%crop_id%tab,2)
+        do lu=1,size(pheno%crop_slot%tab,2)
             n_slots = pheno%n_crops_by_year(lu)
             if (n_slots < 1) cycle
 
             do day=1,n_days
-                crop_slot = pheno%crop_id%tab(day,lu)
+                crop_slot = pheno%crop_slot%tab(day,lu)
                 if (crop_slot < 0 .or. crop_slot > n_slots) then
                     print *, 'Invalid crop slot ', crop_slot, ' at day ', day, ', land-use class ', lu
                     print *, 'Expected a value between 0 and ', n_slots
@@ -466,7 +464,7 @@ module cli_crop_parameters!
             ! Derive crop-specific daily-series parameters by rotation slot.
             n_present_slots = 0
             do slot=1,n_slots
-                crop_mask = pheno%crop_id%tab(:,lu) == slot
+                crop_mask = pheno%crop_slot%tab(:,lu) == slot
                 if (.not. any(crop_mask)) then
                     if (.not. missing_crop_slot_warned(lu)) then
                         print *, 'Warning: Crop slot ', slot, ' never occurs in land-use class ', lu, &
@@ -476,8 +474,6 @@ module cli_crop_parameters!
                     cycle
                 end if
                 n_present_slots = n_present_slots + 1
-                ! %PS% Preserve the existing annual/permanent convention: annual
-                ! land uses have a zero Kcb outside crop-in-field periods.
                 low_value = minval(pheno%k_cb%tab(:,lu))
                 high_value = maxval(pheno%k_cb%tab(:,lu), mask=crop_mask)
                 mid_value = high_value
@@ -500,11 +496,11 @@ module cli_crop_parameters!
             first_end = 0
             last_start = n_days + 1
 
-            if (pheno%crop_id%tab(1,lu) > 0 .and. &
-                & pheno%crop_id%tab(1,lu) == pheno%crop_id%tab(n_days,lu)) then
-                crop_slot = pheno%crop_id%tab(1,lu)
+            if (pheno%crop_slot%tab(1,lu) > 0 .and. &
+                & pheno%crop_slot%tab(1,lu) == pheno%crop_slot%tab(n_days,lu)) then
+                crop_slot = pheno%crop_slot%tab(1,lu)
                 first_end = 1
-                do while (first_end < n_days .and. pheno%crop_id%tab(first_end+1,lu) == crop_slot)
+                do while (first_end < n_days .and. pheno%crop_slot%tab(first_end+1,lu) == crop_slot)
                     first_end = first_end + 1
                 end do
                 cycle_idx = 1
@@ -515,7 +511,7 @@ module cli_crop_parameters!
                     pheno%iid(lu,cycle_idx) = n_days
                 else
                     last_start = n_days
-                    do while (last_start > 1 .and. pheno%crop_id%tab(last_start-1,lu) == crop_slot)
+                    do while (last_start > 1 .and. pheno%crop_slot%tab(last_start-1,lu) == crop_slot)
                         last_start = last_start - 1
                     end do
                     pheno%ii0(lu,cycle_idx) = last_start
@@ -527,13 +523,13 @@ module cli_crop_parameters!
 
             day = first_end + 1
             do while (day <= min(n_days,last_start-1))
-                if (pheno%crop_id%tab(day,lu) == 0) then
+                if (pheno%crop_slot%tab(day,lu) == 0) then
                     day = day + 1
                     cycle
                 end if
-                crop_slot = pheno%crop_id%tab(day,lu)
+                crop_slot = pheno%crop_slot%tab(day,lu)
                 start_day = day
-                do while (day <= min(n_days,last_start-1) .and. pheno%crop_id%tab(day,lu) == crop_slot)
+                do while (day <= min(n_days,last_start-1) .and. pheno%crop_slot%tab(day,lu) == crop_slot)
                     day = day + 1
                 end do
                 end_day = day - 1
@@ -570,7 +566,7 @@ module cli_crop_parameters!
             if(associated(info_pheno(i)%cn_day%tab)) deallocate(info_pheno(i)%cn_day%tab)!
             if(associated(info_pheno(i)%f_c%tab)) deallocate(info_pheno(i)%f_c%tab)!
             if(associated(info_pheno(i)%r_stress%tab)) deallocate(info_pheno(i)%r_stress%tab)!
-            if(associated(info_pheno(i)%crop_id%tab)) deallocate(info_pheno(i)%crop_id%tab)! %PS%
+            if(associated(info_pheno(i)%crop_slot%tab)) deallocate(info_pheno(i)%crop_slot%tab)
         end do!
         
     end subroutine destroy_infofeno_tab!
@@ -588,7 +584,7 @@ module cli_crop_parameters!
             close(info_pheno(i)%cn_day%unit)!
             close(info_pheno(i)%f_c%unit)!
             close(info_pheno(i)%r_stress%unit)!
-            close(info_pheno(i)%crop_id%unit)
+            close(info_pheno(i)%crop_slot%unit)
             if(associated(info_pheno(i)%cycle_crop_slot)) deallocate(info_pheno(i)%cycle_crop_slot)
         end do!
         deallocate(info_pheno)!

@@ -588,8 +588,8 @@ module cli_read_parameter!
         end do
 
         if (verbose .eqv. .true.) then
-            print *, "Simulated crop IDs:", xml%sim%lu_list
-            print *, "Not simulated crop IDs:", xml%sim%no_lu_list
+            print *, "Simulated land-use classes:", xml%sim%lu_list
+            print *, "Not simulated land-use classes:", xml%sim%no_lu_list
         end if
     end subroutine read_sim_parameters
 
