@@ -1153,10 +1153,10 @@ module cli_read_parameter!
                     select case (label)
                         case ('ksat_ii');   read (buffer, *, iostat = ios) theta2_rice%k_sat_2
                         case ('n_ii');      read (buffer, *, iostat = ios) theta2_rice%n_2
-                        case ('tetaii_fc'); read (buffer, *, iostat = ios) theta2_rice%theta2_FC
-                        case ('tetaii_r');  read (buffer, *, iostat = ios) theta2_rice%theta2_R
-                        case ('tetaii_sat');read (buffer, *, iostat = ios) theta2_rice%theta2_SAT
-                        case ('tetaii_wp'); read (buffer, *, iostat = ios) theta2_rice%theta2_WP
+                        case ('tetaii_fc', 'thetaii_fc'); read (buffer, *, iostat = ios) theta2_rice%theta2_FC
+                        case ('tetaii_r',  'thetaii_r' ); read (buffer, *, iostat = ios) theta2_rice%theta2_R
+                        case ('tetaii_sat','thetaii_sat');read (buffer, *, iostat = ios) theta2_rice%theta2_SAT
+                        case ('tetaii_wp', 'thetaii_wp'); read (buffer, *, iostat = ios) theta2_rice%theta2_WP
                         case default
                             print *, 'Skipping invalid label <',trim(label),'> at line', line, ' of file: ', &
                                 & trim(sim%soil_prop_x_rice_fn), '. Execution will be aborted...'
