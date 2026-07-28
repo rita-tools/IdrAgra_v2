@@ -430,7 +430,7 @@ module mod_crop_phenology
             crop_pars_mat%f_c(i,j)              = 0.0D0
             crop_pars_mat%r_stress(i,j)         = 0.0D0
             crop_pars_mat%irrigation_class(i,j) = 0
-            crop_pars_mat%cn_class(i,j)         = 0
+            crop_pars_mat%cn_class(i,j)         = 1
             crop_pars_mat%p(i,j)                = 0.0D0
             crop_pars_mat%a(i,j)                = 0.0D0
             crop_pars_mat%d_t_max(i,j)          = 0.0D0

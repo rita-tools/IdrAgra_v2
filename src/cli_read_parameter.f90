@@ -739,9 +739,9 @@ module cli_read_parameter!
         line = 0; tablestart = 0
         ios = 0
         call seek_un(errorflag,free_unit)!
-        print*,'In read_irr_parameters, irr_met_path:',xml%sim%irr_met_path
-        print*,'In read_irr_parameters, irr_met_filename:',xml%sim%irr_met_list_fn
-        
+        print*,'irr_met_path: ',     xml%sim%irr_met_path
+        print*,'irr_met_filename: ', xml%sim%irr_met_list_fn
+
         open(free_unit,file=trim(xml%sim%irr_met_path)//trim(xml%sim%irr_met_list_fn),action="read")!
         line = 0; tablestart = 0
         ios = 0
@@ -1337,7 +1337,8 @@ module cli_read_parameter!
             ! calculate the average irrigation height
             irr_units_tbl(i)%h_irr_mean=sum(h_met%mat,irr_units_map%mat==irr_units_tbl(i)%id .and. domain_map%mat/=domain_map%header%nan)/irr_units_tbl(i)%n_cells
             if(ios/=0)then
-                print *, 'Error reading file ', trim(pars%sim%irrdistr_list_fn), ' in line ', n_irr_units, '. Execution will be aborted...'
+                print *, 'Error reading file ', trim(pars%sim%irrdistr_list_fn), ' in line ', i+1, '.'
+                print *, 'Expected format: integer real integer. Execution will be aborted...'
                 stop
             end if!
         end do!
