@@ -3,7 +3,6 @@ obj/*.mod
 obj/*.o
 assets
 release
-
 demo/simout/**
 .codex_tmp
 *.zip

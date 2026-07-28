@@ -1,0 +1,6 @@
+# Weather stations used by both CropCoef and IdrAgra
+StatNum = 2
+Table =
+FileName X Y
+station_west.dat 500250.0 5000750.0
+station_east.dat 502000.0 5001000.0

@@ -1,196 +1,237 @@
-################ Input file for Idragra ##########################
+################ IdrAgra v2.3.0 compact feature demo #################
 #
-#                   Note: lines starting with <#> are comments
-# 
-########################################################
+# Anything that comes after "#" is a comment and is ignored by IdrAgra.
+# Folder paths are relative to the directory from which IdrAgra is run.
+#
+######################################################################
 
-### 0. Printing ###
+
+### 0. Output controls ################################################
+
+# prt_all: master switch for the complete standard output set [y/n].
+# Individual switches below may be used to enable selected outputs when
+# prt_all = n.
 prt_all = n
-prt_stp_irr = y
-prt_stp_deep_perc = y #flux2
-prt_stp_et_act = y
-prt_stp_et_pot = y
-prt_stp_transp_act = y
-prt_stp_transp_pot = y
 
-### 1. General section ###
+# prt_annual: print annual summaries [y/n].
+prt_annual = y
 
-# 1.1. Input and output folders and files
+# prt_yield: print crop-yield output [y/n].
+prt_yield = y
 
-# 1.1.1. Output folder
+# Time-step output switches [y/n].
+prt_stp_irr = y          # irrigation
+prt_stp_cap_rise = y     # capillary rise
+prt_stp_deep_perc = y    # deep percolation
+prt_stp_et_act = y       # actual evapotranspiration
+prt_stp_et_pot = y       # potential evapotranspiration
 
-# OutputPath: path to output folder [name_outputpath\\]
+
+### 1. Input and output paths #########################################
+
+# OutputPath: folder in which simulation results are written.
 OutputPath = simout\\
 
-# 1.1.2. Input folders
-
-# InputPath: path to spatialized input folder (default: spatial_data\\)
+# InputPath: folder containing spatialized model inputs.
 InputPath = geodata\\
 
-# MeteoPath: path to meteorological stations folder (default: meteo_data\\)
+# MeteoPath: folder containing meteorological station data.
 MeteoPath = meteodata\\
-# MeteoFileName: file, located in root folder, in which meteorological filenames are stored (default: weather_stations.dat)
+
+# MeteoFileName: root-level file listing the meteorological input files.
 MeteoFileName = weather_stations.dat
 
-# PhenoPath: path to phenological parameters folder (default: crop_series\\)
+# PhenoPath: folder containing crop phenology parameter files.
 PhenoPath = pheno\\
-# PhenoFileRoot: first part of the name of phenological parameters subfolders (labelled as PhenoFileRoot_MeteoNum.dat) (default: pheno_)
+
+# PhenoFileRoot: common prefix used by phenology files associated with
+# meteorological stations.
 PhenoFileRoot = pheno_
 
-# IrrMethPath: path to irrigation methods folder (default: irrmeth_data\\)
+# IrrMethPath: folder containing irrigation-method files.
 IrrMethPath = irrmethods\\
-# IrrMethFileName: file, located in irrigation methods folder, in which irrigation methods filenames are stored (default: irrmethods.txt)
-IrrMethFileName = irrmethods.txt 
 
-# WatSourPath: path to water sources folder (default: watsour_data\\)
+# IrrMethFileName: file listing the irrigation-method input files.
+IrrMethFileName = irrmethods.txt
+
+# WatSourPath: folder containing water-source input files.
 WatSourPath = wsources\\
 
-# 1.2. Simulation settings
 
-# 1.2.1.  Type of simulation
+### 2. Simulation mode, period and conditions #########################
 
-# Mode: type of simulation [0...4]
-# Mode = 0 # simulation without irrigation
-# Mode = 1 # simulation with irrigation, mode consumptions
-# Mode = 2 # simulation with irrigation, field capacity needs satisfaction
-# Mode = 3 # simulation with irrigation, fixed volumes
-# Mode = 4 # fixed irrigation applications, data and volumes are specified in a file
-Mode = 0
+# Mode: irrigation simulation mode [0...4].
+#   0 = no irrigation
+#   1 = irrigation consumptions
+#   2 = satisfy field-capacity requirements
+#   3 = fixed irrigation volumes
+#   4 = fixed irrigation dates and volumes read from file
+Mode = 1
 
-# 1.2.2. Simulation conditions
-
-# InitialThetaFlag: switch, external setting of initial soil moisture condition [T F] (T=true, F= false)
-# InitialThetaFlag = T # initial moisture condition read from external file
-# InitialThetaFlag = F # internally generated initial moisture condition by running the first year and using its output as initial moisture for the simulation
+# InitialThetaFlag: read the initial soil-moisture state from an external
+# file [T/F]. When F, IdrAgra generates the initial condition internally.
 InitialThetaFlag = T
-InitialConditionPath = init_cond\\
+
+# FinalThetaFlag: save the final soil-moisture state for possible reuse as
+# an initial condition in a subsequent simulation [T/F].
+FinalThetaFlag = T
+
+# StartSimulation / EndSimulation: inclusive simulation dates [dd/mm/yyyy].
+StartSimulation = 01/01/2021
+EndSimulation = 31/12/2022
+
+# Initial-condition input. Used when InitialThetaFlag = T.
+InitialConditionPath = geodata\\
 InitialCondition = IC_theta
 
-# CapillaryFlag: switch, simulation of capillary rise [T F] (T=true, F= false)
-# CapillaryFlag = T # capillary rise simulated
-# CapillaryFlag = F # capillary rise not simulated
-CapillaryFlag = F
+# Final-condition output. Used when FinalThetaFlag = T.
+FinalConditionPath = final_condition\\
+FinalCondition = FC_theta
 
-# SoilUseVarFlag: switch, simulation uses yearly soil uses [T F] (T=true, F= false)
-# SoilUseVarFlag = T # soil uses changes every year
-# SoilUseVarFlag = F # soil uses does not change
+# CapillaryFlag: enable capillary-rise simulation [T/F].
+CapillaryFlag = T
+
+# SoilUseVarFlag: allow soil use to vary between years [T/F].
 SoilUseVarFlag = T
 
-# 1.2.3. Meteorological inputs
 
-# MeteoStatTotNum: number of meteorological stations
-MeteoStatTotNum = 1
-# MeteoStatWeightNum: number of nearest meteorological stations used to weight crop phenology
+### 3. Meteorology, land use, and sowing #############################
+
+# MeteoStatTotNum: total number of meteorological stations.
+MeteoStatTotNum = 2
+
+# MeteoStatWeightNum: number of nearest stations used in the weighted
+# meteorological/phenological calculations.
 MeteoStatWeightNum = 2
 
-# 1.2.4. Soil uses inputs
+# SoilUsesNum: number of soil-use classes included in each phenological
+# series.
+SoilUsesNum = 7
 
-# SoilUsesNum: number of considered soil uses in each of phenological series
-SoilUsesNum = 3
-# SimulatedSoilUses: list of soil uses to be simulated (e.g. 1 2 3 4 5 ...)
-SimulatedSoilUses = 1 2 3
-# RandSowDaysWind: number of days of window for sowing date randomization
-RandSowDaysWind = 0
+# SimulatedSoilUses: IDs of the soil-use classes to simulate.
+SimulatedSoilUses = 1 2 3 4 5 6 7
 
-# 1.2.5. Periodical output setting
+# RandSowDaysSym: shape of the sowing-date randomization window.
+RandSowDaysSym = symmetric
 
-# MonthlyFlag: output interval (monthly or specific interval) [T F] (T=true, F= false)
-# MonthlyFlag = T # switch, output each month
-# MonthlyFlag = F # switch, periodical output
-MonthlyFlag = T
+# RandSowDaysWind: half-width or extent, in days, of the sowing-date
+# randomization window.
+RandSowDaysWind = 3
 
-# if MonthlyFlag = F, choose output interval - output will be recorded from StartDate to EndDate every DeltaDate days
-# StartDate: start Julian day [1...366] for periodic output 
-StartDate = 105
-# EndDate: end Julian day [1...366] for periodic output
-EndDate = 273
-# DeltaDate: output interval, Julian days [1... 366]
-DeltaDate = 10
+# Repeatable: use a repeatable random sequence, allowing identical results
+# across equivalent runs [T/F].
+Repeatable = T
 
-### 2. Simulation specifications  ###
+# Forecast_day: forecast horizon or reference day used by forecast-related
+# calculations.
+Forecast_day = 1
 
-# 2.1. Ponding parameters
 
-# PondSlopeMin: slope below which (or equal to) maximum ponding (q_max) occurs
-# PondSlopeMin = 0.00
+### 4. Periodic output ################################################
 
-# PondFracMax : maximum ponding ratio between ponded water and theorical runoff
-# PondFracMax = 0.90
+# MonthlyFlag: periodic-output schedule. In this demo, "monthly" requests
+# monthly output. WeekDay and StartDate/EndDate/DeltaDate below are inactive
+# unless a weekly or periodic schedule is selected.
+MonthlyFlag = monthly
 
-# PondSlopeMax: slope over which minimum ponding (q_min) occurs
-# PondSlopeMax = 0.05
+# WeekDay: used only when MonthlyFlag selects a weekly schedule.
+WeekDay = monday
 
-# PondFracMin: minimum ponding ratio between ponded water and theorical runoff
-#PondFracMin = 0.10
+# StartDate / EndDate: used only when MonthlyFlag selects a periodic schedule;
+# first and last day of year [1...366] included in that schedule.
+StartDate = 91
+EndDate = 304
 
-# 2.2. Soil conductivity parameters
+# DeltaDate: used only with a periodic schedule; interval between outputs [d].
+DeltaDate = 14
 
-# 01q_eva: 10th percentile of soil conductivity for evaporative layer
-01q_eva = 0.575118
 
-# 09q_eva: 90th percentile of soil conductivity for evaporative layer
-09q_eva = 8.026400
+### 5. Soil-water, runoff, and layer parameters ######################
 
-# 01q_trasp: 10th percentile of soil conductivity for traspirative layer
-01q_trasp = 0.472116
+# Lower and upper Ksat calibration breakpoints for the evaporative layer.
+# IdrAgra does not calculate these percentiles: the supplied values are used
+# directly to interpolate the irrigation-related percolation-booster
+# coefficients. They affect irrigated simulations (Modes 1...4).
+# 01q_eva: lower breakpoint; 09q_eva: upper breakpoint.
+01q_eva = 3.32
+09q_eva = 6.69
 
-# 09q_trasp: 90th percentile of soil conductivity for traspirative layer
-09q_trasp = 7.706101
+# Lower and upper Ksat calibration breakpoints for the transpirative layer.
+# As above, these are direct calibration inputs rather than statistics
+# calculated by IdrAgra.
+# 01q_trasp: lower breakpoint; 09q_trasp: upper breakpoint.
+01q_trasp = 1.40
+09q_trasp = 4.41
 
-# 2.2. Irrigation inputs
+# zEvap: evaporative-layer depth [m].
+zEvap = 0.10
 
-# StartIrrSeason: Julian day [1...366] in which irrigation season starts (e.g. 105)
-StartIrrSeason = 1
+# zRoot: transpirative/root-zone depth [m].
+zRoot = 0.90
 
-# EndIrrSeason: Julian day [1...366] in which irrigation season starts (e.g. 273)
-EndIrrSeason = 366 
+# LambdaCN: initial-abstraction ratio used by the Curve Number runoff
+# formulation [-].
+LambdaCN = 0.20
 
-# if Mode = 1 (consumptions), define irrigation sources
-# BasinsTotNum: total number of irrigation districts
-# BasinsTotNum = 0
+# lim_prec: minimum precipitation threshold used by rainfall/runoff
+# calculations [mm].
+lim_prec = 0.10
 
-# BasinsXSourceTotNum: number of combinations of irrigation districts and diversions
-# BasinsXSourceTotNum = 0
+# h_maxpond: general/out-of-season maximum surface-ponding depth [mm].
+# During the irrigation season, irrigation-method values override this value.
+h_maxpond = 30.0
 
-# SourceSurfDerivTotNum: total number of surface derivations
-# SourceSurfDerivTotNum = 0
+# fc_ratio: field-capacity target multiplier [-]. Used only in Mode 2;
+# changing it has no effect in this demo while Mode = 1.
+fc_ratio = 1.0
 
-# SourceFlowWellTotNum: total number of flowing wells
-# SourceFlowWellTotNum = 0
 
-# SourceTailwaterTotNum: total number of tailwater sources
-# SourceTailwaterTotNum = 0
+### 6. Irrigation season and source files ############################
 
-# SourceWellTotNum: total number of public wells
-# SourceWellTotNum = 0
+# StartIrrSeason / EndIrrSeason: default irrigation-method season [1...366].
+# Values specified by an individual irrigation-method file override these.
+StartIrrSeason = 91
+EndIrrSeason = 274
 
-# 2.3. Layers depth [m]
+# Water-source and irrigation-network input filenames. Most source/diversion
+# files are used by Mode 1; sched_irr_fn is used only by Mode 4.
+WatSources_fn = watsources.txt
+mon_sources_i_div_fn = monit_sources_i.txt
+mon_sources_ii_div_fn = monit_sources_ii.txt
+int_reuse_div_fn = int_reuse.txt
+cr_sources_list_fn = cr_sources.txt
+IrrDistr_list_fn = irr_districts.txt
+sched_irr_fn = scheduled_irrigation.txt
 
-# zEvap: evaporative layer depth [m]
-zEvap = 0.1
 
-# zRoot: transpirative layer depth [m]
-zRoot = 0.9
+### 7. DTx settings (experimental; inactive in this demo) ############
 
-### 3. DTx specifications ###
-
-# DTxMode: DTx calculation off [none], DTx statistical analysis [analysis] or DTx application [application]
-# DTxMode = none
-# DTxMode = analysis
-# DTxMode = application
+# DTx support is incomplete. Keep all values in this block even when the mode
+# is "none", because the current code does not provide safe defaults for every
+# internal DTx dimension.
+#
+# DTxMode: experimental DTx calculation mode [none/analysis/application].
+#   none        = disable DTx calculations
+#   analysis    = accumulate samples and fit gamma-distribution parameters
+#   application = export current-run accumulated deficit maps; despite its
+#                 name, it does NOT load or apply relationships from analysis
 DTxMode = none
 
-# DTxNumXs: number of calculated indices (one for each integration period), i.e. elements of DTx_x
-DTxNumXs = 3 
+# DTxNumXs: number of DTx integration periods listed in DTx_x.
+DTxNumXs = 3
 
-# DTx_x: integration period  (DT10 sums transpirative deficit of 10 days)
+# DTx_x: integration periods in days. For example, DT10 represents the
+# transpirative deficit accumulated over 10 days.
 DTx_x = 10 20 30
 
-# DTxDeltaDate: DTx calculation interval
+# DTxDeltaDate: interval, in days, between DTx calculations.
 DTxDeltaDate = 10
-# DTxDelayDays: delay from the first day of year to start calculation 
-DTxDelayDays = 1 
 
-# if DTxMode = analysis, choose minimum cardinality (i.e. number of elements for a valid estimate)
-# DTxMinCard: minimum cardinality for statistical analysis
-DTxMinCard = 3 
+# DTxDelayDays: delay, in days from the start of the year, before DTx
+# calculations begin.
+DTxDelayDays = 1
+
+# DTxMinCard: minimum sample cardinality required for a valid estimate in
+# analysis mode. This two-year demo cannot normally satisfy a value of 3;
+# the value is retained because DTx is disabled.
+DTxMinCard = 3

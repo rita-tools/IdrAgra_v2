@@ -1,0 +1,6 @@
+Ksat_II = 0.40
+N_II = 9.00
+ThetaII_FC = 0.300
+ThetaII_r = 0.070
+ThetaII_sat = 0.480
+ThetaII_WP = 0.130
