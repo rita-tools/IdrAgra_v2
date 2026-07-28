@@ -30,7 +30,7 @@ module cli_simulation_manager!
 ! calc_interception              <- interception calculation
 ! Pioggia_Efficace          <- effective rainfall calculation
 !
-    use mod_utility, only: sp, dp, get_value_index, make_numbered_name, get_uniform_sample, days_x_month, calc_date, day_of_week
+    use mod_utility, only: sp, dp, get_value_index, get_uniform_sample, days_x_month, calc_date, day_of_week
     use mod_parameters
     use mod_grid, only: read_grid, write_grid, print_mat_as_grid, overlay_domain, &
                         & bound, id_to_par
@@ -109,7 +109,6 @@ module cli_simulation_manager!
         integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::dir_phenofases
         integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::dir_meteo
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::meteo_weight
-        character(len=255),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::code_pmeteo
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,pars%sim%n_irr_meth)::h_irr ! z depends on number of irrigation methods 
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::priv_irr!
         real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::coll_irr!
@@ -194,8 +193,7 @@ module cli_simulation_manager!
         do j=1,size(info_spat%domain%mat,2)
             do i=1,size(info_spat%domain%mat,1)
                 if(info_spat%backup_domain%mat(i,j)/=info_spat%backup_domain%header%nan) then !%PS% changed from %domain to %backup_domain to avoid problems with cells that are not simulated in the first year but become part of the active domain later
-                    code_pmeteo(i,j) = make_numbered_name(dir_phenofases(i,j),".dat")
-                    dir_phenofases(i,j) = get_value_index(info_meteo%filename, code_pmeteo(i,j))
+                    dir_phenofases(i,j) = get_value_index(info_meteo%station_id, dir_phenofases(i,j))
                 end if
             end do
         end do
@@ -207,12 +205,10 @@ module cli_simulation_manager!
             do j=1,size(info_spat%domain%mat,2)
                 do i=1,size(info_spat%domain%mat,1)
                     if(info_spat%backup_domain%mat(i,j)/=info_spat%backup_domain%header%nan) then !%PS% changed from %domain to %backup_domain to avoid problems with cells that are not simulated in the first year but become part of the active domain later
-                        code_pmeteo(i,j) = make_numbered_name(dir_meteo(i,j,k),".dat")
-                        dir_meteo(i,j,k) = get_value_index(info_meteo%filename,code_pmeteo(i,j))
+                        dir_meteo(i,j,k) = get_value_index(info_meteo%station_id, dir_meteo(i,j,k))
                         if (dir_meteo(i,j,k)==0) then
-                            print*,"The weather station", int(info_spat%weight_ws(k)%mat(i,j)), &
-                                & "cannot be found in the &
-                                & meteorological stations list. Execution will be aborted..."
+                            print*,"The weather station with ID", int(info_spat%weight_ws(k)%mat(i,j)), &
+                                 & "cannot be found in the meteorological stations list. Execution will be aborted..."
                             stop
                         end if
                         meteo_weight(i,j,k) = info_spat%weight_ws(k)%mat(i,j) - int(info_spat%weight_ws(k)%mat(i,j))!
@@ -932,7 +928,7 @@ module cli_simulation_manager!
                                           & h_met_use, info_spat%irr_starts%mat, info_spat%irr_ends%mat, pheno%cn_class             )
 
                         ! %EAC%: save irrigation units results
-                        call save_irr_unit_data(doy, out_tbl_list, irr_units)
+                        call save_irr_unit_data(doy, out_tbl_list, irr_units, pars%cr%n_withdrawals)
 
                         ! update irrigation losses
                         call calc_irrigation_losses(a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min), irr_loss)
@@ -1402,7 +1398,7 @@ module cli_simulation_manager!
             call save_yield_debug_data(yield, info_spat%domain)
         
             ! close the csv files for cell outputs
-            call close_cell_output_by_year(out_tbl_list,pars%sim%mode,pars%sim%f_out_cells, pars%sim)
+            call close_cell_output_by_year(out_tbl_list,pars%sim%mode,pars%sim%f_out_cells, pars%sim,pars%cr%n_withdrawals)
             ! destroy annual variables
             call destroy_infofeno_tab(info_pheno)
             call destroy_crop(crop_map)

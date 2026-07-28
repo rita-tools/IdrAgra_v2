@@ -7,6 +7,7 @@ module mod_meteo!
     ! store weather station data
     type meteo_info!
         integer::unit                   ! unit associated to the input file
+        integer::station_id             ! stable ID read from the weather-file header
         character(len=255)::filename    ! name of the input file
         real(dp)::x_m                   ! longitude
         real(dp)::y_m                   ! latitude
@@ -179,8 +180,10 @@ module mod_meteo!
         character(len=300) :: comment,buffer, label
         integer :: p
         integer :: line, tablestart
-        character(len=300) :: date_string
-        character(leN=300) :: date_start, date_end
+        character(len=300) :: date_string, station_header
+        character(len=300) :: date_start, date_end
+        integer :: header_station_id
+        logical :: station_id_valid, station_id_mismatch
 
         ios = 0
         line = 0; tablestart = 0
@@ -235,7 +238,32 @@ module mod_meteo!
                                         & not exist. Execution will be aborted...'
                                     stop
                                 end if
-                                read(info_meteo(i)%unit,*)  ! skip the header with  Id and name of the weather station
+
+                                !%PS%
+                                ! Read the station ID, either from:
+                                !   - the filename (if numeric)
+                                !   - the first line of the file (expected format: "Id station: <x>, location: <a string>")
+                                read(info_meteo(i)%unit, '(a300)', iostat=ios) station_header
+                                if (ios /= 0) then
+                                    print *, 'Cannot read the first line of ', trim(info_meteo(i)%filename), '.'
+                                    print *, 'Execution will be aborted...'
+                                    stop
+                                end if
+                                call resolve_weather_station_id(info_meteo(i)%filename, station_header, &
+                                    & info_meteo(i)%station_id, header_station_id, station_id_valid, station_id_mismatch)
+                                if (.not. station_id_valid) then
+                                    print *, 'Invalid weather-station ID in ', trim(info_meteo(i)%filename), &
+                                        & ': ', trim(station_header)
+                                    print *, 'A valid positive header ID is required when the filename is not numeric.'
+                                    print *, 'Execution will be aborted...'
+                                    stop
+                                end if
+                                if (verbose .and. station_id_mismatch) then
+                                    print *, 'Warning: station ID ', header_station_id, ' in ', &
+                                        & trim(info_meteo(i)%filename), ' differs from numeric filename ID ', &
+                                        & info_meteo(i)%station_id, '; using the filename ID.'
+                                end if
+
                                 read(info_meteo(i)%unit,*)  info_meteo(i)%lat_deg, info_meteo(i)%alt_m ! read latitude and altitude 
                                 ! Read the first and the last days, separated by " -> " : e.g. "01/01/1993 -> 31/12/2014" TODO: reverse the order aaaa/mm/dd
                                 read(info_meteo(i)%unit, '(a300)') date_string
@@ -266,14 +294,25 @@ module mod_meteo!
         end do
         close(free_unit)!
 
+        ! Check for duplicated IDs
+        do i=1,size(info_meteo)
+            if (count(info_meteo%station_id == info_meteo(i)%station_id) > 1) then
+                print *, 'Duplicate weather-station ID ', info_meteo(i)%station_id, &
+                    & ' found among the resolved meteorological station identifiers.'
+                print *, 'Execution will be aborted...'
+                stop
+            end if
+        end do
+
         if (verbose .eqv. .true.) then
             print *,'===== DEBUG: weather station data====='
             print *,'Weather station file: ',  filemeteo_name
             print *,'Meteo files path: ',  dir
             print *,'# Weather station in list file: ',  size(info_meteo)
-            print *,'name lon_m lat_m lat_g alt_m dd/mm/yy'
+            print *,'id name lon_m lat_m lat_g alt_m dd/mm/yy'
             do i=1,size(info_meteo)
-                print *, trim(info_meteo(i)%filename),' ' , info_meteo(i)%x_m,' ', info_meteo(i)%y_m, ' ', &
+                print *, info_meteo(i)%station_id, ' ', trim(info_meteo(i)%filename),' ' , &
+                    info_meteo(i)%x_m,' ', info_meteo(i)%y_m, ' ', &
                     info_meteo(i)%lat_deg, ' ', info_meteo(i)%alt_m, ' ',  &
                     info_meteo(i)%start%day, '/', info_meteo(i)%start%month, '/', info_meteo(i)%start%year
             end do
@@ -331,6 +370,48 @@ module mod_meteo!
                                             info_meteo(i)%lat_deg,info_meteo(i)%alt_m,res_surf,current_doy)!
         end do!
     end subroutine read_meteo_data!
-    !
-        !
+
+    !%PS%: Weather station filenames can now be either numbers or strings.
+    !     - If a number: station's ID is the filename
+    !     - If a string: station's ID is read from the first line of the file
+    subroutine resolve_weather_station_id(filename, station_header, station_id, id_from_header, id_valid, id_mismatch)
+        character(len=*), intent(in) :: filename, station_header
+        integer, intent(out) :: station_id, id_from_header
+        logical, intent(out) :: id_valid, id_mismatch
+        character(len=255) :: filename_stem
+        integer :: colon_pos, comma_pos, extension_pos, id_from_filename, ios
+        logical :: header_id_valid, numeric_filename
+
+        id_from_header = 0
+        header_id_valid = .false.
+        colon_pos = index(station_header, ':')
+        comma_pos = index(station_header, ',')
+        if (colon_pos > 0 .and. comma_pos > colon_pos+1) then
+            read(station_header(colon_pos+1:comma_pos-1), *, iostat=ios) id_from_header
+            header_id_valid = ios == 0 .and. id_from_header > 0
+        end if
+
+        filename_stem = trim(adjustl(filename))
+        extension_pos = index(trim(filename_stem), '.')
+        if (extension_pos > 1) filename_stem = filename_stem(:extension_pos-1)
+
+        ! Check if the weather station's filename is a number, in that case interpret it as the station's ID
+        numeric_filename = len_trim(filename_stem) > 0 .and. verify(trim(filename_stem), '0123456789') == 0
+        id_from_filename = 0
+        if (numeric_filename) then
+            read(filename_stem, *, iostat=ios) id_from_filename
+            numeric_filename = ios == 0 .and. id_from_filename > 0
+        end if
+
+        if (numeric_filename) then ! Station's ID is the filename (without extension)
+            station_id = id_from_filename
+            id_valid = .true.
+            id_mismatch = header_id_valid .and. id_from_header /= id_from_filename
+        else                       ! Station's ID is read from the first line of the file
+            station_id = id_from_header
+            id_valid = header_id_valid
+            id_mismatch = .false.
+        end if
+    end subroutine resolve_weather_station_id
+
 end module mod_meteo!

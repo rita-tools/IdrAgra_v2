@@ -483,9 +483,9 @@ module cli_save_outputs!
         !
     end subroutine init_cell_output_by_year!
     !
-    subroutine close_cell_output_by_year(out_tbl_list,mode,f_cell_exists,sim)!
-        ! close all opened file
-        integer,intent(in)::mode
+    subroutine close_cell_output_by_year(out_tbl_list, mode, f_cell_exists, sim, n_nm_pub)
+        ! close all opened files
+        integer, intent(in) :: mode, n_nm_pub
         logical,intent(in)::f_cell_exists
         type(output_table_list),intent(inout)::out_tbl_list
         type(simulation),intent(in)::sim
@@ -508,7 +508,7 @@ module cli_save_outputs!
         end if
         if (mode == 1 ) then
             close(out_tbl_list%q_irr_units%unit)!
-            close(out_tbl_list%q_un_col%unit)!
+            if (n_nm_pub >= 1) close(out_tbl_list%q_un_col%unit)!
             close(out_tbl_list%q_surplus%unit)!
             close(out_tbl_list%q_irr%unit)!
             close(out_tbl_list%q_rem%unit)!
@@ -1300,8 +1300,8 @@ module cli_save_outputs!
         yr_debug_map%iter2%mat = a
     end subroutine assign_annual_debug_map!
 
-    subroutine save_irr_unit_data(doy,out_tables,irr_units)
-        integer, intent(in):: doy
+    subroutine save_irr_unit_data(doy, out_tables, irr_units, n_nm_pub)
+        integer, intent(in) :: doy, n_nm_pub
         type(output_table_list), intent(in)::out_tables
         type(irr_units_table),dimension(:),allocatable, intent(in)::irr_units
         integer:: i
@@ -1311,7 +1311,9 @@ module cli_save_outputs!
         write(out_tables%q_rem%unit,*)doy,'; ',(irr_units(i)%q_rem,'; ',i=1,size(irr_units))
         write(out_tables%q_un_priv%unit,*)doy,'; ',(irr_units(i)%q_un_priv,'; ',i=1,size(irr_units))
         write(out_tables%n_inv_cells%unit,*)doy,'; ',(irr_units(i)%n_irrigated_cells,'; ',i=1,size(irr_units))
-        write(out_tables%q_un_col%unit,*)doy,'; ',(irr_units(i)%q_un_coll,'; ',i=1,size(irr_units))
+        if (n_nm_pub >= 1) then
+            write(out_tables%q_un_col%unit,*)doy,'; ',(irr_units(i)%q_un_coll,'; ',i=1,size(irr_units))
+        end if
         ! q_act_fld(4)
     end subroutine save_irr_unit_data
 
