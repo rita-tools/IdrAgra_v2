@@ -21,8 +21,11 @@ jobs:
       - name: Build
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path release | Out-Null
+          New-Item -ItemType Directory -Force -Path release, obj | Out-Null
+          make cleanall
           make
+          make cleanobjects
+          make debug=1
 
       - name: Package release
         shell: pwsh
@@ -31,7 +34,8 @@ jobs:
           $zipPath = "$packageDir.zip"
 
           New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
-          Copy-Item release/*.exe $packageDir/
+          Copy-Item release/*_release.exe $packageDir/
+          Copy-Item release/*_debug.exe $packageDir/
           Copy-Item Utilities $packageDir/Utilities -Recurse
           Copy-Item demo $packageDir/demo -Recurse
           Compress-Archive -Path "$packageDir/*" -DestinationPath $zipPath -Force
@@ -42,7 +46,8 @@ jobs:
           $version = $env:GITHUB_REF_NAME.TrimStart('v')
 
           gh release create $env:GITHUB_REF_NAME `
-            release/*.exe `
+            release/*_release.exe `
+            release/*_debug.exe `
             release/*.zip `
             --title "IdrAgra $version" `
             --generate-notes

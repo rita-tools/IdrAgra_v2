@@ -19,24 +19,22 @@ export PATH := $(MINGW64_BINDIR):$(PATH)
 
 CC = gfortran
 CPP = gfortran -cpp
-IS_RELEASE := true
 
-# -g for gdb, -O0 zero optimization or -Og
-### for debug ###
-TYPE := debug
-GFFLAGS = -cpp -DGIT_VERSION=\"$(VERSION)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -g -Wall -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all,no-array-temps -ffpe-trap=zero,overflow,underflow -finit-real=nan -c 
-# nnnooo  GFFLAGS = -cpp -DGIT_VERSION=\"$(VERSION)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -g -Wall  -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all -ffpe-trap=denorm -funsafe-math-optimizations -finit-real=nan -c 
-#GFFLAGS = -g -O0 -Wall -Wextra -Wshadow -pedantic -static -c
-#GFFLAGS =  -cpp -DMY_VERSION=\"$(VERSION)\" -g -Wall -c
+# Build mode:
+#   make         -> release build
+#   make debug   -> debug build
+#   make debug=1 -> debug build
+debug ?= 0
 
-ifeq ($(IS_RELEASE),true)
-   ### for release ###
-   # -ffree-line-length-512 manage long commands in the code
+ifeq ($(debug),1)
+   TYPE := debug
+   GFFLAGS = -cpp -DGIT_VERSION=\"$(VERSION)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -g -Wall -Wconversion -fimplicit-none -fbacktrace -ffree-line-length-0 -fcheck=all,no-array-temps -ffpe-trap=zero,overflow,underflow -finit-real=nan -c
+   LDFLAGS = -g
+else
    TYPE := release
-   GFFLAGS = -cpp -DGIT_VERSION=\"$(VERSION)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -ffast-math  -O3 -ffree-line-length-0 -c
+   GFFLAGS = -cpp -DGIT_VERSION=\"$(VERSION)\" -DCOMP_DATE=\"$(CURRENTDATE)\" -DWIN=$(WIN) -ffast-math -O3 -ffree-line-length-0 -c
+   LDFLAGS =
 endif
-
-LDFLAGS = 
 
 APPNAME = idragra_$(VERSION)_$(TYPE)
 APPALIAS = idragra_latest
@@ -72,9 +70,9 @@ FILES = mod_constants mod_utility mod_parameters mod_grid mod_common mod_evapotr
 # Builds the app
 # force removing main.o in order to update program metadata
 $(APPNAME): $(patsubst %, $(OBJDIR)/%.o, $(FILES))
-	$(DEL) -f /$(OBJDIR)/cli_main.o
+	$(DEL) -f $(OBJDIR)/cli_main.o
 	$(CC) -o $(OBJDIR)/cli_main.o -J$(OBJDIR) $(GFFLAGS) $(SRCDIR)/cli_main.f90
-	$(CPP) -g -o $(RELDIR)/$@$(EXE) $^ $(OBJDIR)/cli_main.o $(LDFLAGS) -static
+	$(CPP) -o $(RELDIR)/$@$(EXE) $^ $(OBJDIR)/cli_main.o $(LDFLAGS) -static
 	$(CP) $(RELDIR)/$@$(EXE) $(RELDIR)/$(APPALIAS)$(EXE)
 
 # The following sets a function that creates makefile rules
@@ -92,16 +90,22 @@ $(foreach element,$(FILES),$(eval $(call make-o-rule,$(element))))
 all:
 	$(APPNAME)
 
-##### Set the obj folder empty ####
-# Cleans complete project
-# call as: make cleanall
+.PHONY: debug
+debug:
+	$(MAKE) cleanobjects
+	$(MAKE) debug=1
+
+##### Clean build outputs ####
+.PHONY: cleanobjects
+cleanobjects:
+	$(DEL) -f $(wildcard ./$(OBJDIR)/*.mod)
+	$(DEL) -f $(wildcard ./$(OBJDIR)/*.o)
+
 .PHONY: cleanall
-cleanall:
-	$(DEL) $(wildcard ./$(OBJDIR)/*.mod)
-	$(DEL) $(wildcard ./$(OBJDIR)/*.o)
-	$(DEL) $(wildcard ./$(RELDIR)/*.exe)
+cleanall: cleanobjects
+	$(DEL) -f $(wildcard ./$(RELDIR)/*.exe)
 
 .PHONY: cleanmain
 cleanmain:
 	@echo "hello from cleanmain"
-	$(DEL) -f /$(OBJDIR)/main.o
+	$(DEL) -f $(OBJDIR)/main.o
