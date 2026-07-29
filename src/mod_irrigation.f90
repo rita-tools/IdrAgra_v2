@@ -107,16 +107,13 @@ subroutine update_adj_perco_parameters(info_spat, matrice_irr, day_from_irr, adj
 
 end subroutine
 
-subroutine irrigation_need_fixed(info_spat, h_irr, bil2, bil2_old, bil1_old, pheno, &
-    & eff_rain, xrice_ksat, h_sat2, day_from_irr, adj_perc_par)
+subroutine irrigation_need_fixed(info_spat, h_irr, bil2, bil2_old, bil1_old, pheno, eff_rain, xrice_ksat, h_sat2)
     ! calculate irrigation needs at field capacity and fixed volume (defined by irrigation methods)
    real(dp),dimension(:,:,:),intent(out)::h_irr
     type(spatial_info),intent(in)::info_spat
     type(balance1_matrices),intent(in)::bil1_old
     type(balance2_matrices),intent(in)::bil2,bil2_old
     type(crop_pars_matrices),intent(in)::pheno
-    integer,dimension(:,:),intent(inout)::day_from_irr
-    real(dp),dimension(:,:,:),intent(inout)::adj_perc_par ! parameter that adjust percolation
     real(dp),dimension(:,:),intent(in)::eff_rain
     real(dp),intent(in)::xrice_ksat     ! ksat of the transpirative layer for rice
     real(dp),dimension(:,:),intent(in)::h_sat2
@@ -158,16 +155,13 @@ subroutine irrigation_need_fixed(info_spat, h_irr, bil2, bil2_old, bil1_old, phe
 
 end subroutine irrigation_need_fixed
 
-subroutine irrigation_need_fc(info_spat,h_irr,bil2,bil2_old,bil1_old,pheno,&
-    & eff_rain,xrice_ksat,day_from_irr,adj_perc_par, fc_ratio)
+subroutine irrigation_need_fc(info_spat, h_irr, bil2, bil2_old, bil1_old, pheno, eff_rain, xrice_ksat, fc_ratio)
     ! calculate irrigation needs at field capacity
    real(dp),dimension(:,:,:),intent(out)::h_irr
     type(spatial_info),intent(in)::info_spat
     type(balance1_matrices),intent(in)::bil1_old
     type(balance2_matrices),intent(in)::bil2,bil2_old
     type(crop_pars_matrices),intent(in)::pheno
-    integer,dimension(:,:),intent(inout)::day_from_irr
-    real(dp),dimension(:,:,:),intent(inout)::adj_perc_par
     real(dp),dimension(:,:),intent(in)::eff_rain
     integer::i,j
     real(dp),intent(in)::xrice_ksat     ! ksat of the transpirative layer for rice
@@ -216,7 +210,7 @@ subroutine irrigation_need_fc(info_spat,h_irr,bil2,bil2_old,bil1_old,pheno,&
 end subroutine irrigation_need_fc
 
 subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_irr, &
-    & day_from_irr, adj_perc_par, verbose, bil1_old, bil2, bil2_old, &
+    & verbose, bil1_old, bil2, bil2_old, &
     & a_loss, b_loss, c_loss, wind_vel, temp_ave,losses,eff_rain,xrice_ksat,h_sat2)
     ! spread irrigation height when scheduled
     ! TODO: need for testing
@@ -228,8 +222,6 @@ subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_
     type(scheduled_irrigation),dimension(:),intent(in)::sch_irr
     type(crop_pars_matrices),intent(in)::pheno
     real(dp),dimension(:,:,:),intent(out)::h_irr
-    integer,dimension(:,:),intent(inout)::day_from_irr
-    real(dp),dimension(:,:,:),intent(inout)::adj_perc_par
     logical:: verbose
     type(balance1_matrices),intent(inout):: bil1_old
     type(balance2_matrices),intent(inout)::bil2, bil2_old
@@ -353,9 +345,9 @@ subroutine irrigate_rice(h_irr,pheno,eff_rain,k_sat)
     end where
 end subroutine irrigate_rice
 
-subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, transp_pot, h_soil_old,             &
-                        & h_raw_coll, h_raw_half, h_raw, h_raw_priv, h_irr, doy, priv_irr, coll_irr, day_from_irr, &
-                        & esp_perc, am_perc,bm_perc, f_shape_area, cell_area, h_met, irr_starts, irr_ends, cn_class)
+subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, transp_pot, h_soil_old, &
+                        & h_raw_coll, h_raw_half, h_raw, h_raw_priv, h_irr, doy, priv_irr, coll_irr,   &
+                        & f_shape_area, cell_area, h_met, irr_starts, irr_ends, cn_class               )
     ! calculate irrigation heights in "USE" mode
     type(grid_i),intent(in)::domain, irr_units_map, method
     integer,dimension(:,:),intent(in)::irr_class, cn_class
@@ -368,10 +360,6 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
     real(dp),dimension(:,:,:),intent(out)::h_irr
     integer,intent(in)::doy
     real(dp),dimension(:,:),intent(inout)::priv_irr,coll_irr
-    integer,dimension(:,:),intent(inout)::day_from_irr
-    real(dp),dimension(:,:,:),intent(inout)::esp_perc
-    type(grid_r),dimension(:),intent(in)::am_perc
-    type(grid_r),dimension(:),intent(in)::bm_perc
     real(dp),dimension(:,:),intent(in)::cell_area
     real(dp),dimension(:,:),intent(in)::h_met
     integer,dimension(:,:),intent(in)::irr_starts

@@ -36,7 +36,6 @@ integer :: i
 logical :: verbose = .false.
 logical :: summary = .false.
 logical :: showpreview = .false.
-logical :: file_exists
 
 ! get options
 do i = 1, iargc()

@@ -9,12 +9,11 @@ end interface
 
 contains
 
-subroutine calculate_water_stresses(h_soil,h_fc,h_wp,h_sat,p_day,k_stress_dry,k_stress_sat)
+subroutine calculate_water_stresses(h_soil, h_fc, h_wp, p_day, k_stress_dry, k_stress_sat)
     ! calculate stresses
     real(dp), intent(in)::h_soil              ! actual soil content [mm]
     real(dp), intent(in)::h_wp                ! water content at wilting point [mm]
     real(dp), intent(in)::h_fc                ! water content at field capacity [mm]
-    real(dp), intent(in)::h_sat               ! water content at saturation [mm]
     real(dp), intent(in)::p_day               ! deplection fraction adjusted for meteorological conditions [-]
 
     real(dp), intent(out)::k_stress_dry       ! water scarcity stress coefficient[-]

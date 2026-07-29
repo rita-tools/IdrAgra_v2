@@ -385,7 +385,6 @@ subroutine init_water_sources_duty(pars,wat_src_tbl,src_info,weather_info)
     type(source_info),intent(inout)::src_info
     type(meteo_info),dimension(:),intent(in)::weather_info
 
-    integer :: ios = 0
     integer::error_flag
     integer::i
 

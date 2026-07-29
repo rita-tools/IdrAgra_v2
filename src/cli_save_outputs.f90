@@ -161,8 +161,7 @@ subroutine init_cell_output_file(free_unit,file_name,table_header,table_subheade
     end if
 end subroutine init_cell_output_file
 
-subroutine init_cell_output_by_year(out_tbl_list,path,yr,id_ws_list, mode, f_cell_exists, sim, &
-                                   & id_irr_unit_list, n_nm_pub, id_nm_pub_list)
+subroutine init_cell_output_by_year(out_tbl_list,path,yr,id_ws_list, mode, f_cell_exists, sim, id_irr_unit_list, n_nm_pub)
     ! read the list of output cells and
     ! prepare the output file for the selected year
     character(len=*),intent(in)::path                                   ! output path
@@ -170,7 +169,6 @@ subroutine init_cell_output_by_year(out_tbl_list,path,yr,id_ws_list, mode, f_cel
     character(len=*),dimension(:),intent(in)::id_ws_list                ! weather stations
     integer,dimension(:),intent(in),optional::id_irr_unit_list          ! irrigation units
     integer, intent(in),optional:: n_nm_pub                             ! number of non monitored public sources
-    character(len=*),dimension(:),intent(in),optional::id_nm_pub_list   ! id list of non monitored public sources
     type(output_table_list),intent(inout)::out_tbl_list                 ! list of the output table to be printed
     integer, intent(in)::mode                                           ! simulation mode
     logical,intent(in)::f_cell_exists
@@ -389,9 +387,9 @@ subroutine init_cell_output_by_year(out_tbl_list,path,yr,id_ws_list, mode, f_cel
                 write(id_irr_unit_str(i),*)id_irr_unit_list(i)
                 id_irr_unit_str(i)="SubDistr_"//trim(adjustl(id_irr_unit_str(i)))
             end do
-            allocate(w_str(size(id_irr_unit_str)+1)) !allocate(w_str(n_nm_pub+1))
+            allocate(w_str(size(id_irr_unit_str)+1))
             w_str(1)="DoY"
-            w_str(2:size(w_str))=id_irr_unit_str(:) !w_str(2:size(w_str))=id_nm_pub_list(:)
+            w_str(2:size(w_str))=id_irr_unit_str(:)
             call init_cell_output_file(out_tbl_list%q_un_col%unit,trim(path)//trim(adjustl(out_tbl_list%q_un_col%fn)),trim(title),w_str)
             deallocate(w_str)
         end if

@@ -74,7 +74,7 @@ function cap_rise(sr, depth_under_rz, &
 
 end function cap_rise
 
-function percolation_first_layer(adj_perc_par,theta_act,theta_r, theta_fc, theta_sat, k_sat, fatt_n)
+function percolation_first_layer(theta_act,theta_r, theta_fc, theta_sat, k_sat, fatt_n)
     ! Percolation model suggested by %CG% Apr 2024
 
     real(dp),intent(in)::theta_act           ! actual water content [m3/m3 or mm]
@@ -86,8 +86,6 @@ function percolation_first_layer(adj_perc_par,theta_act,theta_r, theta_fc, theta
 
     real(dp),intent(in)::k_sat              ! saturated hydraulic conductivity [cm/h]
     real(dp),intent(in)::fatt_n             ! Brooks & Corey curve fitting parameter [-]
-    real(dp),intent(in)::adj_perc_par       ! factor that takes into account irrigation method and days spent from last irrigation [-]
-
     real(dp)::k_uns                         ! hydraulic conductivity at unsaturated condition [cm/h]
     real(dp)::percolation_first_layer       ! percolation in selected time frame - (sub)hourly [mm/h]
 
@@ -102,14 +100,12 @@ function percolation_first_layer(adj_perc_par,theta_act,theta_r, theta_fc, theta
     else if(theta_act > theta_fc)then
         percolation_first_layer=(theta_act-theta_fc) ! all the water above fc is percolation
     else
-        percolation_first_layer=k_uns*10!*adj_perc_par!min(theta_act-theta_r,k_uns*10) ! theta_act < theta_fc
+        percolation_first_layer = k_uns*10 ! theta_act < theta_fc
     end if
 
-    ! Adjusted percolation
-    percolation_first_layer=percolation_first_layer!*adj_perc_par! TODO: %CG% not consider adj_perc_par
 end function percolation_first_layer
 
-function percolation(adj_perc_par,theta_act,theta_r,theta_sat,k_sat, fatt_n, doy)
+function percolation(adj_perc_par,theta_act,theta_r,theta_sat,k_sat, fatt_n)
     ! Percolation model
     ! Reference:
     ! Brooks, Corey, 1966
@@ -123,8 +119,6 @@ function percolation(adj_perc_par,theta_act,theta_r,theta_sat,k_sat, fatt_n, doy
     real(dp),intent(in)::k_sat              ! saturated hydraulic conductivity [cm/h]
     real(dp),intent(in)::fatt_n             ! Brooks & Corey curve fitting parameter [-]
     real(dp),intent(in)::adj_perc_par       ! factor that takes into account irrigation method and days spent from last irrigation [-]
-    integer,intent(in)::doy                 ! current day for debug
-
     real(dp)::percolation                   ! percolation in selected time frame - (sub)hourly [mm/h]
 
     if(theta_act < theta_r)then
@@ -201,10 +195,10 @@ recursive subroutine water_balance_evap_lay(h_net_irr, h_soil1, &
         ! TODO: check order and update h_soil_mean
         call evaporation(h_soil_mean, h_rew, h_wp, kc_max, few, k_e, k_cb,h_et0,h_eva_act,h_eva_pot,k_r)
 
-        h_perc1 = percolation(adj_perc_par,h_soil_mean, h_r, h_sat, k_sat, fatt_n,doy)
-        !h_perc1 = percolation_first_layer(adj_perc_par,h_soil_mean, h_r, h_fc, h_sat, k_sat, fatt_n)
+        h_perc1 = percolation(adj_perc_par,h_soil_mean, h_r, h_sat, k_sat, fatt_n)
+        !h_perc1 = percolation_first_layer(h_soil_mean, h_r, h_fc, h_sat, k_sat, fatt_n)
 
-        call calculate_water_stresses(h_soil_mean,h_fc,h_wp,h_sat,p_day,k_stress_dry,k_stress_sat)
+        call calculate_water_stresses(h_soil_mean,h_fc,h_wp,p_day,k_stress_dry,k_stress_sat)
 
         hks = min(k_stress_dry,k_stress_sat)
 
@@ -326,7 +320,7 @@ recursive subroutine water_balance_transp_lay(h_soil2, h_transp_act, h_transp_po
         h_caprise = 0.
         h_rise = 0.
 
-        call calculate_water_stresses(h_soil_mean,h_fc,h_wp,h_sat,p_day,k_stress_dry,k_stress_sat)
+        call calculate_water_stresses(h_soil_mean,h_fc,h_wp,p_day,k_stress_dry,k_stress_sat)
 
         hks = min(k_stress_dry,k_stress_sat)
 
@@ -345,7 +339,7 @@ recursive subroutine water_balance_transp_lay(h_soil2, h_transp_act, h_transp_po
         if(h_caprise > 0.) then
             h_perc2 = 0.
         else
-            h_perc2 = percolation(adj_perc_par,h_soil_mean,h_r,h_sat, k_sat, fatt_n,doy)
+            h_perc2 = percolation(adj_perc_par, h_soil_mean, h_r, h_sat, k_sat, fatt_n)
         end if
 
         ! %CG% add control to limit percolation to the available saturation volume

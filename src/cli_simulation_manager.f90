@@ -593,8 +593,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         ! Output files *.csv inizialization
         if (pars%sim%mode == 1) then
             call init_cell_output_by_year(out_tbl_list, pars%sim%path, s_years, info_meteo%filename, &
-                & pars%sim%mode, pars%sim%f_out_cells, pars%sim, &
-                & irr_units%id, pars%cr%n_withdrawals, info_sources%unm_src_tbl%wat_src_id)
+                & pars%sim%mode, pars%sim%f_out_cells, pars%sim, irr_units%id, pars%cr%n_withdrawals)
         else
             call init_cell_output_by_year(out_tbl_list,pars%sim%path,s_years,info_meteo%filename, &
                 & pars%sim%mode, pars%sim%f_out_cells, pars%sim)
@@ -922,8 +921,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                                       & irr_units, (wat_bal1_old%h_transp_pot+wat_bal2_old%h_transp_pot),                       &
                                       & (wat_bal1_old%h_soil + wat_bal2_old%h_soil),                                            &
                                       & wat_bal2%h_raw_sup, wat_bal2%h_raw_inf, wat_bal2%h_raw, wat_bal2%h_raw_priv,            &
-                                      & h_irr, doy, priv_irr, coll_irr, day_from_irr, esp_perc,                                 &
-                                      & info_spat%a_perc, info_spat%b_perc, pars%sim%f_shapearea, info_spat%cell_area%mat,      &
+                                      & h_irr, doy, priv_irr, coll_irr, pars%sim%f_shapearea, info_spat%cell_area%mat,          &
                                       & h_met_use, info_spat%irr_starts%mat, info_spat%irr_ends%mat, pheno%cn_class             )
 
                     ! %EAC%: save irrigation units results
@@ -942,7 +940,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
                 case (2) ! NEED mode with field capacity target
                     call irrigation_need_fc(info_spat, h_irr, wat_bal2, wat_bal2_old, wat_bal1_old, pheno, &
-                        & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, day_from_irr, esp_perc,pars%sim%fc_ratio)
+                                          & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, pars%sim%fc_ratio    )
                     ! if outside the irrigation period, set irrigation height to zero
                     do z=1, pars%sim%n_irr_meth
                         where(doy<info_spat%irr_starts%mat .or. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
@@ -951,7 +949,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
                 case (3) ! NEED mode with fixed volume
                     call irrigation_need_fixed(info_spat, h_irr, wat_bal2, wat_bal2_old, wat_bal1_old, pheno, &
-                        & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, wat%layer(2)%h_sat, day_from_irr, esp_perc)
+                                             & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, wat%layer(2)%h_sat   )
                     ! update irrigation losses
                     call calc_irrigation_losses(a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min),irr_loss)
                     ! if outside the irrigation period, set irrigation height to zero
@@ -963,7 +961,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
                 case (4)! SCHEDULED mode
                     call irrigation_scheduled(info_spat, doy, current_year, irr_sch, pheno, &
-                        & h_irr, day_from_irr, esp_perc, debug, wat_bal1_old, wat_bal2, wat_bal2_old, &
+                        & h_irr, debug, wat_bal1_old, wat_bal2, wat_bal2_old, &
                         & a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min),irr_loss,&
                         wat_bal1%h_eff_rain, theta2_rice%k_sat_2, wat%layer(2)%h_sat)
                     ! if outside the irrigation period, set irrigation height to zero
