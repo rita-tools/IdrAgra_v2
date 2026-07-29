@@ -138,7 +138,6 @@ contains
 ! TODO: make a general form
 subroutine init_cell_output_file(free_unit,file_name,table_header,table_subheader)
     ! create the output file and print the header
-    implicit none
     character(len=*),intent(in)::file_name
     character(len=*),intent(in)::table_header                               ! column names
     character(len=*),dimension(:),optional,intent(in)::table_subheader      ! additional column names
@@ -791,7 +790,6 @@ subroutine destroy_annual_output(yr_map)
 end subroutine destroy_annual_output
 
 subroutine destroy_yield_output(yld_map)
-    implicit none
     type(yield_t)::yld_map
 
     deallocate(yld_map%biomass_pot%mat)
@@ -808,7 +806,6 @@ subroutine destroy_yield_output(yld_map)
 end subroutine destroy_yield_output
 
 subroutine destroy_annual_debug_output(dbg_yr_map)
-    implicit none
     type(annual_debug_map)::dbg_yr_map
 
     deallocate(dbg_yr_map%eva_act_tot%mat)
@@ -1007,7 +1004,6 @@ end subroutine save_step_data
 
 subroutine save_step_irrigation(a_step_map,doy,domain,calendar, init_total)
     ! save only irrigation map
-    implicit none
     type(step_map),intent(inout)::a_step_map
     integer,intent(in)::doy
     type(grid_i),intent(in)::domain
@@ -1071,7 +1067,6 @@ end subroutine save_debug_step_data
 
 subroutine save_yearly_data(yr_map,domain)
     ! save annual outputs (water balance variable and efficiency)
-    implicit none
     type(annual_map),intent(in)::yr_map
     type(grid_i),intent(in)::domain
 
@@ -1181,7 +1176,6 @@ subroutine save_annual_debug_data(yr_dbg_map, domain)
 end subroutine save_annual_debug_data
 
 subroutine save_yield_debug_data(yield,domain)
-    implicit none
     type(yield_t),intent(in)::yield
     type(grid_i),intent(in)::domain
     integer::errorflag

@@ -110,8 +110,7 @@ contains
 subroutine make_random_emergence(info_pheno,meteo_weight,dir_meteo,domain,soiluse,crop_mat,irandom,year_length)
     !randomization of emergence date from phenological series at meteorological stations
 
-    implicit none
-    real(dp),dimension(:,:,:),intent(in)::meteo_weight
+   real(dp),dimension(:,:,:),intent(in)::meteo_weight
     integer,dimension(:,:,:),intent(in)::dir_meteo
     type(grid_i),intent(in)::domain
     integer,dimension(:,:),intent(in)::soiluse
@@ -212,8 +211,7 @@ end subroutine make_random_emergence
 
 subroutine populate_crop_yield_matrices(info_pheno,dir_phenofases,domain,soil_use,crop_mat,year)
     ! populate of crop matrices with crop yield parameters
-    implicit none
-    type(crop_pheno_info),dimension(:),intent(in)::info_pheno
+   type(crop_pheno_info),dimension(:),intent(in)::info_pheno
     integer,dimension(:,:),intent(in)::dir_phenofases
     type(grid_i),intent(in)::domain
     integer,dimension(:,:),intent(in)::soil_use

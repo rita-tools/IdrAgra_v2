@@ -1,5 +1,6 @@
 module mod_system
 implicit none
+
 ! don't indent macro call
 #if WIN == 1
 ! default is unix

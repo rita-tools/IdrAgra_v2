@@ -14,8 +14,7 @@ implicit none
 contains
 
 subroutine read_all_parameters(file_xml, xml, xml_dtx, ErrorFlag, debug)
-    implicit none
-    character(len=*), intent(in) :: file_xml
+   character(len=*), intent(in) :: file_xml
     logical, intent(in) :: debug
     integer, intent(out) :: ErrorFlag
     type(TDx_index), intent(inout) :: xml_dtx
@@ -81,7 +80,6 @@ end subroutine read_all_parameters
 
 subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
     ! read settings for the simulation
-    implicit none
     character(len=*), intent(in) :: file_xml
     integer, intent(out) :: ErrorFlag
     logical, intent(in) :: verbose
@@ -595,7 +593,6 @@ end subroutine read_sim_parameters
 
 ! TODO: %EAC% at the moment the id of the irrigation method define its order in the list
 subroutine read_irr_method(irr_method_fn, met, verbose)
-    implicit none
     character(len=*),intent(in) :: irr_method_fn
     type(par_method),dimension(:),intent(inout) :: met
     logical, intent(in), optional :: verbose
@@ -722,7 +719,6 @@ subroutine read_irr_method(irr_method_fn, met, verbose)
 end subroutine read_irr_method
 
 subroutine read_all_irr_methods(xml, ErrorFlag, debug)
-    implicit none
     logical, intent(in) :: debug
     integer, intent(out) :: ErrorFlag
     type(parameters), intent(inout) :: xml
@@ -834,7 +830,6 @@ end subroutine read_spatial_info
 
 subroutine read_grid_files(info_spat, extent, sim)
     !Read *.asc files content into info_spat variable
-    implicit none
     type(bound),intent(in)::extent
     type(simulation),intent(inout)::sim
     type(spatial_info),intent(out)::info_spat
@@ -1120,7 +1115,6 @@ end subroutine check_irr_grid
 
 subroutine read_rice_parameters(sim, theta2_rice)
     ! read the parameters specific for rice paddy
-    implicit none
     type(simulation),intent(inout)::sim
     integer::errorflag,ios
     type(soil2_rice)::theta2_rice
@@ -1171,7 +1165,6 @@ end subroutine read_rice_parameters
 subroutine init_cn_table(tab_CN2, tab_CN3)
     ! init the CN table
     ! TODO: replace with the initialization from external file
-    implicit none
     real(dp),dimension(:,:,:),intent(out):: tab_CN2, tab_CN3
 
     tab_CN2 = tabCN
@@ -1183,7 +1176,6 @@ end subroutine init_cn_table
 
 subroutine write_init_grids(info_spat,mode,path,sim)
     ! save the grid data for the selected area
-    implicit none
     type(spatial_info),intent(in)::info_spat
     integer, intent(in)::mode
     character(len=*),intent(in)::path
@@ -1264,7 +1256,6 @@ end subroutine write_init_grids
 
 subroutine init_irrigation_units(domain_map,irr_units_map,eff_net,irr_units_tbl,wat_src_tbl,pars,h_met)
     !allocazione e inizializzazione della variabile IU
-    implicit none
     type(grid_i),intent(in)::domain_map,irr_units_map
     type(grid_r),intent(in)::eff_net,h_met
     type(parameters),intent(in)::pars

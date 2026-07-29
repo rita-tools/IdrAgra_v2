@@ -4,8 +4,8 @@ use mod_grid, only: grid_i, grid_r
 ! use mod_parameters, only: pond ! NOT USED
 use mod_crop_phenology, only: crop_pars_matrices
 use mod_common, only: moisture
-
 implicit none
+
 
 type output_cn
     real(dp)::tab_cn2              ! CN tabulated values (CN2)
@@ -59,8 +59,7 @@ end subroutine CN_runoff
 subroutine CN_table(tab_CN2, tab_CN3,hydr_cond,cn,cn_day,cn_day_out,domain,hydr_grp, &
     & slope, cn_out,theta,t_soil1,t_soil2)
     ! CN model
-    implicit none
-    ! Input
+   ! Input
     real(dp),dimension(:,:,:),intent(in)::tab_CN2, tab_CN3
     type(grid_i),intent(in)::domain                                    ! simulation domain
     type(grid_i),intent(in)::hydr_grp                                  ! hydrological group [-] [integer, 1-4 - corresponds to A-D classes]
@@ -165,8 +164,7 @@ end subroutine CN_table
 
 subroutine adjust_cn_by_slope(tab_CN2,tab_CN3,slope,tab_CN2_slope)
     !slope CN adjustment
-    implicit none
-    real(dp),intent(in)::slope
+   real(dp),intent(in)::slope
     real(dp),dimension(:,:,:),intent(in)::tab_CN3,tab_CN2
     real(dp),dimension(:,:,:),intent(inout)::tab_CN2_slope
 
@@ -183,8 +181,7 @@ end subroutine adjust_cn_by_slope
 
 subroutine adjust_cn_by_pheno(cn_day,tab_CN2_slope,cn2,cn2day,k)
     !phenological phase CN adjustment
-    implicit none
-    integer,intent(in)::cn_day
+   integer,intent(in)::cn_day
     real(dp),intent(in)::tab_CN2_slope
     real(dp),intent(in)::cn2
     real(dp),intent(out)::cn2day
@@ -207,8 +204,7 @@ end subroutine adjust_cn_by_pheno
 
 subroutine adjust_cn_by_moisture(cn,cn1,cn2,cn3,swp,sfc,ssat,sfcwp,st)
     !moisture content CN adjustment
-    implicit none
-    real(dp),intent(inout)::cn
+   real(dp),intent(inout)::cn
     real(dp),intent(in)::cn1,cn2,cn3
     real(dp),intent(in)::swp,sfcwp,sfc,ssat,st ! moisture content: WP, AWCII, FC, saturation, actual [mm]
     real(dp),parameter::cn4=95.d0

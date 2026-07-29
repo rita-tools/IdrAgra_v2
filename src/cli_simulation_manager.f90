@@ -48,8 +48,8 @@ use cli_watsources
 use cli_crop_parameters, only: read_all_crop_pars, destroy_infofeno_tab, check_pheno_parameters, k_cb_matrices
 use cli_save_outputs
 use cli_read_parameter
-
 implicit none
+
 
 ! Assignment statement overloading interface
 ! Help to initialize and update derived types
@@ -70,7 +70,6 @@ contains
 
 subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, info_meteo, info_pheno, tab_CN2, tab_CN3,&
     & theta2_rice, sim_years,boundaries, debug, summary)
-    implicit none
 
     type(parameters),intent(inout)::pars
     type(TDx_index),intent(in)::pars_TDx
@@ -1449,8 +1448,7 @@ subroutine write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal
     & info_spat, pars, wat, wat_bal_hour, fw, fw_old, esp_perc, out_cn, out_cn_day, h_bypass, coll_irr, &
     & priv_irr, out_tbl, mode,cells,sim)
     ! write daily output for each control cells
-    implicit none
-    integer, intent(in):: doy
+   integer, intent(in):: doy
     type(meteo_mat), intent(in):: meteo
     type(meteo_info), dimension(:), intent(in):: info_meteo
     type(crop_pars_matrices), intent(in):: pheno
@@ -1602,8 +1600,7 @@ end subroutine write_daily_output
 subroutine write_outputs_by_step (doy, meteo, irrigation_sum, bil1, bil2, &
     & info_spat, coll_irr, priv_irr, asc, deb_asc,hbypass, intervals, clock_time, summary)
     ! writes periodic (monthly/weekly/custom) output in *.asc files
-    implicit none
-    integer, intent(in):: doy
+   integer, intent(in):: doy
     type(meteo_mat), intent(in):: meteo
     real(dp), dimension(:,:), intent(in):: irrigation_sum
     real(dp), dimension(:,:), intent(in):: hbypass
@@ -1683,8 +1680,7 @@ subroutine allocate_all (asc,yasc,deb_asc,deb_yasc,bil1,bil1_old,bil2,bil2_old,b
 end subroutine allocate_all
 
 subroutine destroy_all(asc,yasc,deb_asc,deb_yasc,bil1,bil1_old,bil2,bil2_old,bil_hour,meteo,wat,pheno,imax, jmax)
-    implicit none
-    type(step_map)::asc
+   type(step_map)::asc
     type(step_debug_map),optional::deb_asc
     type(annual_map)::yasc
     type(annual_debug_map),optional::deb_yasc
@@ -1717,8 +1713,7 @@ end subroutine destroy_all
 
 subroutine allocate_crop_map(crop_mat,domain,mcrop_alt,a)
     ! init crop matrix
-    implicit none
-    type(crop_matrices), intent(inout)::crop_mat
+   type(crop_matrices), intent(inout)::crop_mat
     integer,dimension(:,:),intent(in)::domain
     integer,intent(in)::mcrop_alt
     integer,intent(in)::a
@@ -1762,8 +1757,7 @@ subroutine allocate_crop_map(crop_mat,domain,mcrop_alt,a)
 end subroutine allocate_crop_map
 
 subroutine destroy_crop(crop_map)
-    implicit none
-    type(crop_matrices),intent(inout)::crop_map
+   type(crop_matrices),intent(inout)::crop_map
 
     deallocate(crop_map%ii0)
     deallocate(crop_map%iie)
@@ -1787,8 +1781,7 @@ end subroutine destroy_crop
 
 subroutine init_wat_bal1(bil,a)
     ! overloading of the assignment operator "="
-    implicit none
-    real(dp),intent(in)::a
+   real(dp),intent(in)::a
     type(balance1_matrices),intent(out)::bil
 
     bil%d_e = a
@@ -1809,8 +1802,7 @@ end subroutine init_wat_bal1
 
 subroutine init_wat_bal2(bil,a)
     ! overloading of the assignment operator "="
-    implicit none
-    real(dp),intent(in)::a
+   real(dp),intent(in)::a
     type(balance2_matrices),intent(out)::bil
 
     bil%d_t = a
@@ -1831,8 +1823,7 @@ end subroutine init_wat_bal2
 
 subroutine eq_wat_bal1(bil_out,bil_in)
     ! overloading of the assignment operator "="
-    implicit none
-    type(balance1_matrices),intent(in)::bil_in
+   type(balance1_matrices),intent(in)::bil_in
     type(balance1_matrices),intent(out)::bil_out
     bil_out%d_e = bil_in%d_e
     bil_out%h_eva = bil_in%h_eva
@@ -1851,8 +1842,7 @@ subroutine eq_wat_bal1(bil_out,bil_in)
 end subroutine eq_wat_bal1
 
 subroutine eq_wat_bal2(bil_out,bil_in)
-    implicit none
-    ! overloading of the assignment operator "="
+   ! overloading of the assignment operator "="
     type(balance2_matrices),intent(in)::bil_in
     type(balance2_matrices),intent(out)::bil_out
 
@@ -1874,8 +1864,7 @@ end subroutine eq_wat_bal2
 
 subroutine init_pheno(pheno,a)
     ! TODO: probably to be updated
-    implicit none
-    type(crop_pars_matrices),intent(inout)::pheno
+   type(crop_pars_matrices),intent(inout)::pheno
     real(dp),intent(in)::a
 
     pheno%k_cb_old = pheno%k_cb   ! Store kcb of the current day in kcb_old
@@ -1907,8 +1896,7 @@ subroutine init_pheno(pheno,a)
 end subroutine init_pheno
 
 subroutine init_meteo(meteo,a)
-    implicit none
-    type(meteo_mat),intent(out)::meteo
+   type(meteo_mat),intent(out)::meteo
     real(dp),intent(in)::a
 
     meteo%T_max = a
@@ -1927,8 +1915,7 @@ end subroutine init_meteo
 
 subroutine create_meteo_matrices(info_meteo, dir_meteo, meteo_weight, meteo, domain, doy, res_canopy)
     ! distribute weather variables to the domain according to the weights of each weather stations
-    implicit none
-    type(meteo_info),dimension(:),intent(in)::info_meteo
+   type(meteo_info),dimension(:),intent(in)::info_meteo
     integer,dimension(:,:,:),intent(in)::dir_meteo
     type(meteo_mat),intent(inout)::meteo
     real(dp),dimension(:,:,:),intent(in)::meteo_weight
@@ -1960,8 +1947,7 @@ end subroutine create_meteo_matrices
 
 function calc_interception(p,pheno)
     ! Calculate the interception according to Von Hoyningen-Hune (1983) and Braden (1985)
-    implicit none
-    real(dp),dimension(:,:),intent(in)::p       ! precipitation and any other above canopy irrigation [mm]
+   real(dp),dimension(:,:),intent(in)::p       ! precipitation and any other above canopy irrigation [mm]
     type(crop_pars_matrices),intent(in)::pheno
     real(dp),dimension(size(p,1),size(p,2))::f_c  !cover fraction [-]
     real(dp),dimension(size(p,1),size(p,2))::calc_interception
@@ -1977,8 +1963,7 @@ end function calc_interception
 
 function net_precipitation(h_gross_precip, h_interception)
     ! calculate the effective precipitation of each day
-    implicit none
-    real(dp),dimension(:,:),intent(in)::h_gross_precip                       ! precipitation + irrigation above canopy [mm]
+   real(dp),dimension(:,:),intent(in)::h_gross_precip                       ! precipitation + irrigation above canopy [mm]
     real(dp),dimension(size(h_gross_precip,1),size(h_gross_precip,2))::h_interception       ! interception [mm] !TODO: allocated externally?
     real(dp),dimension(size(h_gross_precip,1),size(h_gross_precip,2))::net_precipitation
 
@@ -1994,8 +1979,7 @@ end function net_precipitation
 
 subroutine eq_extensive(a,b)
     ! overloading of the assignment operator for the variable of type hourly
-    implicit none
-    real(dp),intent(in)::b
+   real(dp),intent(in)::b
     type(hourly),intent(out)::a
 
     a%esten%k_e = b
@@ -2022,8 +2006,7 @@ end subroutine eq_extensive
 subroutine b1_no_iter_eva(pheno, meteo, h_rain_lim, wat, fw_day, fw_irr, fw_rain, fc, &
                         & h_irr_sum, f_interception, domain, balance1_mat, fw_old) ! %RR% add fw_old for testing
     ! calculate the elements of the evaporative model that change daily
-    implicit none
-    type(grid_i),intent(in)::domain
+   type(grid_i),intent(in)::domain
     type(balance1_matrices),intent(in):: balance1_mat
     type(crop_pars_matrices),intent(in)::pheno
     type(meteo_mat),intent(in)::meteo
@@ -2107,8 +2090,7 @@ subroutine b1_no_iter_eva(pheno, meteo, h_rain_lim, wat, fw_day, fw_irr, fw_rain
 end subroutine b1_no_iter_eva
 
 subroutine init_water_balance_variables(wat_bal1,wat_bal2)
-    implicit none
-    type(balance1_matrices),intent(out)::wat_bal1
+   type(balance1_matrices),intent(out)::wat_bal1
     type(balance2_matrices),intent(out)::wat_bal2
 
     wat_bal1%h_soil = 0.
@@ -2132,8 +2114,7 @@ end subroutine init_water_balance_variables
 
 subroutine update_soil_pars(domain,theta,d_e,d_t,wat,theta2_rice,cn_class,k_cb)
     ! update water matrix that change with only the thikness of the soil layer
-    implicit none
-    type(grid_i),intent(in)::domain
+   type(grid_i),intent(in)::domain
     type(moisture),dimension(:),intent(in)::theta
     real(dp),dimension(:,:),intent(in)::d_e,d_t
     type(wat_matrix),intent(out)::wat
@@ -2163,8 +2144,7 @@ end subroutine update_soil_pars
 
 subroutine init_wat_bal1_matrices(wat_bal1,imax,jmax,f_allocate)
     ! init/destroy water balance variable
-    implicit none
-    type(balance1_matrices),intent(inout)::wat_bal1
+   type(balance1_matrices),intent(inout)::wat_bal1
     integer,intent(in)::imax
     integer,intent(in)::jmax
     logical,intent(in)::f_allocate
@@ -2215,8 +2195,7 @@ end subroutine init_wat_bal1_matrices
 
 subroutine init_wat_bal2_matrices(wat_bal2,imax,jmax,f_allocate)
     ! init/destroy water balance variable
-    implicit none
-    type(balance2_matrices),intent(inout)::wat_bal2
+   type(balance2_matrices),intent(inout)::wat_bal2
     integer,intent(in)::imax
     integer,intent(in)::jmax
     logical,intent(in)::f_allocate
@@ -2263,8 +2242,7 @@ end subroutine init_wat_bal2_matrices
 
 subroutine init_wat_bal_hour(wat_bal1_hour,imax,jmax,f_allocate)
     ! init/destroy wat_bal_hourly
-    implicit none
-    type(hourly),intent(inout)::wat_bal1_hour
+   type(hourly),intent(inout)::wat_bal1_hour
     integer,intent(in)::imax
     integer,intent(in)::jmax
     logical,intent(in)::f_allocate
@@ -2332,8 +2310,7 @@ end subroutine init_wat_bal_hour
 
 subroutine init_meteo_matrices(meteo,imax,jmax,f_allocate)
     ! init/destroy weather map
-    implicit none
-    type(meteo_mat),intent(inout)::meteo
+   type(meteo_mat),intent(inout)::meteo
     integer,intent(in)::imax
     integer,intent(in)::jmax
     logical,intent(in)::f_allocate
@@ -2371,8 +2348,7 @@ end subroutine init_meteo_matrices
 
 subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
     ! init/destroy pheno
-    implicit none
-    type(crop_pars_matrices),intent(inout)::pheno
+   type(crop_pars_matrices),intent(inout)::pheno
     integer,intent(in)::imax
     integer,intent(in)::jmax
     logical,intent(in)::f_allocate
@@ -2444,8 +2420,7 @@ end subroutine init_pheno_matrices
 
 subroutine init_wat_matrices(wat,imax,jmax,allocazione)
     ! init/destroy water matrices
-    implicit none
-    type(wat_matrix),intent(inout)::wat
+   type(wat_matrix),intent(inout)::wat
     integer,intent(in)::imax
     integer,intent(in)::jmax
     logical,intent(in)::allocazione

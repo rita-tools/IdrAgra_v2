@@ -95,8 +95,7 @@ subroutine read_unm_coll_sources_list(file_name, unm_coll_src_tbl, error_flag, n
     ! List =
     ! 60.txt
     ! EndList =
-    implicit none
-    character(len=*), intent(in):: file_name
+   character(len=*), intent(in):: file_name
     type(unmonitored_sources_table),intent(inout)::unm_coll_src_tbl
     type(parameters),intent(inout)::pars
     integer, intent(out):: error_flag
@@ -173,8 +172,7 @@ subroutine read_unm_coll_sources_list(file_name, unm_coll_src_tbl, error_flag, n
 end subroutine read_unm_coll_sources_list
 
 subroutine read_unm_coll_source_par(file_name,unm_col_sour_tbl,error_flag,k,pars)
-    implicit none
-    character(len=*), intent(in) :: file_name
+   character(len=*), intent(in) :: file_name
     integer,intent(in)::k
     type(parameters),intent(inout)::pars
     type(unmonitored_sources_table),intent(out)::unm_col_sour_tbl
@@ -276,8 +274,7 @@ subroutine open_scheduled_irrigation(file_name,sch_irr,debug)
     !   - a field header line
     !   - a 1-n list of record with data in the form: | irrigation unit id | year | doy | water depth |
     !     separated by tab character or spaces
-    implicit none
-    character(len=*), intent(in) :: file_name
+   character(len=*), intent(in) :: file_name
     logical, intent(in):: debug
     type(scheduled_irrigation),dimension(:),allocatable,intent(out)::sch_irr
     integer :: error_flag
@@ -511,8 +508,7 @@ end subroutine close_water_sources_dudy
 
 subroutine nom_water_supply(watsources_fn, irr_units, src_info, wat_src_tbl, f_shapearea, cell_size, shape_area, &
                             & irr_unit_map, verbose)
-    implicit none
-    character(len=*), intent(in):: watsources_fn
+   character(len=*), intent(in):: watsources_fn
     type(irr_units_table),dimension(:),intent(inout)::irr_units
     type(source_info),intent(in)::src_info
     type(water_sources_table),dimension(:),intent(in)::wat_src_tbl
@@ -579,8 +575,7 @@ end subroutine nom_water_supply
 
 subroutine read_water_sources(year_length,pars,src_info)
     ! read daily discharges for one year
-    implicit none
-    integer,intent(in)::year_length
+   integer,intent(in)::year_length
     type(source_info),intent(inout)::src_info
     type(parameters),intent(in)::pars
 

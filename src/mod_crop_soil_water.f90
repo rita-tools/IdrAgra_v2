@@ -1,8 +1,8 @@
 module mod_crop_soil_water
 use mod_constants, only: sp, dp
 use mod_evapotranspiration
-
 implicit none
+
 
 contains
 
@@ -76,7 +76,6 @@ end function cap_rise
 
 function percolation_first_layer(adj_perc_par,theta_act,theta_r, theta_fc, theta_sat, k_sat, fatt_n)
     ! Percolation model suggested by %CG% Apr 2024
-    implicit none
 
     real(dp),intent(in)::theta_act           ! actual water content [m3/m3 or mm]
     real(dp),intent(in)::theta_r             ! residual water content [m3/m3 or mm]
@@ -116,7 +115,6 @@ function percolation(adj_perc_par,theta_act,theta_r,theta_sat,k_sat, fatt_n, doy
     ! Brooks, Corey, 1966
     ! Properties of porous media affecting fluid flow
     ! J. Irr. Drain. Div. 92(1966):61-88
-    implicit none
 
     real(dp),intent(in)::theta_act          ! actual water content [m3/m3 or mm]
     real(dp),intent(in)::theta_r            ! residual water content [m3/m3 or mm]

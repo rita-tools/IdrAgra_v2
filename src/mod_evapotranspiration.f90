@@ -1,7 +1,7 @@
 module mod_evapotranspiration
 use mod_constants, only: sp, dp, pi
-
 implicit none
+
 
 interface ET_reference
     module procedure ET_reference_sc,ET_reference_mat
@@ -97,8 +97,7 @@ function ET_reference_sc(T_max, T_min, HUM_max, HUM_min, Wind_vel, Rad_sol, lat_
     ! calculate reference evapotranspiration considering the elevation
     ! see FAO-56
     ! Note: scalar mode
-    implicit none
-    integer,intent(in)::doy ! day of the year
+   integer,intent(in)::doy ! day of the year
     real(dp),intent(in)::T_max, T_min, HUM_max, HUM_min, Wind_vel, Rad_sol, lat_ws, alt_ws
     real(dp),intent(in):: res_surf
     !real(sp),parameter::pi = 3.141592653589793238462643383279502884197_sp

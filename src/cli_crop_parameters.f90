@@ -5,8 +5,8 @@ use mod_parameters, only: simulation
 use mod_meteo, only: meteo_info
 use mod_crop_phenology
 use mod_system
-
 implicit none
+
 
 logical, dimension(:), allocatable, save :: missing_crop_slot_warned
 
@@ -39,7 +39,6 @@ end subroutine open_daily_crop_par_file
 
 subroutine init_crop_par_from_file(file_name, n_crop, n_crop_alt, string_elements, n_crops_by_year, error_flag)
     ! init static crop parameters from parameter file
-    implicit none
     character(len=*), intent(in) :: file_name
     integer, intent(in) :: n_crop
     integer, intent(inout) :: n_crop_alt
@@ -93,7 +92,6 @@ end subroutine init_crop_par_from_file
 
 subroutine read_water_prod_file(file_name, string_elements, n_crops_by_year, unit_param, error_flag)
     ! read water productivity related parameters
-    implicit none
     character(len=*), intent(in) :: file_name
     integer, intent(in) :: string_elements
     integer, dimension(:), intent(in) :: n_crops_by_year
@@ -176,7 +174,6 @@ subroutine read_canopy_resistance_file(file_name, unit_param, string_elements, e
 end subroutine read_canopy_resistance_file
 
 subroutine spread_col_i(string_in, sep, string_el, string_space, string_out)
-    implicit none
     character(len=*), intent(in) :: string_in
     character(len=*), intent(in) :: sep
     integer, intent(in) :: string_el
@@ -194,7 +191,6 @@ subroutine spread_col_i(string_in, sep, string_el, string_space, string_out)
 end subroutine spread_col_i
 
 subroutine spread_col_r(string_in, sep, string_el, string_space, string_out)
-    implicit none
     character(len=*), intent(in) :: string_in
     character(len=*), intent(in) :: sep
     integer, intent(in) :: string_el
@@ -215,7 +211,6 @@ end subroutine spread_col_r
 subroutine read_crop_par_file(file_name, string_elements, ze_fix, unit_param, error_flag)
     ! read static crop parameters file
     ! TODO: merge with init_crop_par_from_file ?
-    implicit none
     character(len=*), intent(in) :: file_name
     integer, intent(in) :: string_elements
     real(dp), intent(in) :: ze_fix
@@ -597,7 +592,6 @@ end subroutine close_pheno_file
 
 subroutine check_pheno_parameters(info_pheno,info_meteo)
 ! check if phenological parameters match weather station data
-    implicit none
     type(crop_pheno_info),dimension(:),intent(in)::info_pheno
     type(meteo_info),dimension(:),intent(in)::info_meteo
     integer::i
@@ -610,7 +604,6 @@ end subroutine check_pheno_parameters
 subroutine check_crop_parameters(info_pheno,weather_station)
 ! check if phenological parameters match weather station data
 ! if k_cb is null than all the other parameters must be null
-    implicit none
     type(crop_pheno_info),intent(in)::info_pheno
     character(len=*),intent(in)::weather_station
     integer::error_flag
