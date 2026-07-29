@@ -1,7 +1,6 @@
 module mod_TDx_index
 ! TODO: split UI functions from model
 use mod_constants, only: sp, dp, nan_r
-use mod_utility, only: seek_un
 use mod_grid, only: grid_i, grid_r, print_mat_as_grid
 implicit none
 
@@ -33,18 +32,16 @@ subroutine calc_TDx(domain,gg,year,DxiTOT,kcb,gg_max,max_year,x,TD,unit_Dxi)
     real(dp),dimension(:,:),intent(in)::TD              ! transpiration deficit
     real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::Dxi_tempN,Dxi_temp
     integer::index_Dxi
-    integer::i,errorflag,ios
+    integer::i,ios
     real(dp),parameter::nan=-9999.
 
     Dxi_temp = 0.
     if(gg==1 .and. year==1)then
         do i=1,size(unit_Dxi)
-            call seek_un(errorflag,unit_Dxi(i))
-            open ( unit = unit_Dxi(i), status = 'scratch', form = 'unformatted', &
+            open(newunit=unit_Dxi(i), status='scratch', form='unformatted', &
                 & action = 'readwrite', iostat = ios)
             if(ios/=0)then
-                print *, "Error opening file scratch connected to unit unit_Dxi(",i,")=", unit_Dxi(i), &
-                    & " iostat=", ios, ". Execution will be aborted..."
+                print *, "Error opening scratch file ", i, "; iostat=", ios, ". Execution will be aborted..."
                 stop
             end if
             write(unit_Dxi(i),iostat=ios)Dxi_temp
@@ -118,7 +115,7 @@ subroutine init_TDx(unit_deficit,domain,path,TDx)
     character(len=*),intent(in)::path
     real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::temp
     integer,dimension(size(domain%mat,1),size(domain%mat,2))::num
-    integer::i,j,errorflag,ios
+    integer::i,j,ios
     character(len=*),intent(in)::TDx
     integer::free_unit
     character(len=55)::str_y, str7, nfile
@@ -129,12 +126,10 @@ subroutine init_TDx(unit_deficit,domain,path,TDx)
         write(str_y,*)j
         do i=1,unit_deficit(1)
             write(str7,*)i
-            call seek_un(errorflag,free_unit)
             nfile=TDx//'_'//trim(adjustl(str7))//'_'//trim(adjustl(str_y))//'.tmp'
-            open(unit=free_unit,file=trim(path)//trim(nfile),form='unformatted',action='readwrite',iostat=ios)
+            open(newunit=free_unit, file=trim(path)//trim(nfile), form='unformatted', action='readwrite', iostat=ios)
             if(ios/=0)then
-                print *, "Error opening file tmp connected to unit =", free_unit, " iostat=", ios, &
-                    & " nfile=",trim(nfile), ". Execution will be aborted..."
+                print *, "Error opening file ", trim(nfile), "; iostat=", ios, ". Execution will be aborted..."
                 stop
             end if
             if(j==1 .or. j==2)then
@@ -170,7 +165,7 @@ subroutine update_TDx_DB(deficit,TDx,time_step,domain,path)
     character(len=*),intent(in)::TDx
     character(len=*),intent(in)::path
     integer::ios
-    integer::free_unit,errorflag
+    integer::free_unit
     character(len=55)::str_y,str7,nfile
     real(dp),parameter::nan=-9999.
 
@@ -179,11 +174,9 @@ subroutine update_TDx_DB(deficit,TDx,time_step,domain,path)
     temp_vect(:,:,1)=deficit(:,:)       ! populates x,j,1 of temp_vect with tot_deficit ( tot_deficit(:,:,cont_dt))
     write(str_y,*)1
     nfile=TDx//'_'//trim(adjustl(str7))//'_'//trim(adjustl(str_y))//'.tmp'
-    call seek_un(free_unit,errorflag)
-    open(unit=free_unit,file=trim(path)//trim(nfile),form='unformatted',action='readwrite',iostat=ios, status='old')
+    open(newunit=free_unit, file=trim(path)//trim(nfile), form='unformatted', action='readwrite', iostat=ios, status='old')
     if(ios/=0)then
-        print *, "Error opening file tmp connected to unit =", free_unit, " iostat=", ios, &
-            & " nfile=",trim(nfile), ". Execution will be aborted..."
+        print *, "Error opening file ", trim(nfile), "; iostat=", ios, ". Execution will be aborted..."
         stop
     end if
     read(free_unit,iostat=ios)temp
@@ -217,10 +210,9 @@ subroutine update_TDx_DB(deficit,TDx,time_step,domain,path)
     temp_vect(:,:,1)=merge(log(deficit_nozeros),nan,deficit_nozeros/=nan)
     write(str_y,*)2
     nfile=TDx//'_'//trim(adjustl(str7))//'_'//trim(adjustl(str_y))//'.tmp'
-    call seek_un(free_unit,errorflag)
-    open(unit=free_unit,file=trim(path)//trim(nfile),form='unformatted',action='readwrite',iostat=ios, status='old')
+    open(newunit=free_unit, file=trim(path)//trim(nfile), form='unformatted', action='readwrite', iostat=ios, status='old')
     if(ios/=0)then
-        print *, "Error opening file tmp connected to unit =", free_unit, " iostat=", ios, " nfile=",trim(nfile), &
+        print *, "Error opening file ", trim(nfile), "; iostat=", ios, &
             & ". Execution will be aborted..."
         stop
     end if
@@ -253,10 +245,9 @@ subroutine update_TDx_DB(deficit,TDx,time_step,domain,path)
     count_num=0
     write(str_y,*)3
     nfile=TDx//'_'//trim(adjustl(str7))//'_'//trim(adjustl(str_y))//'.tmp'
-    call seek_un(free_unit,errorflag)
-    open(unit=free_unit,file=trim(path)//trim(nfile),form='unformatted',action='readwrite',iostat=ios, status='old')
+    open(newunit=free_unit, file=trim(path)//trim(nfile), form='unformatted', action='readwrite', iostat=ios, status='old')
     if(ios/=0)then
-        print *, "Error opening file tmp connected to unit =", free_unit, " iostat=", ios, " nfile=",trim(nfile), &
+        print *, "Error opening file ", trim(nfile), "; iostat=", ios, &
             & ". Execution will be aborted..."
         stop
     end if
@@ -290,10 +281,9 @@ subroutine update_TDx_DB(deficit,TDx,time_step,domain,path)
     count_zeros=0
     write(str_y,*)4
     nfile=TDx//'_'//trim(adjustl(str7))//'_'//trim(adjustl(str_y))//'.tmp'
-    call seek_un(free_unit,errorflag)
-    open(unit=free_unit,file=trim(path)//trim(nfile),form='unformatted',action='readwrite',iostat=ios, status='old')
+    open(newunit=free_unit, file=trim(path)//trim(nfile), form='unformatted', action='readwrite', iostat=ios, status='old')
     if(ios/=0)then
-        print *, "Error opening file tmp connected to unit =", free_unit, " iostat=", ios, " nfile=",trim(nfile), &
+        print *, "Error opening file ", trim(nfile), "; iostat=", ios, &
             & ". Execution will be aborted..."
         stop
     end if
@@ -359,10 +349,9 @@ subroutine save_TDx_statistics(unit_deficit,domain,path,threshold_num,TDx)
         do y=1,unit_deficit(2)
             write(str_y,*)y
             nfile=TDx//'_'//trim(adjustl(str7))//'_'//trim(adjustl(str_y))//'.tmp'
-            call seek_un(free_unit,errorflag)
-            open(unit=free_unit,file=trim(path)//trim(nfile),form='unformatted',action='readwrite',iostat=ios, status='old')
+            open(newunit=free_unit, file=trim(path)//trim(nfile), form='unformatted', action='readwrite', iostat=ios, status='old')
             if(ios/=0)then
-                print *, "Error opening file tmp connected to unit =", free_unit, " iostat=", ios, " nfile=",trim(nfile), &
+                print *, "Error opening file ", trim(nfile), "; iostat=", ios, &
                     & ". Execution will be aborted..."
                 stop
             end if
@@ -435,10 +424,9 @@ subroutine make_TDx_report(domain,path,n_week,TDx)
     write(str7,*)n_week
     write(str_y,*)1
     nfile=TDx//'_'//trim(adjustl(str7))//'_'//trim(adjustl(str_y))//'.tmp'
-    call seek_un(free_unit,errorflag)
-    open(unit=free_unit,file=trim(path)//trim(nfile),form='unformatted',action='readwrite',iostat=ios, status='old')
+    open(newunit=free_unit, file=trim(path)//trim(nfile), form='unformatted', action='readwrite', iostat=ios, status='old')
     if(ios/=0)then
-        print *, "Error opening file tmp connected to unit =", free_unit, " iostat=", ios, " nfile=",trim(nfile), &
+        print *, "Error opening file ", trim(nfile), "; iostat=", ios, &
         & ". Execution will be aborted..."
         stop
     end if

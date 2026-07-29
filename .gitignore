@@ -6,3 +6,4 @@ release
 demo/simout/**
 .codex_tmp
 *.zip
+/demo/final_condition
