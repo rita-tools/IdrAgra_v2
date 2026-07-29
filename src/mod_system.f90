@@ -1,16 +1,21 @@
 module mod_system
 implicit none
 
+character(len=10), private :: mkdir_cmd = 'mkdir'
+
 ! don't indent macro call
 #if WIN == 1
-! default is unix
-character(len = 10), private :: mkdir_cmd = 'mkdir'
-character :: delimiter = '\\'
+!%PS%: used to set delimiter = '\\', but it was being truncated to just '\' because unspecified character length is 1. achar(92) is equivalent to, but safer than, '\'.
+#define PATH_DELIMITER achar(92)
+
 #else
 ! default is unix
-character(len = 10), private :: mkdir_cmd = 'mkdir'
-character :: delimiter = '/'
+#define PATH_DELIMITER '/'
 #endif
+
+character(len=1) :: delimiter = PATH_DELIMITER ! %PS%: Variable is assigned only once so that this doesn't look like an error to VS Code/Modern Fortran
+
+#undef PATH_DELIMITER
 
 contains
 

@@ -1265,7 +1265,7 @@ subroutine init_irrigation_units(domain_map,irr_units_map,eff_net,irr_units_tbl,
     integer::i,free_unit,error_flag,ios
     integer:: strlen
     character(len=999) :: str                            ! File string
-    character(len=1),parameter :: delimiter = achar(9)   ! Delimiter: horizontal tab
+    character(len=1),parameter :: tab = achar(9)   ! Delimiter: horizontal tab
     integer::cols, n_irr_units                                 ! File columns (cols) and rows (n_bac = irrigation district number)
 
     strlen = 999
@@ -1283,7 +1283,7 @@ subroutine init_irrigation_units(domain_map,irr_units_map,eff_net,irr_units_tbl,
 
     cols = 1                        ! Count the number of delimiters in the first line
     do i = 1, strlen
-        if (str(i:i) == delimiter) then
+        if (str(i:i) == tab) then
             cols = cols+1
         end if
     end do
