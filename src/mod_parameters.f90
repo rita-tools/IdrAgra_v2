@@ -58,6 +58,7 @@ type simulation
     character(len=255) :: meteoweight_fn
     character(len=255) :: shapearea_fn
     character(len=255) :: irandom_fn
+    character(len=255) :: phenology_events_fn           ! optional external cell phenology events
 
 
     integer :: step_out                         ! monthly output = 0, weekly output = 1, user defined = 2
@@ -76,6 +77,7 @@ type simulation
     integer :: rand_seed                        ! seed to initialize the random number generator
     logical :: rand_symmetry                    ! states if the randomization of emergence date is symmetric [-n,+n] or asymmetric [0, 2n]
     integer :: sowing_range                     ! range of variability of the sowing day [days]
+    integer :: cut_irrigation_halt_days = 0      ! symmetric irrigation halt around inferred/external cuts; 0 disables
     logical :: repeatable                       ! if true, al random generated are repeated over times
     integer :: imax                             ! maximum number of rows in the raster map
     integer :: jmax                             ! maximum number of columns in the raster map

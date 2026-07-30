@@ -39,6 +39,8 @@ use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data
 use mod_runoff
 use mod_crop_soil_water
 use mod_crop_phenology, only: crop_pheno_info, crop_matrices, populate_crop_pars_matrices
+use mod_phenology_events, only: phenology_event_list, read_phenology_events, apply_phenology_events, &
+                               & destroy_phenology_events, make_cut_irrigation_halt_mask
 use mod_TDx_index
 use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva
 use mod_common, only: wat_matrix, soil2_rice, hourly, unit_file_scratch
@@ -101,6 +103,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     type(irr_units_table),dimension(:),allocatable::irr_units      ! Allocated in mod_watsources
     type(scheduled_irrigation),dimension(:),allocatable::irr_sch ! Allocated in 'open_scheduled_irrigation' function
     type(crop_matrices)::crop_map
+    type(phenology_event_list) :: pheno_events
 
     integer:: unit_crop
     integer::i,j,k,y,current_year,doy,hour,z,w                           ! for cycles
@@ -125,6 +128,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::a_loss, b_loss, c_loss, f_interception ! application losses model
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::h_irr_sum, h_bypass, h_met_use
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::k_sat2_use, fact_n2_use
+    logical,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::cut_irr_halt_mask
 
     !! TDx
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,pars_TDx%temp%n_ind)::tot_deficit      ! TDx sum
@@ -230,6 +234,10 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
     n_day=0   ! Daily count initialization
     h_irr = 0.
+
+    !%PS%: Looks for the phenology_events file, listing cell- and date- specific sow/harvest/cut actions
+    call read_phenology_events(trim(pars%sim%input_path)//trim(pars%sim%phenology_events_fn), pheno_events, &
+                             & info_spat%domain%header%imax, info_spat%domain%header%jmax, pars%sim%n_crops )
 
     ! TODO Explore if is possible to have outputs on a specific day of the week (utility:day_of_week)
 
@@ -523,6 +531,10 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         ! which will be calculated in populate_crop_pars_matrices
         call make_random_emergence(info_pheno,meteo_weight,dir_meteo,info_spat%domain,info_spat%soil_use_id%mat, &
             & crop_map, info_spat%irandom%mat, pars%sim%year_step(y))
+
+        !%PS%: Optionally overwrite cell-level phenology according to sow/harvest/cut dates specified by the user
+        call apply_phenology_events(pheno_events, current_year, pars%sim%year_step(y), info_spat%domain,              &
+                                  & info_spat%soil_use_id, dir_phenofases, info_spat%irandom%mat, info_pheno, crop_map)
 
         if (pars%sim%prt_debug_out == 'y') then
             ! write debug files of reference data for crop randomization
@@ -949,12 +961,16 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 case (3) ! NEED mode with fixed volume
                     call irrigation_need_fixed(info_spat, h_irr, wat_bal2, wat_bal2_old, wat_bal1_old, pheno, &
                                              & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, wat%layer(2)%h_sat   )
+                    call make_cut_irrigation_halt_mask(crop_map, info_pheno, dir_phenofases, &
+                        & info_spat%soil_use_id, info_spat%irandom%mat, doy, pars%sim%year_step(y), &
+                        & pars%sim%cut_irrigation_halt_days, cut_irr_halt_mask)
                     ! update irrigation losses
                     call calc_irrigation_losses(a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min),irr_loss)
                     ! if outside the irrigation period, set irrigation height to zero
                     ! and calculate net irrigation
                     do z=1, pars%sim%n_irr_meth
-                        where(doy<info_spat%irr_starts%mat .or. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
+                        where(doy<info_spat%irr_starts%mat .or. doy>info_spat%irr_ends%mat .or. cut_irr_halt_mask) &
+                            & h_irr(:,:,z) = 0.
                         h_irr(:,:,z) = h_irr(:,:,z) * (1.0-irr_loss/100.0)
                     end do
 
@@ -1402,6 +1418,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         call destroy_yield_output(yield)
     end do year_cycle
 
+    call destroy_phenology_events(pheno_events)
+
     ! Save output for the following year
     if (pars%sim%f_theta_out .eqv. .true.) then
         info_spat%theta(1)%old%mat = wat_bal1%h_soil/(1000.*wat_bal1%d_e)
@@ -1717,6 +1735,8 @@ subroutine allocate_crop_map(crop_mat,domain,mcrop_alt,a)
 
     allocate(crop_mat%ii0(size(domain,1),size(domain,2),mcrop_alt))
     allocate(crop_mat%iie(size(domain,1),size(domain,2),mcrop_alt))
+    allocate(crop_mat%external_calendar(size(domain,1),size(domain,2),mcrop_alt))
+    allocate(crop_mat%suppress_irandom(size(domain,1),size(domain,2)))
     allocate(crop_mat%iid(size(domain,1),size(domain,2),mcrop_alt))
     allocate(crop_mat%ii0_ref(size(domain,1),size(domain,2),mcrop_alt))
     allocate(crop_mat%iie_ref(size(domain,1),size(domain,2),mcrop_alt))
@@ -1733,8 +1753,15 @@ subroutine allocate_crop_map(crop_mat,domain,mcrop_alt,a)
     allocate(crop_mat%k_cb_min(size(domain,1),size(domain,2),mcrop_alt))
     allocate(crop_mat%k_cb_mid(size(domain,1),size(domain,2),mcrop_alt))
     allocate(crop_mat%k_cb_max(size(domain,1),size(domain,2),mcrop_alt))
+    allocate(crop_mat%n_external_cuts(size(domain,1),size(domain,2),mcrop_alt))
+    allocate(crop_mat%ref_first_cut(size(domain,1),size(domain,2),mcrop_alt))
+    allocate(crop_mat%ref_regrowth_start(size(domain,1),size(domain,2),mcrop_alt))
+    allocate(crop_mat%ref_regrowth_end(size(domain,1),size(domain,2),mcrop_alt))
+    nullify(crop_mat%external_cut_doy)
     crop_mat%ii0 = a
     crop_mat%iie = a
+    crop_mat%external_calendar = .false.
+    crop_mat%suppress_irandom = .false.
     crop_mat%iid = 0.d0
     crop_mat%ii0_ref = a
     crop_mat%iie_ref = a
@@ -1751,6 +1778,10 @@ subroutine allocate_crop_map(crop_mat,domain,mcrop_alt,a)
     crop_mat%k_cb_min = a
     crop_mat%k_cb_mid = a
     crop_mat%k_cb_max = a
+    crop_mat%n_external_cuts = 0
+    crop_mat%ref_first_cut = 0
+    crop_mat%ref_regrowth_start = 0
+    crop_mat%ref_regrowth_end = 0
 end subroutine allocate_crop_map
 
 subroutine destroy_crop(crop_map)
@@ -1758,6 +1789,8 @@ subroutine destroy_crop(crop_map)
 
     deallocate(crop_map%ii0)
     deallocate(crop_map%iie)
+    deallocate(crop_map%external_calendar)
+    deallocate(crop_map%suppress_irandom)
     deallocate(crop_map%iid)
     deallocate(crop_map%ii0_ref)
     deallocate(crop_map%iie_ref)
@@ -1774,6 +1807,11 @@ subroutine destroy_crop(crop_map)
     deallocate(crop_map%k_cb_min)
     deallocate(crop_map%k_cb_mid)
     deallocate(crop_map%k_cb_max)
+    deallocate(crop_map%n_external_cuts)
+    if (associated(crop_map%external_cut_doy)) deallocate(crop_map%external_cut_doy)
+    deallocate(crop_map%ref_first_cut)
+    deallocate(crop_map%ref_regrowth_start)
+    deallocate(crop_map%ref_regrowth_end)
 end subroutine destroy_crop
 
 subroutine init_wat_bal1(bil,a)

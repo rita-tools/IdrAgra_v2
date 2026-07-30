@@ -427,4 +427,10 @@ pure elemental function pdf_normal(x, x_mean, x_std) result(pdf)
     pdf = (1/((2*pi*x_std**2)**0.5))*exp(-((x-x_mean)**2)/(2*x_std**2))
 end function
 
+pure integer function days_in_calendar_year(year)
+    integer, intent(in) :: year
+    days_in_calendar_year = 365
+    if (mod(year,400) == 0 .or. (mod(year,4) == 0 .and. mod(year,100) /= 0)) days_in_calendar_year = 366
+end function days_in_calendar_year
+
 end module mod_utility

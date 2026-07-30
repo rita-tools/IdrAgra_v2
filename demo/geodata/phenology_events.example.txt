@@ -1,0 +1,7 @@
+# Optional external phenology events.
+# Columns: row col year doy event crop_slot
+# Event is one of: sowing, cut, harvest.
+#
+# 2 2 2021 105 sowing 1
+# 2 2 2021 162 cut 1
+# 2 2 2021 220 harvest 1

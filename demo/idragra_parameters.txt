@@ -48,6 +48,14 @@ PhenoPath = pheno\\
 # meteorological stations.
 PhenoFileRoot = pheno_
 
+# PhenologyEventsFileName: optional cell-specific sowing, cutting, and
+# harvest events in InputPath. A missing file disables external events.
+PhenologyEventsFileName = phenology_events.txt
+
+# CutIrrigationHaltDays: in mode 3, suppress irrigation on Kcb-inferred or
+# external cut dates and this many days before and after them. Zero disables.
+CutIrrigationHaltDays = 0
+
 # IrrMethPath: folder containing irrigation-method files.
 IrrMethPath = irrmethods\\
 

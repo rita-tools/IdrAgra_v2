@@ -174,6 +174,8 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
                                             )
                     case ('phenofileroot') ! the sub string to use as root of phenophase subfolder
                         read(buffer, *, iostat=ios) xml%sim%pheno_root
+                    case ('phenologyeventsfilename', 'phenoeventsfilename')
+                        read(buffer, *, iostat=ios) xml%sim%phenology_events_fn
                     case ('irrmethpath') ! path to meteo files
                         read(buffer, *, iostat=ios) xml%sim%irr_met_path
                         xml%sim%irr_met_path = replace_str( string = xml%sim%irr_met_path &
@@ -318,6 +320,12 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
                         end select
                     case ('randsowdayswind') ! range of sowinf
                         read(buffer, *, iostat=ios) xml%sim%sowing_range
+                    case ('cutirrigationhaltdays')
+                        read(buffer, *, iostat=ios) xml%sim%cut_irrigation_halt_days
+                        if (xml%sim%cut_irrigation_halt_days < 0) then
+                            print *, 'CutIrrigationHaltDays cannot be negative. Execution will be aborted...'
+                            stop
+                        end if
                     case ('repeatable') ! set simulation with random seeding repeatible
                         if ((trim(adjustl(buffer)) == 'true') .or. (trim(adjustl(buffer))== 't') .or. (trim(adjustl(buffer)) == '1'))  then
                             xml%sim%repeatable = .true.
