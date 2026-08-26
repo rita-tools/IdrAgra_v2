@@ -1123,7 +1123,14 @@ subroutine read_rice_parameters(sim, theta2_rice)
     line = 0
     ios = 0
 
-    open(newunit=theta2_rice%unit_soil_rice, file=trim(dir)//trim(sim%soil_prop_x_rice_fn), action='read')
+    open(newunit=theta2_rice%unit_soil_rice,file=trim(dir)//trim(sim%soil_prop_x_rice_fn),status='old',action='read',iostat=ios)
+    if (ios /= 0) then
+        !%PS%: now rice soil parameters are optional
+        print *, "WARNING: Couldn't open the rice soil properties file: ", trim(dir)//trim(sim%soil_prop_x_rice_fn), &
+               & ". Rice soil properties will not be modified."
+        return
+    end if
+
     do while (ios == 0)
         read (theta2_rice%unit_soil_rice, '(A)', iostat = ios) buffer
         if (ios == 0) then
