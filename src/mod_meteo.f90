@@ -174,7 +174,7 @@ subroutine read_meteo_parameters(sim,info_meteo,verbose)
     integer :: free_unit, i
     integer :: ios
     character(len=255) :: filemeteo_name
-    integer::m_topoieta   ! check information in simulation
+    integer :: n_stations
     character(len=255)::dir
     character(len=300) :: comment,buffer, label
     integer :: p
@@ -214,8 +214,8 @@ subroutine read_meteo_parameters(sim,info_meteo,verbose)
 
                 select case (label)
                     case ('statnum')
-                        read(buffer, *, iostat=ios) m_topoieta ! number of weather station
-                        if (m_topoieta /= sim%n_voronoi) then
+                        read(buffer, *, iostat=ios) n_stations ! number of weather station
+                        if (n_stations /= sim%n_voronoi) then
                             print *, "Meteorological stations number (MeteoStatTotNum) in simulation parameter &
                                 & file is not equal to the number (StatNum) in ", filemeteo_name, " database"
                             print *, 'Execution will be aborted...'
@@ -224,7 +224,7 @@ subroutine read_meteo_parameters(sim,info_meteo,verbose)
                         allocate(info_meteo(sim%n_voronoi))    ! allocate enough memory to store weather stations information
                     case ('table')
                         tablestart = line
-                        read (free_unit, *) ! skip the header of the table
+                        read (free_unit, *); line = line + 1 ! skip the header of the table
                         do i=1,size(info_meteo)
                             read(free_unit,*)info_meteo(i)%filename, info_meteo(i)%x_m, info_meteo(i)%y_m
                             line = line + 1
@@ -274,15 +274,16 @@ subroutine read_meteo_parameters(sim,info_meteo,verbose)
                             read(info_meteo(i)%unit,*)  ! skip line
                         end do
                     case ('endtable')
-                        if ((line - tablestart - 1) > m_topoieta) then
+                        if ((line - tablestart - 2) < n_stations) then
                             stop 'Meteorological stations number (StatNum) is higher than meteorological &
                                 & station listed in the table. Execution will be aborted...'
-                        else if ((line - tablestart - 1) < m_topoieta) then
+                        else if ((line - tablestart - 2) > n_stations) then
                             stop 'Meteorological stations number (StatNum) is lower than meteorological &
                                 & station listed in the table. Execution will be aborted...'
                         end if
                     case default ! all other cases ...
-                        print *, 'Skipping invalid label <',trim(label),'> at line', line, ' of file: ', trim(filemeteo_name)
+                        print *, 'Skipping invalid label <',trim(label),'> at line', line, ' of file: ', trim(filemeteo_name) ! todo: line number here is not reliable when size(info_meteo) doesn't match the actual number of entries
+                        if (trim(label) /= '') print *, 'labels (StatNum, Table, EndTable) must be followed by an equal sign (=)'
                         print *, 'Execution will be aborted...'
                         stop
                 end select
