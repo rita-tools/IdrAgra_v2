@@ -88,19 +88,20 @@ subroutine init_crop_par_from_file(file_name, n_crop, n_crop_alt, string_element
     close (free_unit)
 end subroutine init_crop_par_from_file
 
-subroutine read_water_prod_file(file_name, string_elements, n_crops_by_year, unit_param, error_flag)
+subroutine read_water_prod_file(file_name, string_elements, n_crops_by_year,          &
+                              & unit_param, sim_end_year, weath_start_year, error_flag)
     ! read water productivity related parameters
     character(len=*), intent(in) :: file_name
     integer, intent(in) :: string_elements
     integer, dimension(:), intent(in) :: n_crops_by_year
     real(dp), dimension(:,:,:), intent(inout) :: unit_param
+    integer, intent(in) :: sim_end_year, weath_start_year
     integer, intent(out) :: error_flag
-    integer :: free_unit
-    integer :: ios
-    integer :: line, p, i
+    integer :: free_unit, ios, line, p, year
     character(len=string_elements*20) :: buffer, label  !EAC:  use string_elements x 20
 
     error_flag = 0
+    line = 0
     open(newunit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios)
     if (ios /= 0 ) then
         print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. &
@@ -120,10 +121,16 @@ subroutine read_water_prod_file(file_name, string_elements, n_crops_by_year, uni
 
             select case (label)
                 case ('year') ! header line
-                    i = 1
                 case default
-                    call spread_col(buffer, achar(9), string_elements, n_crops_by_year, unit_param(:,:,i))
-                    i = i + 1
+                    read (label, *, iostat=ios) year
+                    if (ios /= 0) then
+                        print *, 'Invalid WPadj.dat entry at line ', line, ': ', trim(label), '. Execution will be aborted...'
+                        stop
+                    end if
+                    ! Store values from the first year of weather data to the last year of simulation (weather data might start earlier than simulation)
+                    if (year >= weath_start_year .and. year <= sim_end_year) then
+                        call spread_col(buffer,achar(9),string_elements,n_crops_by_year,unit_param(:,:,year-weath_start_year+1))
+                    end if
             end select
         end if
     end do
@@ -386,7 +393,8 @@ subroutine init_crop_phenology_pars(sim, info_pheno, info_meteo, ze_fix, verbose
         info_pheno(i)%iid             = 0
         info_pheno(i)%cycle_crop_slot = 0
         call read_water_prod_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"WPadj.dat",  &
-                                & string_elements, n_crops_by_year, info_pheno(i)%wp_adj, ErrorFlag)
+                                & string_elements, n_crops_by_year, info_pheno(i)%wp_adj,          &
+                                & sim%end_simulation%year, sim%start_year, ErrorFlag)
         call read_crop_par_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropParam.dat", &
                               & string_elements, ze_fix, info_pheno(i), ErrorFlag                   )
 
