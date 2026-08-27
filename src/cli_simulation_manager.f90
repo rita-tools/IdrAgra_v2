@@ -145,7 +145,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     integer::tmax_d, tmin_d, time
     ! to account for skipped years
     integer:: s_meteostat, s_step
-    real(dp):: value
+    real(dp):: value, h_irr_hour
     !CHARACTER(LEN=20)::fc_name
     type(grid_r)::pheno_grd
 
@@ -242,8 +242,10 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             info_spat%h_meth=info_spat%domain
             info_spat%h_meth%mat=0                           ! Qwat == 0 for each irrigation method
 
-            alpha_ms_map=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_th_ms)  ! Spreads irrigation threshold for each irrigation method
-            alpha_unm_map=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_th_unm)! Spreads irrigation threshold for each irrigation method
+            !%PS% safe initialization values for variables that are used even in mode 0
+            alpha_ms_map = 1.0D0
+            alpha_unm_map = 1.0D0
+            fw_irr = 1.0D0
 
             f_interception=info_spat%domain%mat
             f_interception=1                                                   ! Flag interception set to 1
@@ -1047,11 +1049,19 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 do j=1, size(info_spat%domain%mat,2)
                     do i=1,size(info_spat%domain%mat,1)
                         if(info_spat%domain%mat(i,j)/=info_spat%domain%header%nan)then
+
+                            !%PS%: only calculate irrigation amount if not in mode 0
+                            if (pars%sim%mode /= 0) then
+                                h_irr_hour = h_irr(i,j, info_spat%irr_meth_id%mat(i,j))                    * & ! Daily amount for this cell
+                                           & pars%irr%met(info_spat%irr_meth_id%mat(i,j))%freq(hour)       * & ! Fraction to be applied each hour of activity
+                                           & (1-pars%irr%met(info_spat%irr_meth_id%mat(i,j))%f_interception)   ! 1 - intercepted fraction
+                            else
+                                h_irr_hour = 0
+                            end if
+
                             ! %RR%: add k_r
                             ! water balance for the evaporative layer
-                            call water_balance_evap_lay(h_irr(i,j, info_spat%irr_meth_id%mat(i,j)) * &
-                                & pars%irr%met(info_spat%irr_meth_id%mat(i,j))%freq(hour)  &
-                                & * (1-pars%irr%met(info_spat%irr_meth_id%mat(i,j))%f_interception), &
+                            call water_balance_evap_lay(h_irr_hour, &
                                 & wat_bal_hour%inten%h_soil1(i,j), wat_bal_hour%esten%h_inf(i,j), &
                                 & wat_bal_hour%esten%h_eva(i,j), wat_bal_hour%esten%h_eva_pot(i,j), &
                                 & wat_bal_hour%esten%h_perc1(i,j), wat_bal_hour%inten%h_pond0(i,j), wat_bal_hour%esten%h_pond(i,j), &

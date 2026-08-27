@@ -73,7 +73,13 @@ subroutine read_all_parameters(file_xml, xml, xml_dtx, ErrorFlag, debug)
         ! Collective unmonitored sources have no time series of discharges
     end if
 
-    call read_all_irr_methods(xml, ErrorFlag, debug)
+    !%PS%: Don't require the irrigation methods file if in no-irrigation mode
+    if (xml%sim%mode == 0) then
+        xml%sim%n_irr_meth = 0
+        allocate(xml%irr%met(0))
+    else
+        call read_all_irr_methods(xml, ErrorFlag, debug)
+    end if
 
 end subroutine read_all_parameters
 
