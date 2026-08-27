@@ -130,38 +130,38 @@ subroutine read_water_prod_file(file_name, string_elements, n_crops_by_year, uni
     close (free_unit)
 end subroutine read_water_prod_file
 
-subroutine read_canopy_resistance_file(file_name, unit_param, string_elements, error_flag)
+subroutine read_canopy_resistance_file(file_name, unit_param, sim_end_year, weath_start_year, error_flag)
     ! read canopy resistance parameters
     character(len=*), intent(in) :: file_name
     real(dp), dimension(:), intent(inout) :: unit_param
-    integer, intent(in) :: string_elements
+    integer, intent(in) :: sim_end_year, weath_start_year
     integer, intent(out) :: error_flag
-    integer :: free_unit
-    integer :: ios
-    integer :: line, p, i
-    character(len=string_elements*20) :: buffer, label  ! EAC: string_elements x 20
+    integer :: free_unit, ios, line, year
+    real(dp) :: resistance
+    character(len=255) :: full_line
 
     error_flag = 0
-    i = 1
     open(newunit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios)
     if (ios /= 0 ) then
-        print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. &
-            & Execution will be aborted..."
+        print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. Execution will be aborted..."
         stop
     end if
 
-    read (free_unit, '(A)', iostat=ios)     ! skyp the first line
+    read (free_unit, '(A)', iostat=ios) ! skip the first line
+    line = 1
     do while (ios == 0)
-        read (free_unit, '(A)', iostat=ios) buffer
+        read (free_unit, '(A)', iostat=ios) full_line
         if (ios == 0) then
             line = line + 1
-            buffer = trim(buffer)
-            call lower_case(buffer)
-            p = scan(buffer, achar(32)) ! find the first space ---> " "=achar(32)! TODO: use always tab?
-            label = buffer(1:p-1)
-            buffer = buffer(p+1:)
-            read (buffer, *) unit_param(i)
-            i = i + 1
+            read (full_line, *, iostat=ios) year, resistance
+            if (ios /= 0) then
+                print *, 'Invalid CanopyRes.dat entry at line ', line, ': ', trim(full_line), '. Execution will be aborted...'
+                stop
+            end if
+            ! Store values from the first year of weather data to the last year of simulation (weather data might start earlier than simulation)
+            if (year >= weath_start_year .and. year <= sim_end_year) then
+                unit_param(year - weath_start_year + 1) = resistance
+            end if
         end if
     end do
 
@@ -327,7 +327,8 @@ subroutine init_crop_phenology_pars(sim, info_pheno, info_meteo, ze_fix, verbose
     call init_crop_par_from_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropParam.dat", &
         & sim%n_lus, sim%n_crops, string_elements, n_crops_by_year, ErrorFlag)
 
-    call read_canopy_resistance_file(trim(dir)//delimiter//'CanopyRes.dat', sim%res_canopy, string_elements, ErrorFlag)
+    call read_canopy_resistance_file(trim(dir)//delimiter//'CanopyRes.dat', sim%res_canopy, &
+        & sim%end_simulation%year, sim%start_year, ErrorFlag)
 
     do i=1,size(info_pheno)
         dir_name = info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)
