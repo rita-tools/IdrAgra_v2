@@ -19,6 +19,13 @@ DEFAULT_COUPLING_DIRECTORY = "modflow_exchange"
 class CouplerError(RuntimeError):
     pass
 
+
+class CommandLineArgs(argparse.Namespace):
+    working_dir: Path
+    idragra_exe: Path
+    idragra_args: list[str]
+
+
 @dataclass(frozen=True)
 class ModflowConfiguration:
     library: Path
@@ -101,13 +108,15 @@ class IdrAgraProcess:
         environment["IDRAGRA_COUPLING_DIR"] = str(coupling_dir)
         environment["IDRAGRA_COUPLING_DAYS"] = str(period_days)
         self.coupling_dir = coupling_dir
+
+        # Launches IdrAgra as a subprocess, redirecting its stdin and stdout to pipes for communication
         self.process = subprocess.Popen(
             [str(executable), *executable_args],
             cwd=run_dir,
             env=environment,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stdin=subprocess.PIPE,    
+            stdout=subprocess.PIPE,   # Redirects all IdrAgra standard output to self.process.stdout for reading
+            stderr=subprocess.STDOUT, # Adds IdrAgra's standard error to self.process.stdout as well
             text=True,
             bufsize=1,
             errors="replace",
@@ -117,14 +126,23 @@ class IdrAgraProcess:
         if self.process.stdout is None:
             raise CouplerError("IdrAgra stdout is unavailable")
         while True:
+            # Keep reading lines from IdrAgra's output
             line = self.process.stdout.readline()
+
+            # If IdrAgra's stdout is closed, we receive an empty string (note that a purposefully empty line is received as "\n", not "")
             if line == "":
                 code = self.process.poll()
                 raise CouplerError(f"IdrAgra exited with code {code} before the next handshake")
+
+            # Because Fortran's stdout no longer points to the console, it is up to python to print it to screen:
             print(line, end="")
+
+            # Look for the handshake line that indicates IdrAgra is ready to exchange data
             stripped = line.strip()
             if not stripped.startswith(READY_TOKEN + " "):
                 continue
+
+            # When found, parse it and read the idragra-generated .asc files
             fields = stripped.split()
             if len(fields) != 3:
                 raise CouplerError(f"Malformed IdrAgra handshake: {stripped}")
@@ -243,10 +261,9 @@ def main() -> int:
     except (OSError, CouplerError) as exc:
         raise SystemExit(str(exc)) from exc
 
-    # Ensure dependencies are installed
+    # Ensure modflowapi is installed
     try:
         import modflowapi
-        from modflowapi import Callbacks
     except ImportError as exc:
         raise SystemExit("Install the prototype dependencies with: pip install modflowapi numpy") from exc
 
@@ -258,7 +275,7 @@ def main() -> int:
         executable.resolve(), run_dir, executable_args, coupling_dir.resolve(), params.period_days
     )
     callback = CouplingCallback(
-        idragra, Callbacks, params.recharge_package, params.well_package
+        idragra, modflowapi.Callbacks, params.recharge_package, params.well_package
     )
     try:
         modflowapi.run_simulation(
@@ -366,7 +383,7 @@ def _set_boundary_field(package: Any, field: str, grid: AsciiGrid, values: np.nd
     stress_data[field] = _values_for_boundary(grid, values, target.size)
 
 
-def parse_command_line_args() -> argparse.Namespace:
+def parse_command_line_args() -> CommandLineArgs:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--working-dir", required=True, type=Path)
     parser.add_argument("--idragra-exe", required=True, type=Path)
@@ -377,7 +394,7 @@ def parse_command_line_args() -> argparse.Namespace:
         nargs=argparse.REMAINDER,
         help="arguments passed to IdrAgra (place them after --, for example: -- -f custom_parameters.txt)",
     )
-    return parser.parse_args()
+    return parser.parse_args(namespace=CommandLineArgs())
 
 
 if __name__ == "__main__":

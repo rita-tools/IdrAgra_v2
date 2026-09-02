@@ -2,9 +2,9 @@
 
 This protoype uses the official MF6 API to couple IdrAgra and MODFLOW simulations.
 The two models run indipendently and exchange data every x days (specified in `modflow_parameters.txt`), waiting for each other before continuing. Information exchange is done through .asc files stored in a temporary coupling folder:
-- exchange_NNNNNN.asc (cumulative net percolation through the bottom of IdrAgra's profile over the period [mm, positive downwards])
-- pumping_NNNNNN.asc (cumulative uptake from irrigation wells over the period [mm, negative])
-- water_table_NNNNNN.asc (MODFLOW-updated water table depth [m from soil surface, positive])
+- exchange_NNNNNN.asc (cumulative net percolation through the bottom of IdrAgra's profile over the period [mm])
+- pumping_NNNNNN.asc (cumulative uptake from irrigation wells over the period [mm])
+- water_table_NNNNNN.asc (MODFLOW-updated water table depth [m from soil surface])
 MODFLOW receives exchange and pumping, updates the water table, and feeds it back to IdrAgra.
 
 It is assumed that the user has a pre-existing MODFLOW 6 simulation ready to use, which should:
