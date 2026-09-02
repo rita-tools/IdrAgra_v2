@@ -88,6 +88,7 @@ type simulation
     integer,dimension(:),pointer :: lu_list     ! list of ids if the simulated land uses
     integer,dimension(:),pointer :: no_lu_list  ! list of ids if the NOT simulated land uses
     logical :: f_cap_rise                       ! if true, capillary rise is calculated
+    logical :: use_modflow_coupling = .false.   ! if true, exchange groundwater fluxes with MODFLOW
     logical :: f_shapearea                      ! if true, use shapes area (for vectorialization)
     logical :: f_irandom                        ! if true, use user defined random values
     integer :: n_ws                             ! maximum number of weather station

@@ -60,6 +60,9 @@ WatSourPath = wsources\\
 
 ### 2. Simulation mode, period and conditions #########################
 
+# Enable running through the external MODFLOW controller. Optional setting; default is F
+UseModflowCoupling = F
+
 # Mode: irrigation simulation mode [0...4].
 #   0 = no irrigation
 #   1 = irrigation consumptions

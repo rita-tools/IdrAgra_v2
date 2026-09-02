@@ -1,0 +1,20 @@
+################ IdrAgra / MODFLOW 6 coupling ########################
+#
+# Copy this file to the IdrAgra run directory as ModflowParameters.txt.
+# Relative paths are resolved from that directory.
+#
+######################################################################
+
+# Path to the libmf6.dll library - downloadable from https://github.com/MODFLOW-ORG/modflow6/releases
+LibMf6 = a_path/to/your/file_location/libmf6.dll
+
+# Path to a folder containing files for an existing MODFLOW 6 simulation
+ModflowWorkspace = a_path/to/your/folder
+
+# Number of IdrAgra days represented by one MODFLOW stress period.
+CouplingPeriodDays = 7
+
+# Names of the packages that IdrAgra acts on during the coupled run (see MODFLOW's .nam file)
+# They only need to be specified if the MODFLOW simulation has multiple .rch or .wel files, should stay commented-out otherwise
+# RechargePackage = rch_0
+# WellPackage = wel_0

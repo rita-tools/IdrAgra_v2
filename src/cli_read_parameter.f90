@@ -147,17 +147,6 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
                                             , search = "\\" &
                                             , substitute = delimiter &
                                             )
-                        inquire(file=trim(xml%sim%path), exist=dir_exists)   ! dir_exists will be TRUE if the directory exists
-                        if (dir_exists .eqv. .true.) then
-                            print *,'The directory ', trim(xml%sim%path), ' already exists and will be updated'
-                            print *, " <enter> to continue "
-                            read *
-                        else
-                            ! TODO: intrinsic 'system' not included in std2008
-                            !call get_environment_variable('DELIMITER',delimiter)
-                            !call system('mkdir '//delimiter//trim(xml%sim%path))
-                            call make_dir(xml%sim%path)
-                        end if
                     case ('inputpath') ! path to spazialized input files
                         read(buffer, *, iostat=ios) xml%sim%input_path
                         xml%sim%input_path = replace_str( string = xml%sim%input_path &
@@ -255,6 +244,14 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
                         xml%sim%thetaII_end_fn = trim(xml%sim%thetaII_end_fn)//'II'
                     case ('capillaryflag') ! T: calculate capillary rise
                         read(buffer, *, iostat=ios) xml%sim%f_cap_rise
+                    case ('usemodflowcoupling') ! T: couple the run with MODFLOW 6
+                        read(buffer, *, iostat=ios) xml%sim%use_modflow_coupling
+                        if (xml%sim%use_modflow_coupling) then
+                            call get_environment_variable('IDRAGRA_COUPLING_DIR', buffer, status=ios)
+                            if (ios /= 0 .or. len_trim(buffer) == 0) then
+                                stop 'UseModflowCoupling = T requires launching IdrAgra through the MODFLOW coupling interface.'
+                            end if
+                        end if
                     case('soilusevarflag') ! T: land use update yearly
                         read(buffer, *, iostat=ios) xml%sim%f_soiluse
                     case ('meteostatweightnum') ! number of weather stations
@@ -531,6 +528,21 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
             end if
         end if
     end do
+
+    ! Pause before overwriting the output directory
+    !%PS%: moved to after the parsing loop so that:
+    !   1. xml%sim%use_modflow_coupling is already defined (coupling requires skipping the pause)
+    !   2. the user gets to read any "invalid label" messages during the pause
+    inquire(file=trim(xml%sim%path), exist=dir_exists)
+    if (dir_exists .eqv. .true.) then
+        print *,'The directory ', trim(xml%sim%path), ' already exists and will be overwritten'
+        if (.not. xml%sim%use_modflow_coupling) then
+            print *, " <enter> to continue "
+            read *
+        end if
+    else
+        call make_dir(xml%sim%path)
+    end if
 
     if (xml%sim%step_out == 1) then
         ! take into account the last week of the previos year and the first of the following year

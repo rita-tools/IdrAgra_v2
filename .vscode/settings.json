@@ -3,5 +3,8 @@
         "!go",
         "FortranFixedForm",
         "FortranFreeForm"
-    ]
+    ],
+    "files.exclude": {
+        "**/__pycache__": true
+    }
 }

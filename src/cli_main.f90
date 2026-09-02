@@ -387,6 +387,7 @@ print *, 'FinalThetaFlag = ',  xml%sim%f_theta_out
 print *, 'RadnSowDaysWind = ',  xml%sim%sowing_range
 print *, 'SoilUsesNum = ', xml%sim%n_lus
 print *, 'CapillaryFlag = ', xml%sim%f_cap_rise
+print *, 'UseModflowCoupling = ', xml%sim%use_modflow_coupling
 print *, 'SoilUseVarFlag = ', xml%sim%f_soiluse
 print *, 'MeteoStatWeightNum = ', xml%sim%n_ws
 print *, 'MeteoStatTotNum = ', xml%sim%n_voronoi

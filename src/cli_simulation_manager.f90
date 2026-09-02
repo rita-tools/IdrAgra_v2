@@ -43,6 +43,7 @@ use mod_TDx_index
 use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva
 use mod_common, only: wat_matrix, soil2_rice, hourly, unit_file_scratch
 use mod_irrigation
+use mod_coupling, only: mf_coupling_state, init_mf_coupling, accumulate_mf_fluxes, coupling_is_due, coupling_handshake
 
 use cli_watsources
 use cli_crop_parameters, only: read_all_crop_pars, destroy_infofeno_tab, check_pheno_parameters, k_cb_matrices
@@ -65,6 +66,8 @@ end interface
 interface assignment(=) !iniz_pheno
     module procedure init_pheno
 end interface
+
+type(mf_coupling_state), save :: coupling
 
 contains
 
@@ -101,8 +104,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     type(irr_units_table),dimension(:),allocatable::irr_units      ! Allocated in mod_watsources
     type(scheduled_irrigation),dimension(:),allocatable::irr_sch ! Allocated in 'open_scheduled_irrigation' function
     type(crop_matrices)::crop_map
-
-    integer:: unit_crop
+    integer :: unit_crop, days_to_simulate_this_year
     integer::i,j,k,y,current_year,doy,hour,z,w                           ! for cycles
     !integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::irandom ! %EAC% use irandom map instead
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::dir_phenofases
@@ -230,6 +232,9 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
     n_day=0   ! Daily count initialization
     h_irr = 0.
+
+    ! Initialize the coupling state (.not. coupling%enabled ensures this is only called once, usually during warmup)
+    if (pars%sim%use_modflow_coupling .and. .not. coupling%enabled) call init_mf_coupling(coupling, info_spat%domain)
 
     ! TODO Explore if is possible to have outputs on a specific day of the week (utility:day_of_week)
 
@@ -619,10 +624,12 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         shift_days = calc_doy(info_meteo(1)%start%day, info_meteo(1)%start%month, pars%sim%start_year+y-1) - calc_doy(1, 1, pars%sim%start_year+y-1)
         days_in_yr = cshift(days_in_yr, info_meteo(1)%start%month-1)
 
+        days_to_simulate_this_year = min(pars%sim%year_step(y), pars%sim%year_step(y) -                                         &
+                                & (pars%sim%start_simulation%doy - (info_meteo(1)%start%doy + sum(pars%sim%year_step(1:(y-1))))))
+
         ! Daily simulation cycle
-        day_cycle: do doy=1, min(pars%sim%year_step(y), pars%sim%year_step(y) - &
-                & (pars%sim%start_simulation%doy - (info_meteo(1)%start%doy + sum(pars%sim%year_step(1:(y-1))))))
-            !if (doy == 100) stop
+        day_cycle: do doy=1, days_to_simulate_this_year
+
             n_day=n_day+1        ! Counter updating
             coll_irr=0           ! Irrigation matrix for collective water sources
             priv_irr=0           ! Irrigation matrix for private water sources
@@ -1279,6 +1286,14 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 call write_outputs_by_step (doy, meteo, h_irr_sum, wat_bal1, wat_bal2, &
                     & info_spat, coll_irr, priv_irr, stp_map, deb_map, h_bypass, pars%sim%intervals, pars%sim%clock(1)-1, &
                     & summary)    ! scheduled outputs
+            end if
+
+            if (coupling%enabled) then
+                call accumulate_mf_fluxes(coupling, wat_bal2%h_perc, wat_bal2%h_caprise, priv_irr)
+                if (coupling_is_due(coupling, y == sim_years .and. doy == days_to_simulate_this_year)) then
+                    call coupling_handshake(coupling, info_spat%domain, pars%sim, boundaries, &
+                                          & info_spat%wat_tab, pars%depth%ze_fix              )
+                end if
             end if
 
             ! save to file the output bu year
