@@ -13,6 +13,8 @@ READY_TOKEN = "IDRAGRA_COUPLING_READY"
 CONTINUE_TOKEN = "IDRAGRA_COUPLING_CONTINUE"
 DEFAULT_IDRAGRA_PARAMETERS_FILE = "idragra_parameters.txt"
 DEFAULT_MODFLOW_PARAMETERS_FILE = "modflow_parameters.txt"
+DEFAULT_IDRAGRA_INPUT_DIRECTORY = "spatial_data"
+DEFAULT_DOMAIN_FILE = "domain.asc"
 DEFAULT_COUPLING_DIRECTORY = "modflow_exchange"
 
 
@@ -102,6 +104,21 @@ class AsciiGrid:
         temporary.replace(path)
 
 
+@dataclass(frozen=True)
+class GridLayout:
+    header: list[tuple[str, str]]
+    shape: tuple[int, int]
+    cellsize: float
+
+    @classmethod
+    def from_grid(cls, grid: AsciiGrid) -> "GridLayout":
+        return cls(grid.header.copy(), grid.data.shape, grid.cellsize)
+
+    @property
+    def size(self) -> int:
+        return self.shape[0] * self.shape[1]
+
+
 class IdrAgraProcess:
     def __init__(self, executable: Path, run_dir: Path, executable_args: list[str], coupling_dir: Path, period_days: int):
         self.coupling_dir = coupling_dir
@@ -150,10 +167,8 @@ class IdrAgraProcess:
                 raise CouplerError(f"Malformed IdrAgra handshake: {stripped}")
             period_index, period_days = int(fields[1]), int(fields[2])
             suffix = f"{period_index:06d}.asc"
-            h_net_perc = AsciiGrid.read(self.coupling_dir / f"exchange_{suffix}")
+            h_net_perc = AsciiGrid.read(self.coupling_dir / f"net_percolation_{suffix}")
             h_pumping = AsciiGrid.read(self.coupling_dir / f"pumping_{suffix}")
-            if h_net_perc.data.shape != h_pumping.data.shape:
-                raise CouplerError("Exchange and pumping grids have different shapes")
             return period_index, period_days, h_net_perc, h_pumping
 
     # Writes the updated water table to an .asc file and gives control back to IdrAgra
@@ -182,14 +197,21 @@ class IdrAgraProcess:
 
 
 class CouplingCallback:
-    def __init__(self, idragra: IdrAgraProcess, callbacks: Any, rch_name: str | None, wel_name: str | None):
+    def __init__(
+        self,
+        idragra: IdrAgraProcess,
+        callbacks: Any,
+        rch_name: str | None,
+        wel_name: str | None,
+        grid_layout: GridLayout,
+    ):
         self.idragra = idragra
         self.callbacks = callbacks
         self.rch_name = rch_name
         self.wel_name = wel_name
+        self.grid_layout = grid_layout
         self.period_index = 0
         self.period_days = 0
-        self.h_net_perc: AsciiGrid | None = None
         self.model: Any = None
         self.rch_package: Any = None
         self.wel_package: Any = None
@@ -201,6 +223,7 @@ class CouplingCallback:
         # Called once before the solving begins
         if callback_step == self.callbacks.initialize:
             self.model = simulation.get_model()
+            _validate_modflow_grid(self.model, self.grid_layout)
             self.rch_package = _select_package(self.model, self.rch_name, "rch")
             self.wel_package = _select_package(self.model, self.wel_name, "wel")
             return
@@ -215,40 +238,31 @@ class CouplingCallback:
                 raise CouplerError(f"IdrAgra period {period_index}; MODFLOW expected {expected_index}")
 
             recharge_m_per_day = h_net_perc.data / (1000.0 * period_days)
-            pumping_m3_per_day = -(h_pumping.data / 1000.0) * h_net_perc.cellsize**2 / period_days
-            _set_boundary_field(self.rch_package, "recharge", h_net_perc, recharge_m_per_day)
-            _set_boundary_field(self.wel_package, "q", h_pumping, pumping_m3_per_day)
+            pumping_m3_per_day = -(h_pumping.data / 1000.0) * self.grid_layout.cellsize**2 / period_days
+            _set_mf_boundary_condition(self.rch_package, "recharge", h_net_perc, recharge_m_per_day, inactive_value=0.0)
+            _set_mf_boundary_condition(self.wel_package, "q", h_pumping, pumping_m3_per_day, inactive_value=0.0)
 
             self.period_index = period_index
             self.period_days = period_days
-            self.h_net_perc = h_net_perc
             print(f"MODFLOW period {period_index}: importing IdrAgra flows for {period_days} day(s)")
             return
 
         # Called at the end of each stress period (gives control back to IdrAgra)
         if callback_step == self.callbacks.stress_period_end:
-
-            # Safety check
-            if self.h_net_perc is None:
-                raise CouplerError("MODFLOW reached period end without IdrAgra flows - was callback not called at period start?")
-
-            
             heads = np.asarray(self.model.X, dtype=float).reshape(-1)
             top = np.asarray(self.model.dis.top.values, dtype=float).reshape(-1)
-            if heads.size != self.h_net_perc.data.size:
+            if heads.size != self.grid_layout.size:
                 raise CouplerError(
                     "Prototype requires one MODFLOW layer aligned with the complete IdrAgra grid; "
-                    f"got {heads.size} heads and {self.h_net_perc.data.size} IdrAgra cells"
+                    f"got {heads.size} heads and {self.grid_layout.size} IdrAgra cells"
                 )
             if top.size == 1:
                 top = np.full(heads.size, top.item())
             if top.size != heads.size:
                 raise CouplerError(f"MODFLOW top has {top.size} values; expected {heads.size}")
 
-            depth = np.maximum(top - heads, 0.0).reshape(self.h_net_perc.data.shape)
-            depth[~self.h_net_perc.valid] = self.h_net_perc.nodata
-            self.idragra.continue_idragra_sim(self.period_index, AsciiGrid(self.h_net_perc.header, depth))
-            self.h_net_perc = None
+            depth = np.maximum(top - heads, 0.0).reshape(self.grid_layout.shape)
+            self.idragra.continue_idragra_sim(self.period_index, AsciiGrid(self.grid_layout.header, depth))
 
 
 
@@ -264,13 +278,19 @@ def main() -> int:
     if executable_args[:1] == ["--"]:
         executable_args = executable_args[1:]
 
-    # Ensure coupling is explicitly enabled in idragra_parameters.txt and read modflow_parameters.txt
     try:
+        # Ensure coupling is explicitly enabled in idragra_parameters.txt
         idragra_parameters = _parameter_file(run_dir, executable_args)
         if not _is_coupling_enabled(idragra_parameters):
             raise CouplerError(
                 f"MODFLOW coupling is disabled in {idragra_parameters}; set UseModflowCoupling = T to enable it"
             )
+
+        # Read domain.asc and store its information in GridLayout (data exchanged between the models must match this grid)
+        domain_grid = AsciiGrid.read(_domain_file(run_dir, idragra_parameters))
+        grid_layout = GridLayout.from_grid(domain_grid)
+
+        # Read modflow_parameters.txt
         params_file_path = run_dir / DEFAULT_MODFLOW_PARAMETERS_FILE
         params = ModflowConfiguration.read(params_file_path)
     except (OSError, CouplerError) as exc:
@@ -293,7 +313,7 @@ def main() -> int:
 
     # Set up the callback function that will be called by the MODFLOW API to exchange data with IdrAgra
     callback = CouplingCallback(
-        idragra, modflowapi.Callbacks, params.recharge_package, params.well_package
+        idragra, modflowapi.Callbacks, params.recharge_package, params.well_package, grid_layout
     )
 
     try:
@@ -326,6 +346,12 @@ def _parameter_file(run_dir: Path, executable_args: list[str]) -> Path:
                 raise CouplerError(f"{argument} requires an IdrAgra parameter filename")
             return _resolve_path_from(run_dir, executable_args[index + 1])
     return (run_dir / DEFAULT_IDRAGRA_PARAMETERS_FILE).resolve()
+
+# Locate IdrAgra's domain.asc
+def _domain_file(run_dir: Path, idragra_parameters: Path) -> Path:
+    values = _read_params_file(idragra_parameters)
+    input_directory = values.get("inputpath", DEFAULT_IDRAGRA_INPUT_DIRECTORY).replace("\\", os.sep)
+    return _resolve_path_from(run_dir, input_directory) / DEFAULT_DOMAIN_FILE
 
 # Return an absolute path to a file given a base directory (if it isn't already absolute)
 def _resolve_path_from(base_dir: Path, a_maybe_relative_path: str) -> Path:
@@ -382,27 +408,51 @@ def _select_package(model: Any, name: str | None, package_type: str) -> Any:
         f"set {'RechargePackage' if package_type == 'rch' else 'WellPackage'}"
     )
 
+# Make sure that the MODFLOW grid matches the IdrAgra domain.asc grid
+def _validate_modflow_grid(model: Any, grid_layout: GridLayout) -> None:
+    model_shape = tuple(int(value) for value in model.shape)
+    expected_shape = (1, *grid_layout.shape)
+    if model_shape != expected_shape:
+        raise CouplerError(f"MODFLOW grid has shape {model_shape}; expected {expected_shape} from {DEFAULT_DOMAIN_FILE}")
 
-def _values_for_boundary(grid: AsciiGrid, values: np.ndarray, boundary_size: int) -> np.ndarray:
-    flat = np.asarray(values, dtype=float).reshape(-1)
-    valid = grid.valid.reshape(-1)
-    if boundary_size == flat.size:
-        return np.where(valid, flat, 0.0)
-    if boundary_size == int(valid.sum()):
-        return flat[valid]
-    raise CouplerError(
-        f"MODFLOW boundary has {boundary_size} entries, but the IdrAgra grid has "
-        f"{flat.size} total and {int(valid.sum())} active cells"
-    )
+    cell_area = np.asarray(model.dis.area.values, dtype=float).reshape(-1)
+    if cell_area.size != grid_layout.size or not np.allclose(
+        cell_area, grid_layout.cellsize**2, rtol=1e-9, atol=1e-9
+    ):
+        expected_area = grid_layout.cellsize**2
+        raise CouplerError(f"MODFLOW cell areas must equal the {expected_area:g} m2 cell area from domain.asc")
 
+    # Check that the MODFLOW IDOMAIN is positive for every cell in the complete IdrAgra grid rectangle
+    # (i.e. MODFLOW simulates all cells, even if some are inactive in IdrAgra)
+    idomain = np.asarray(model.dis.idomain.values).reshape(-1)
+    if idomain.size != grid_layout.size or np.any(idomain <= 0):
+        raise CouplerError("MODFLOW IDOMAIN must be positive for every cell in the complete IdrAgra grid rectangle")
 
-def _set_boundary_field(package: Any, field: str, grid: AsciiGrid, values: np.ndarray) -> None:
+# Currently used to set IdrAgra-prescribed recharge and pumping values to MODFLOW packages
+def _set_mf_boundary_condition(
+    package: Any, field: str, grid: AsciiGrid, values: np.ndarray, inactive_value: float | None = None
+) -> None:
     stress_data = package.stress_period_data
     try:
-        target = stress_data[field]
+        target = np.asarray(stress_data[field], dtype=float).reshape(-1)
     except (KeyError, TypeError, ValueError) as exc:
         raise CouplerError(f"MODFLOW package has no mutable '{field}' field") from exc
-    stress_data[field] = _values_for_boundary(grid, values, target.size)
+
+    flat = np.asarray(values, dtype=float).reshape(-1)
+    valid = grid.valid.reshape(-1)
+    if target.size != flat.size:
+        raise CouplerError(
+            f"MODFLOW {package.pkg_type.upper()} package has {target.size} entries; expected one for each of the "
+            f"{flat.size} cells in the complete IdrAgra grid rectangle"
+        )
+
+    updated = target.copy()
+    updated[valid] = flat[valid]
+
+    # Cells that are inactive IdrAgra-side (e.g. outside the IdrAgra domain) receive the specified inactive_value
+    if inactive_value is not None:
+        updated[~valid] = inactive_value
+    stress_data[field] = updated
 
 
 if __name__ == "__main__":

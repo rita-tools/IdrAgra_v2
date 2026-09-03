@@ -18,7 +18,7 @@ type mf_coupling_state
     integer :: period_index = 0
     integer :: days_in_period = 0
     character(len=500) :: directory = ''
-    real(dp), dimension(:,:), allocatable :: groundwater_exchange
+    real(dp), dimension(:,:), allocatable :: net_percolation
     real(dp), dimension(:,:), allocatable :: private_pumping
 end type mf_coupling_state
 
@@ -48,9 +48,9 @@ subroutine init_mf_coupling(coupling, domain)
         stop 'IDRAGRA_COUPLING_DAYS must be a positive integer.'
     end if
 
-    allocate(coupling%groundwater_exchange(size(domain%mat, 1), size(domain%mat, 2)))
+    allocate(coupling%net_percolation(size(domain%mat, 1), size(domain%mat, 2)))
     allocate(coupling%private_pumping(size(domain%mat, 1), size(domain%mat, 2)))
-    coupling%groundwater_exchange = 0.0_dp
+    coupling%net_percolation = 0.0_dp
     coupling%private_pumping = 0.0_dp
     coupling%enabled = .true.
 
@@ -61,7 +61,7 @@ subroutine accumulate_mf_fluxes(coupling, deep_percolation, capillary_rise, priv
     type(mf_coupling_state), intent(inout) :: coupling
     real(dp), dimension(:,:), intent(in) :: deep_percolation, capillary_rise, private_pumping
 
-    coupling%groundwater_exchange = coupling%groundwater_exchange + deep_percolation - capillary_rise
+    coupling%net_percolation = coupling%net_percolation + deep_percolation - capillary_rise
     coupling%private_pumping = coupling%private_pumping + private_pumping
     coupling%days_in_period = coupling%days_in_period + 1
 end subroutine accumulate_mf_fluxes
@@ -83,7 +83,7 @@ subroutine coupling_handshake(coupling, domain, sim, extent, water_table, minimu
 
     type(grid_r) :: returned_water_table
     real(dp), dimension(size(domain%mat, 1), size(domain%mat, 2)) :: output_matrix
-    character(len=500) :: exchange_path, pumping_path, water_table_path
+    character(len=500) :: net_perc_path, pumping_path, water_table_path
     character(len=64) :: response_from_coupler, token
     character(len=6) :: period_text
     integer :: received_index, error_flag, ios
@@ -91,13 +91,13 @@ subroutine coupling_handshake(coupling, domain, sim, extent, water_table, minimu
     ! Write the exchange fluxes with the water table to files located in the coupling directory
     coupling%period_index = coupling%period_index + 1
     write(period_text, '(i6.6)') coupling%period_index
-    exchange_path = trim(coupling%directory)//'exchange_'//period_text//'.asc'
+    net_perc_path = trim(coupling%directory)//'net_percolation_'//period_text//'.asc'
     pumping_path = trim(coupling%directory)//'pumping_'//period_text//'.asc'
     water_table_path = trim(coupling%directory)//'water_table_'//period_text//'.asc'
 
-    output_matrix = coupling%groundwater_exchange
+    output_matrix = coupling%net_percolation
     where (domain%mat == domain%header%nan) output_matrix = real(domain%header%nan, dp)
-    call print_mat_as_grid(trim(exchange_path), domain%header, output_matrix, error_flag)
+    call print_mat_as_grid(trim(net_perc_path), domain%header, output_matrix, error_flag)
 
     output_matrix = coupling%private_pumping
     where (domain%mat == domain%header%nan) output_matrix = real(domain%header%nan, dp)
@@ -128,7 +128,7 @@ subroutine coupling_handshake(coupling, domain, sim, extent, water_table, minimu
     deallocate(returned_water_table%mat)
 
     ! Reset coupling state
-    coupling%groundwater_exchange = 0.0_dp
+    coupling%net_percolation = 0.0_dp
     coupling%private_pumping = 0.0_dp
     coupling%days_in_period = 0
 end subroutine coupling_handshake
