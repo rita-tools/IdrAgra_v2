@@ -11,8 +11,8 @@ import numpy as np
 
 READY_TOKEN = "IDRAGRA_COUPLING_READY"
 CONTINUE_TOKEN = "IDRAGRA_COUPLING_CONTINUE"
-DEFAULT_IDRAGRA_PARAMETERS = "idragra_parameters.txt"
-DEFAULT_MODFLOW_PARAMETERS = "modflow_parameters.txt"
+DEFAULT_IDRAGRA_PARAMETERS_FILE = "idragra_parameters.txt"
+DEFAULT_MODFLOW_PARAMETERS_FILE = "modflow_parameters.txt"
 DEFAULT_COUPLING_DIRECTORY = "modflow_exchange"
 
 
@@ -51,11 +51,11 @@ class ModflowConfiguration:
         if period_days <= 0:
             raise CouplerError(f"{path}: CouplingPeriodDays must be positive")
         return cls(
-            library=_resolve_from(path.parent, library).resolve(),
-            workspace=_resolve_from(path.parent, workspace).resolve(),
-            period_days=period_days,
-            recharge_package=values.get("rechargepackage"),
-            well_package=values.get("wellpackage"),
+            library = _resolve_path_from(path.parent, library),
+            workspace = _resolve_path_from(path.parent, workspace),
+            period_days = period_days,
+            recharge_package = values.get("rechargepackage"),
+            well_package = values.get("wellpackage"),
         )
 
 
@@ -104,17 +104,19 @@ class AsciiGrid:
 
 class IdrAgraProcess:
     def __init__(self, executable: Path, run_dir: Path, executable_args: list[str], coupling_dir: Path, period_days: int):
+        self.coupling_dir = coupling_dir
+
+        # Make coupling_dir and period_days available to IdrAgra as environmental variables
         environment = os.environ.copy()
         environment["IDRAGRA_COUPLING_DIR"] = str(coupling_dir)
         environment["IDRAGRA_COUPLING_DAYS"] = str(period_days)
-        self.coupling_dir = coupling_dir
 
         # Launches IdrAgra as a subprocess, redirecting its stdin and stdout to pipes for communication
         self.process = subprocess.Popen(
             [str(executable), *executable_args],
             cwd=run_dir,
             env=environment,
-            stdin=subprocess.PIPE,    
+            stdin=subprocess.PIPE,    # Redirects anything written to self.process.stdin to IdrAgra's standard input
             stdout=subprocess.PIPE,   # Redirects all IdrAgra standard output to self.process.stdout for reading
             stderr=subprocess.STDOUT, # Adds IdrAgra's standard error to self.process.stdout as well
             text=True,
@@ -122,7 +124,7 @@ class IdrAgraProcess:
             errors="replace",
         )
 
-    def wait_ready(self) -> tuple[int, int, AsciiGrid, AsciiGrid]:
+    def wait_for_idragra_flows(self) -> tuple[int, int, AsciiGrid, AsciiGrid]:
         if self.process.stdout is None:
             raise CouplerError("IdrAgra stdout is unavailable")
         while True:
@@ -142,26 +144,28 @@ class IdrAgraProcess:
             if not stripped.startswith(READY_TOKEN + " "):
                 continue
 
-            # When found, parse it and read the idragra-generated .asc files
+            # When found, check it for errors and read the idragra-generated .asc files
             fields = stripped.split()
             if len(fields) != 3:
                 raise CouplerError(f"Malformed IdrAgra handshake: {stripped}")
             period_index, period_days = int(fields[1]), int(fields[2])
             suffix = f"{period_index:06d}.asc"
-            exchange = AsciiGrid.read(self.coupling_dir / f"exchange_{suffix}")
-            pumping = AsciiGrid.read(self.coupling_dir / f"pumping_{suffix}")
-            if exchange.data.shape != pumping.data.shape:
+            h_net_perc = AsciiGrid.read(self.coupling_dir / f"exchange_{suffix}")
+            h_pumping = AsciiGrid.read(self.coupling_dir / f"pumping_{suffix}")
+            if h_net_perc.data.shape != h_pumping.data.shape:
                 raise CouplerError("Exchange and pumping grids have different shapes")
-            return period_index, period_days, exchange, pumping
+            return period_index, period_days, h_net_perc, h_pumping
 
-    def continue_with(self, period_index: int, water_table: AsciiGrid) -> None:
+    # Writes the updated water table to an .asc file and gives control back to IdrAgra
+    def continue_idragra_sim(self, period_index: int, water_table: AsciiGrid) -> None:
         water_table.write(self.coupling_dir / f"water_table_{period_index:06d}.asc")
         if self.process.stdin is None:
             raise CouplerError("IdrAgra stdin is unavailable")
-        self.process.stdin.write(f"{CONTINUE_TOKEN} {period_index}\n")
+        self.process.stdin.write(f"{CONTINUE_TOKEN} {period_index}\n") # This is read by IdrAgra as if it were typed on the console (standard input)
         self.process.stdin.flush()
 
-    def finish(self) -> None:
+    # Waits for IdrAgra to finish; meanwhile keeps printing its stdout to the console
+    def finish_simulation(self) -> None:
         if self.process.stdout is not None:
             for line in self.process.stdout:
                 print(line, end="")
@@ -169,13 +173,12 @@ class IdrAgraProcess:
         if code != 0:
             raise CouplerError(f"IdrAgra exited with code {code}")
 
+    # Terminates the IdrAgra process if something went wrong elsewhere (e.g. MODFLOW failure)
     def terminate(self) -> None:
         if self.process.poll() is None:
-            self.process.terminate()
-            try:
-                self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.process.kill()
+            print("Forcibly terminating the IdrAgra process...")
+            self.process.kill()
+            self.process.wait()
 
 
 class CouplingCallback:
@@ -186,54 +189,66 @@ class CouplingCallback:
         self.wel_name = wel_name
         self.period_index = 0
         self.period_days = 0
-        self.exchange: AsciiGrid | None = None
+        self.h_net_perc: AsciiGrid | None = None
         self.model: Any = None
         self.rch_package: Any = None
         self.wel_package: Any = None
 
+    # This is the function that gets called whenever the MODFLOW api uses "callback(simulation, step)".
+    # Here we configure it to do different things depending on said step.
     def __call__(self, simulation: Any, callback_step: Any) -> None:
+
+        # Called once before the solving begins
         if callback_step == self.callbacks.initialize:
             self.model = simulation.get_model()
             self.rch_package = _select_package(self.model, self.rch_name, "rch")
             self.wel_package = _select_package(self.model, self.wel_name, "wel")
             return
 
+        # Called at the beginning of each stress period (import recharge and pumping data simulated by IdrAgra)
         if callback_step == self.callbacks.stress_period_start:
-            period_index, period_days, exchange, pumping = self.idragra.wait_ready()
-            expected = int(simulation.kper) + 1
-            if period_index != expected:
-                raise CouplerError(f"IdrAgra period {period_index}; MODFLOW expected {expected}")
+            period_index, period_days, h_net_perc, h_pumping = self.idragra.wait_for_idragra_flows()
 
-            recharge_m_per_day = exchange.data / (1000.0 * period_days)
-            pumping_m3_per_day = -(pumping.data / 1000.0) * exchange.cellsize**2 / period_days
-            _set_boundary_field(self.rch_package, "recharge", exchange, recharge_m_per_day)
-            _set_boundary_field(self.wel_package, "q", pumping, pumping_m3_per_day)
+            # Check that IdrAgra's period index (1-based) matches MODFLOW's stress period index (0-based)
+            expected_index = int(simulation.kper) + 1
+            if period_index != expected_index:
+                raise CouplerError(f"IdrAgra period {period_index}; MODFLOW expected {expected_index}")
+
+            recharge_m_per_day = h_net_perc.data / (1000.0 * period_days)
+            pumping_m3_per_day = -(h_pumping.data / 1000.0) * h_net_perc.cellsize**2 / period_days
+            _set_boundary_field(self.rch_package, "recharge", h_net_perc, recharge_m_per_day)
+            _set_boundary_field(self.wel_package, "q", h_pumping, pumping_m3_per_day)
 
             self.period_index = period_index
             self.period_days = period_days
-            self.exchange = exchange
-            print(f"MODFLOW period {period_index}: forcing updated for {period_days} day(s)")
+            self.h_net_perc = h_net_perc
+            print(f"MODFLOW period {period_index}: importing IdrAgra flows for {period_days} day(s)")
             return
 
+        # Called at the end of each stress period (gives control back to IdrAgra)
         if callback_step == self.callbacks.stress_period_end:
-            if self.exchange is None:
-                raise CouplerError("MODFLOW reached period end without IdrAgra forcing")
+
+            # Safety check
+            if self.h_net_perc is None:
+                raise CouplerError("MODFLOW reached period end without IdrAgra flows - was callback not called at period start?")
+
+            
             heads = np.asarray(self.model.X, dtype=float).reshape(-1)
             top = np.asarray(self.model.dis.top.values, dtype=float).reshape(-1)
-            if heads.size != self.exchange.data.size:
+            if heads.size != self.h_net_perc.data.size:
                 raise CouplerError(
                     "Prototype requires one MODFLOW layer aligned with the complete IdrAgra grid; "
-                    f"got {heads.size} heads and {self.exchange.data.size} IdrAgra cells"
+                    f"got {heads.size} heads and {self.h_net_perc.data.size} IdrAgra cells"
                 )
             if top.size == 1:
                 top = np.full(heads.size, top.item())
             if top.size != heads.size:
                 raise CouplerError(f"MODFLOW top has {top.size} values; expected {heads.size}")
 
-            depth = np.maximum(top - heads, 0.0).reshape(self.exchange.data.shape)
-            depth[~self.exchange.valid] = self.exchange.nodata
-            self.idragra.continue_with(self.period_index, AsciiGrid(self.exchange.header, depth))
-            self.exchange = None
+            depth = np.maximum(top - heads, 0.0).reshape(self.h_net_perc.data.shape)
+            depth[~self.h_net_perc.valid] = self.h_net_perc.nodata
+            self.idragra.continue_idragra_sim(self.period_index, AsciiGrid(self.h_net_perc.header, depth))
+            self.h_net_perc = None
 
 
 
@@ -256,7 +271,7 @@ def main() -> int:
             raise CouplerError(
                 f"MODFLOW coupling is disabled in {idragra_parameters}; set UseModflowCoupling = T to enable it"
             )
-        params_file_path = run_dir / DEFAULT_MODFLOW_PARAMETERS
+        params_file_path = run_dir / DEFAULT_MODFLOW_PARAMETERS_FILE
         params = ModflowConfiguration.read(params_file_path)
     except (OSError, CouplerError) as exc:
         raise SystemExit(str(exc)) from exc
@@ -271,25 +286,37 @@ def main() -> int:
     coupling_dir = run_dir / DEFAULT_COUPLING_DIRECTORY
     coupling_dir.mkdir(parents=True, exist_ok=True)
 
+    # Set up and launch the IdrAgra process
     idragra = IdrAgraProcess(
         executable.resolve(), run_dir, executable_args, coupling_dir.resolve(), params.period_days
     )
+
+    # Set up the callback function that will be called by the MODFLOW API to exchange data with IdrAgra
     callback = CouplingCallback(
         idragra, modflowapi.Callbacks, params.recharge_package, params.well_package
     )
+
     try:
-        modflowapi.run_simulation(
-            str(params.library), str(params.workspace), callback, verbose=False
-        )
-        idragra.finish()
+        modflowapi.run_simulation(str(params.library), str(params.workspace), callback, verbose=False)
+        idragra.finish_simulation()
     finally:
         idragra.terminate()
     return 0
 
 
-def _resolve_from(base: Path, value: str) -> Path:
-    path = Path(value)
-    return path if path.is_absolute() else base / path
+
+def parse_command_line_args() -> CommandLineArgs:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--working-dir", required=True, type=Path)
+    parser.add_argument("--idragra-exe", required=True, type=Path)
+
+    # Any additional argument is saved in "args.idragra_args" and is passed to IdrAgra to be interpreted as if it were on command line
+    parser.add_argument(
+        "idragra_args",
+        nargs=argparse.REMAINDER,
+        help="arguments passed to IdrAgra (place them after --, for example: -- -f custom_parameters.txt)",
+    )
+    return parser.parse_args(namespace=CommandLineArgs())
 
 # Get the path to idragra_parameters.txt (or custom txt if specified in command line arguments)
 def _parameter_file(run_dir: Path, executable_args: list[str]) -> Path:
@@ -297,22 +324,17 @@ def _parameter_file(run_dir: Path, executable_args: list[str]) -> Path:
         if argument.lower() in {"-f", "-filename"}:
             if index + 1 == len(executable_args):
                 raise CouplerError(f"{argument} requires an IdrAgra parameter filename")
-            return _resolve_from(run_dir, executable_args[index + 1]).resolve()
-    return (run_dir / DEFAULT_IDRAGRA_PARAMETERS).resolve()
+            return _resolve_path_from(run_dir, executable_args[index + 1])
+    return (run_dir / DEFAULT_IDRAGRA_PARAMETERS_FILE).resolve()
 
+# Return an absolute path to a file given a base directory (if it isn't already absolute)
+def _resolve_path_from(base_dir: Path, a_maybe_relative_path: str) -> Path:
+    path = Path(a_maybe_relative_path)
+    if not path.is_absolute():
+        path = base_dir / path
+    return path.resolve()
 
-def _coupling_enabled(path: Path) -> bool:
-    values = _read_params_file(path)
-    return _read_bool(values.get("usemodflowcoupling", "F"), "UseModflowCoupling")
-
-def _read_bool(value: str, name: str) -> bool:
-    normalized = value.strip().lower()
-    if normalized in {"t", ".true.", "true", "y", "yes", "1"}:
-        return True
-    if normalized in {"f", ".false.", "false", "n", "no", "0"}:
-        return False
-    raise CouplerError(f"{name} must be T or F, not {value!r}")
-
+# Check whether "UseModflowCoupling = T" in idragra_parameters.txt
 def _is_coupling_enabled(path: Path) -> bool:
     values = _read_params_file(path)
     usemodflowcoupling = values.get("usemodflowcoupling", "F")
@@ -381,20 +403,6 @@ def _set_boundary_field(package: Any, field: str, grid: AsciiGrid, values: np.nd
     except (KeyError, TypeError, ValueError) as exc:
         raise CouplerError(f"MODFLOW package has no mutable '{field}' field") from exc
     stress_data[field] = _values_for_boundary(grid, values, target.size)
-
-
-def parse_command_line_args() -> CommandLineArgs:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--working-dir", required=True, type=Path)
-    parser.add_argument("--idragra-exe", required=True, type=Path)
-
-    # Any additional argument is saved in "args.idragra_args" and is passed to IdrAgra to be interpreted as if it were on command line
-    parser.add_argument(
-        "idragra_args",
-        nargs=argparse.REMAINDER,
-        help="arguments passed to IdrAgra (place them after --, for example: -- -f custom_parameters.txt)",
-    )
-    return parser.parse_args(namespace=CommandLineArgs())
 
 
 if __name__ == "__main__":
