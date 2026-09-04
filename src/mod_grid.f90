@@ -501,8 +501,8 @@ end subroutine overlay_domain_r
 
 subroutine set_default_par_i(a_grid,domain_grid,default_value)
     ! fill missing value with the value provided by the user - integer
-    type(grid_i),intent(inout)::domain_grid
-    type(grid_i),intent(out)::a_grid
+    type(grid_i),intent(in)::domain_grid
+    type(grid_i),intent(inout)::a_grid
     integer,intent(in)::default_value
 
     where(a_grid%mat==a_grid%header%nan .and. domain_grid%mat/=domain_grid%header%nan) a_grid%mat=default_value
@@ -510,8 +510,8 @@ end subroutine set_default_par_i
 
 subroutine set_default_par_r(a_grid,domain_grid,default_value)
     ! fill missing value with the value provided by the user - real
-    type(grid_i),intent(inout)::domain_grid
-    type(grid_r),intent(out)::a_grid
+    type(grid_i),intent(in)::domain_grid
+    type(grid_r),intent(inout)::a_grid
     real(dp),intent(in)::default_value
 
     where(a_grid%mat==a_grid%header%nan .and. domain_grid%mat/=domain_grid%header%nan) a_grid%mat=default_value

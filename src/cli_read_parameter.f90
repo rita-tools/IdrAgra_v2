@@ -937,7 +937,7 @@ subroutine read_irr_grid(info_spat, extent, sim, met)
     type(bound),intent(in)::extent
     type(simulation),intent(inout)::sim
     type(par_method),dimension(:),intent(inout)::met
-    type(spatial_info),intent(out)::info_spat
+    type(spatial_info),intent(inout)::info_spat
     character(len=300)::dir
     character(len=30)::start_year
 
@@ -1000,7 +1000,7 @@ subroutine check_grid(info_spat, sim)
     ! check grid extension respect to the domain
     ! TODO: reorganize the function
     type(simulation),intent(inout)::sim
-    type(spatial_info),intent(out)::info_spat
+    type(spatial_info),intent(inout)::info_spat
     integer::k
     character(len=30)::k_str
 
@@ -1078,7 +1078,7 @@ end subroutine check_grid
 subroutine check_irr_grid(info_spat, sim)
     ! check irrigation parameters grids
     type(simulation),intent(inout)::sim
-    type(spatial_info),intent(out)::info_spat
+    type(spatial_info),intent(inout)::info_spat
     integer::ios
     character(len=300)::dir
     integer :: line
