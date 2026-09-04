@@ -821,6 +821,7 @@ subroutine read_spatial_info(info_spat, extent, sim, tab_CN2, tab_CN3, theta2_ri
         case (1:4)
             call read_irr_grid(info_spat, extent, sim, met)
             call check_irr_grid(info_spat, sim)
+            call calc_perc_booster_pars(info_spat, met, sim%quantiles)
         case default
             stop 'Simulation mode has been incorrectly set'
     end select
@@ -992,15 +993,11 @@ subroutine read_irr_grid(info_spat, extent, sim, met)
         case default
     end select
     print *, "Irrigation distribution parameters have been read"
-    ! calculate the parameter for the percolative booster TODO: move away from the reading routines
-    call calc_perc_booster_pars(info_spat,met,sim%quantiles)
 
 end subroutine read_irr_grid
 
 subroutine check_grid(info_spat, sim)
     ! check grid extension respect to the domain
-    ! Note: only water table depth is not verified
-    ! so, it cannot be called inside the reading routine
     ! TODO: reorganize the function
     type(simulation),intent(inout)::sim
     type(spatial_info),intent(out)::info_spat
@@ -1089,31 +1086,38 @@ subroutine check_irr_grid(info_spat, sim)
     dir = sim%input_path
     line = 0
     ios = 0
+    call validate_irr_method_map(info_spat%irr_meth_id, info_spat%domain, sim%n_irr_meth, sim%id_irr_meth_fn)
     select case (sim%mode)
         case (1)
             call overlay_domain(info_spat%irr_unit_id, info_spat%domain, sim%irr_units_fn)
-            ! fix not defined irrigation methods
-            call set_default_par(info_spat%irr_meth_id, info_spat%domain, 1)
             call set_default_par(info_spat%eff_net,info_spat%domain, 1.0D0)
         case (2)
-            call set_default_par(info_spat%irr_meth_id, info_spat%domain, 1)
             !call check_mat_irrigation(info_spat%eff_rete,info_spat%domain, 1.0D0) - %RR%
             call set_default_par(info_spat%eff_met, info_spat%domain, 1.0D0)
         case (3)
-            call set_default_par(info_spat%irr_meth_id, info_spat%domain, 1)
             !call check_mat_irrigation(info_spat%eff_rete,info_spat%domain, 1.0D0) - %RR%
         case (4)
             call overlay_domain(info_spat%irr_unit_id, info_spat%domain, sim%irr_units_fn)
-            call set_default_par(info_spat%irr_meth_id, info_spat%domain, 1)
             call set_default_par(info_spat%eff_met, info_spat%domain, 1.0D0)
             call set_default_par(info_spat%eff_net,info_spat%domain, 1.0D0)
         case default
     end select
-    call set_default_par(info_spat%a_perc(1), info_spat%domain, 1.0D0)
-    call set_default_par(info_spat%a_perc(2), info_spat%domain, 1.0D0)
-    call set_default_par(info_spat%b_perc(1), info_spat%domain, 1.0D0)
-    call set_default_par(info_spat%b_perc(2), info_spat%domain, 1.0D0)
+    !%PS%: removed set_default_pars for booster parameters; calc_perc_booster_pars already applies the defaults internally
 end subroutine check_irr_grid
+
+subroutine validate_irr_method_map(method_grid, domain_grid, n_methods, map_name)
+    ! Verify that the irrigation method map contains only valid method IDs (NaNs are removed from the domain)
+    type(grid_i), intent(inout) :: method_grid, domain_grid
+    integer, intent(in) :: n_methods
+    character(len=*), intent(in) :: map_name
+
+    call overlay_domain(method_grid, domain_grid, map_name)
+    if (any(domain_grid%mat /= domain_grid%header%nan .and. (method_grid%mat < 0 .or. method_grid%mat > n_methods))) then
+        print *, "Error in irrigation method map '", trim(map_name), "': IDs other than NoData must be between 0 and ", n_methods
+        print *, "Execution will be aborted..."
+        stop
+    end if
+end subroutine validate_irr_method_map
 
 subroutine read_rice_parameters(sim, theta2_rice)
     ! read the parameters specific for rice paddy
@@ -1313,6 +1317,8 @@ subroutine init_irrigation_units(domain_map,irr_units_map,eff_net,irr_units_tbl,
 
     rewind(free_unit)                ! Rewind of file to store its content
     read(free_unit,*) str            ! Skip header line
+
+    !%PS%, todo: decide whether n_cells/int_distr_eff/h_irr_mean should include non-irrigable cells (e.g. who have irr_method=0 or whose crop have irrigation_class=0)
     do i = 1, n_irr_units
 !~             read(free_unit,*,iostat=ios)IU(i)%id,IU(i)%f_explore,IU(i)%f_un_priv,IU(i)%wat_shift
         read(free_unit,*,iostat=ios)irr_units_tbl(i)%id,irr_units_tbl(i)%f_explore,irr_units_tbl(i)%f_un_priv

@@ -124,7 +124,7 @@ subroutine irrigation_need_fixed(info_spat, h_irr, bil2, bil2_old, bil1_old, phe
     ! the irrigation event is estimated only during the irrigation season
     h_irr_temp = 0.
 
-    where(pheno%irrigation_class == 1)
+    where(pheno%irrigation_class == 1 .and. info_spat%irr_meth_id%mat>0)
         !!! %RR% %CG% %EAC% %AB% (feb-23) network efficiency no more considered in need mode [info_spat%eff_rete%mat]
         where(pheno%cn_class==7)                   ! irrigation matrix for rice
             !h_irr_temp = (bil1_old%h_eva + bil2_old%h_transp_pot)
@@ -150,7 +150,7 @@ subroutine irrigation_need_fixed(info_spat, h_irr, bil2, bil2_old, bil1_old, phe
     ! split the irrigation matrix for each irrigation method
     ! n is the number of irrigation methods
     forall(i=1:size(info_spat%domain%mat,1),j=1:size(info_spat%domain%mat,2),&
-        & info_spat%irr_meth_id%mat(i,j)/=info_spat%irr_meth_id%header%nan) &
+        & info_spat%irr_meth_id%mat(i,j)>0) &
         & h_irr(i,j,info_spat%irr_meth_id%mat(i,j)) = h_irr_temp(i,j)
 
 end subroutine irrigation_need_fixed
@@ -171,7 +171,7 @@ subroutine irrigation_need_fc(info_spat, h_irr, bil2, bil2_old, bil1_old, pheno,
     h_irr = 0.
     h_irr_temp = 0.
     !!! %RR% %CG% %EAC% %AB% (feb-23) network efficiency no more considered in need mode [info_spat%eff_rete%mat]
-    where (pheno%irrigation_class == 1)
+    where (pheno%irrigation_class == 1 .and. info_spat%irr_meth_id%mat>0)
         where (pheno%cn_class==7)                      ! %AB% irrigation matrix for rice
             h_irr_temp = (bil1_old%h_eva + bil2_old%h_transp_pot)/(info_spat%eff_met%mat)
 
@@ -204,7 +204,7 @@ subroutine irrigation_need_fc(info_spat, h_irr, bil2, bil2_old, bil1_old, pheno,
     ! split the irrigation matrix for each irrigation method
     ! n is the number of irrigation methods
     forall(i=1:size(info_spat%domain%mat,1),j=1:size(info_spat%domain%mat,2),&
-        & info_spat%irr_meth_id%mat(i,j)/=info_spat%irr_meth_id%header%nan) &
+        & info_spat%irr_meth_id%mat(i,j)>0) &
         & h_irr(i,j,info_spat%irr_meth_id%mat(i,j)) = h_irr_temp(i,j)
 
 end subroutine irrigation_need_fc
@@ -234,6 +234,7 @@ subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_
     real(dp),intent(in)::xrice_ksat     ! ksat of the transpirative layer for rice
     real(dp),dimension(:,:),intent(in)::h_sat2
 
+    logical, dimension(size(info_spat%domain%mat,1),size(info_spat%domain%mat,2)) :: is_irrigable
     real(dp),dimension(size(info_spat%domain%mat,1),size(info_spat%domain%mat,2))::h_irr_temp
 
     integer::i,j
@@ -243,6 +244,12 @@ subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_
     h_irr_temp = 0.
     losses = 0.
 
+    where(info_spat%domain%mat/=info_spat%domain%header%nan .and. pheno%irrigation_class==1 .and. info_spat%irr_meth_id%mat>0)
+        is_irrigable = .true.
+    elsewhere
+        is_irrigable = .false.
+    end where
+
     ! loop throw scheduled irrigation list and update 'irrigation'
     do i=1,size(sch_irr)
         if (sch_irr(i)%year == year_cur .and. sch_irr(i)%doy == doy_cur) then
@@ -251,9 +258,14 @@ subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_
                     & '; irr.unit.id= ', sch_irr(i)%irr_unit_id, '; water depth = ', sch_irr(i)%h_irr, &
                     & '; h_irr_max= ', maxval(h_irr), '; h_irr_temp_max= ', maxval(h_irr_temp)
             end if
+            if ((sch_irr(i)%h_irr > 0 .or. sch_irr(i)%h_irr == -1 .or. sch_irr(i)%h_irr == -10) .and. &
+                & .not. any(info_spat%irr_unit_id%mat == sch_irr(i)%irr_unit_id .and. is_irrigable)) then
+                print *, 'Warning: scheduled irrigation for IU ', sch_irr(i)%irr_unit_id, &
+                    & ' on day ', doy_cur, ' but no irrigable cells were found.'
+            end if
             if (sch_irr(i)%h_irr > 0) then
                 ! add water quantity  as scheduled
-                where (info_spat%irr_unit_id%mat == sch_irr(i)%irr_unit_id .and. pheno%irrigation_class==1)
+                where (info_spat%irr_unit_id%mat == sch_irr(i)%irr_unit_id .and. is_irrigable)
                     h_irr_temp = sch_irr(i)%h_irr ! %EAC%: like the old version
                 end where
 
@@ -261,7 +273,7 @@ subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_
 
             else if (sch_irr(i)%h_irr == -1) then
                 ! add water with fixed volume
-                where (info_spat%irr_unit_id%mat == sch_irr(i)%irr_unit_id .and. pheno%irrigation_class==1)
+                where (info_spat%irr_unit_id%mat == sch_irr(i)%irr_unit_id .and. is_irrigable)
                     where(pheno%cn_class==7)                   ! irrigation matrix for rice
                         !h_irr_temp = (bil1_old%h_eva+bil2_old%h_transp_pot)
                         h_irr_temp = ((info_spat%h_meth%mat-bil1_old%h_pond)+ & ! fill the ponding layer
@@ -280,7 +292,7 @@ subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_
 
             else if (sch_irr(i)%h_irr == -10) then
                 ! add water to field capacity
-                where (info_spat%irr_unit_id%mat == sch_irr(i)%irr_unit_id .and. pheno%irrigation_class==1)
+                where (info_spat%irr_unit_id%mat == sch_irr(i)%irr_unit_id .and. is_irrigable)
                     where (pheno%cn_class==7)                      ! %AB% irrigation matrix for rice
                         !h_irr_temp = (bil1_old%h_eva+bil2_old%h_transp_pot)/(info_spat%eff_met%mat)
                         h_irr_temp = ((info_spat%h_meth%mat-bil1_old%h_pond)+ & ! fill the ponding layer
@@ -320,7 +332,7 @@ subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_
     ! split the irrigation matrix for each irrigation method
     ! n is the number of irrigation methods
     forall(i=1:size(info_spat%domain%mat,1),j=1:size(info_spat%domain%mat,2),&
-        & info_spat%irr_meth_id%mat(i,j)/=info_spat%irr_meth_id%header%nan) &
+        & info_spat%irr_meth_id%mat(i,j)>0) &
         & h_irr(i,j,info_spat%irr_meth_id%mat(i,j)) = h_irr_temp(i,j)
 
 end subroutine irrigation_scheduled
@@ -431,6 +443,7 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
 
         irr_mask=(irr_units_map%mat==irr_units(k)%id &
                  .and. irr_class==1 &
+                 .and. method%mat>0 &
                  .and. irr_starts<=doy &
                  .and. irr_ends>=doy)
 
@@ -633,7 +646,7 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
     ! TODO: split irrigation sources
     do j=1,domain%header%jmax
         do i=1,domain%header%imax
-            if(domain%mat(i,j)/=domain%header%nan)then
+            if(domain%mat(i,j)/=domain%header%nan .and. method%mat(i,j)>0)then
                 if(.not.(priv_irr(i,j)/=0. .and. coll_irr(i,j)/=0.))then
                     h_irr(i,j,method%mat(i,j)) = priv_irr(i,j)+coll_irr(i,j)
                 else
@@ -668,7 +681,7 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
 end subroutine irrigation_use
 
 subroutine calc_daily_duty(cur_doy, irr_units, sources_info, wat_sources, irr_units_map, domain_map, &
-                         & par, irrigation_class, h_soil_old, h_transp_pot, raw, h_fc                )
+                         & par, irrigation_class, irrigation_method, h_soil_old, h_transp_pot, raw, h_fc)
     ! estimate the water volume for irrigation available in each irrigation units
     integer,intent(in)::cur_doy ! current day of simulation
     type(irr_units_table), dimension(:),intent(inout)::irr_units
@@ -676,7 +689,7 @@ subroutine calc_daily_duty(cur_doy, irr_units, sources_info, wat_sources, irr_un
     type(water_sources_table),dimension(:),intent(in)::wat_sources
     type(grid_i),intent(in)::irr_units_map,domain_map
     type(parameters),intent(in)::par
-    integer,dimension(:,:),intent(in)::irrigation_class
+    integer,dimension(:,:),intent(in)::irrigation_class,irrigation_method
     real(dp),dimension(:,:),intent(in) :: h_soil_old, h_transp_pot, raw, h_fc
 
     integer,dimension(:,:),allocatable::cells_un_coll       ! map of the cells irrigated by unmonitored collective water sources
@@ -702,7 +715,8 @@ subroutine calc_daily_duty(cur_doy, irr_units, sources_info, wat_sources, irr_un
             if (wat_sources(i)%type_id == 4) then
                 where (irr_units_map%mat == wat_sources(i)%id_irr_unit &
                     & .and. domain_map%mat /= domain_map%header%nan &
-                    & .and. irrigation_class == 1) &
+                    & .and. irrigation_class == 1 &
+                    & .and. irrigation_method > 0) &
                     & cells_un_coll = wat_sources(i)%wat_src_idx
             end if
         end do

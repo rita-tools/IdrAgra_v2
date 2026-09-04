@@ -521,6 +521,7 @@ function id_to_par_r(id_grid,pars_list)
     ! return a matrix of real values
     ! choosing the values from the list provided (pars_list)
     ! base on the position in the list
+    !%PS%: id_grid = 0 returns a value of 0 regardless of pars_list (irr_meth 0 means "not irrigable" and doesn't need actual parameters)
    type(grid_i),intent(in)::id_grid
     real(dp),dimension(:),intent(in)::pars_list
 
@@ -528,7 +529,8 @@ function id_to_par_r(id_grid,pars_list)
     integer::i,j
 
     id_to_par_r=real(id_grid%header%nan)
-    forall(i=1:size(id_grid%mat,1), j=1:size(id_grid%mat,2), id_grid%mat(i,j)/=id_grid%header%nan)
+    where(id_grid%mat==0) id_to_par_r=0.0_dp
+    forall(i=1:size(id_grid%mat,1), j=1:size(id_grid%mat,2), id_grid%mat(i,j)>0)
         id_to_par_r(i,j)=pars_list(id_grid%mat(i,j))
     end forall
 end function id_to_par_r
@@ -537,6 +539,7 @@ function id_to_par_i(id_grid,pars_list)
     ! return a matrix of integer values
     ! choosing the values from the list provided (pars_list)
     ! base on the position in the list
+    !%PS%: id_grid = 0 returns a value of 0 regardless of pars_list (irr_meth 0 means "not irrigable" and doesn't need actual parameters)
    type(grid_i),intent(in)::id_grid
     integer,dimension(:),intent(in)::pars_list
 
@@ -544,7 +547,8 @@ function id_to_par_i(id_grid,pars_list)
     integer::i,j
 
     id_to_par_i=id_grid%header%nan
-    forall(i=1:size(id_grid%mat,1), j=1:size(id_grid%mat,2), id_grid%mat(i,j)/=id_grid%header%nan)
+    where(id_grid%mat==0) id_to_par_i=0
+    forall(i=1:size(id_grid%mat,1), j=1:size(id_grid%mat,2), id_grid%mat(i,j)>0)
         id_to_par_i(i,j)=pars_list(id_grid%mat(i,j))
     end forall
 end function id_to_par_i

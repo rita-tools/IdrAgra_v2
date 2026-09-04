@@ -370,7 +370,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                     call read_grid (trim(pars%sim%input_path)// &
                         & trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years))//".asc", &
                         & info_spat%irr_meth_id,pars%sim,boundaries)
-                    call set_default_par (info_spat%irr_meth_id, info_spat%domain,1)
+                    call validate_irr_method_map(info_spat%irr_meth_id, info_spat%domain, pars%sim%n_irr_meth, &
+                        & trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years)))
                     info_spat%h_meth=info_spat%domain
                     info_spat%h_meth%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_irr) ! Spreads h_irr for each irrigation method
                     call init_irrigation_units(info_spat%domain,info_spat%irr_unit_id,info_spat%eff_net,irr_units,wat_src_tbl,&
@@ -398,7 +399,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                     call read_grid (trim(pars%sim%input_path)// &
                         & trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years))//".asc", &
                         & info_spat%irr_meth_id,pars%sim,boundaries)
-                    call set_default_par (info_spat%irr_meth_id,info_spat%domain,1)
+                    call validate_irr_method_map(info_spat%irr_meth_id, info_spat%domain, pars%sim%n_irr_meth, &
+                        & trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years)))
                     call read_grid (trim(pars%sim%input_path)// &
                         & trim(pars%sim%eff_irr_fn)//'_'//trim(adjustl(s_years))//".asc",&
                         & info_spat%eff_met,pars%sim,boundaries)
@@ -425,7 +427,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                     call read_grid (trim(pars%sim%input_path)// &
                         & trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years))//".asc", &
                         & info_spat%irr_meth_id,pars%sim,boundaries)
-                    call set_default_par (info_spat%irr_meth_id,info_spat%domain,1)
+                    call validate_irr_method_map(info_spat%irr_meth_id, info_spat%domain, pars%sim%n_irr_meth, &
+                        & trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years)))
                     info_spat%h_meth=info_spat%domain
                     info_spat%h_meth%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_irr)
                     alpha_ms_map=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_th_ms)
@@ -450,7 +453,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                     call read_grid (trim(pars%sim%input_path)// &
                         & trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years))//".asc", &
                         & info_spat%irr_meth_id,pars%sim,boundaries)
-                    call set_default_par (info_spat%irr_meth_id,info_spat%domain,1)
+                    call validate_irr_method_map(info_spat%irr_meth_id, info_spat%domain, pars%sim%n_irr_meth, &
+                        & trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years)))
                     call read_grid (trim(pars%sim%input_path)// &
                         & trim(pars%sim%eff_irr_fn)//'_'//trim(adjustl(s_years))//".asc",&
                         & info_spat%eff_met,pars%sim,boundaries)
@@ -898,11 +902,11 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                     if (doy==1) irr_units(:)%q_rem = 0
 
                     ! calculate the daily water duty for each irrigation unit, considering the water distribution efficiency
-                    call calc_daily_duty(doy, irr_units, info_sources, wat_src_tbl, info_spat%irr_unit_id, &
-                                       & info_spat%domain, pars, pheno%irrigation_class,                   &
-                                       & (wat_bal1_old%h_soil + wat_bal2_old%h_soil),                      &
-                                       & (wat_bal1_old%h_transp_pot + wat_bal2_old%h_transp_pot),          &
-                                       & wat_bal2%h_raw, (wat%layer(1)%h_fc + wat%layer(2)%h_fc)           )
+                    call calc_daily_duty(doy, irr_units, info_sources, wat_src_tbl, info_spat%irr_unit_id,       &
+                                       & info_spat%domain, pars, pheno%irrigation_class,                         &
+                                       & info_spat%irr_meth_id%mat, (wat_bal1_old%h_soil + wat_bal2_old%h_soil), &
+                                       & (wat_bal1_old%h_transp_pot + wat_bal2_old%h_transp_pot),                &
+                                       & wat_bal2%h_raw, (wat%layer(1)%h_fc + wat%layer(2)%h_fc)                 )
 
                     ! %EAC%: save irrigation units results
                     call save_irr_unit_debug_data(doy, out_tbl_list, irr_units)
@@ -1051,7 +1055,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                         if(info_spat%domain%mat(i,j)/=info_spat%domain%header%nan)then
 
                             !%PS%: only calculate irrigation amount if not in mode 0
-                            if (pars%sim%mode /= 0) then
+                            if (pars%sim%mode /= 0 .and. info_spat%irr_meth_id%mat(i,j) > 0) then
                                 h_irr_hour = h_irr(i,j, info_spat%irr_meth_id%mat(i,j))                    * & ! Daily amount for this cell
                                            & pars%irr%met(info_spat%irr_meth_id%mat(i,j))%freq(hour)       * & ! Fraction to be applied each hour of activity
                                            & (1-pars%irr%met(info_spat%irr_meth_id%mat(i,j))%f_interception)   ! 1 - intercepted fraction
