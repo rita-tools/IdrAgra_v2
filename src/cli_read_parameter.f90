@@ -876,7 +876,7 @@ subroutine read_grid_files(info_spat, extent, sim)
     ! read initial land use map
     if (sim%f_soiluse .eqv. .false.)then  ! Static land use map
         call read_grid(trim(dir)//trim(sim%soiluse_fn)//'.asc',info_spat%soil_use_id,sim,extent)
-        call overlay_domain (info_spat%soil_use_id,info_spat%domain)   ! Set to NaN non simulated soil uses
+        call overlay_domain(info_spat%soil_use_id, info_spat%domain, sim%soiluse_fn)
     else                                ! Dynamic land use map
         write (start_year, *) sim%start_year
         call read_grid(trim(dir)//trim(sim%soiluse_fn)//'_'//trim(adjustl(start_year))//'.asc', &
@@ -977,7 +977,7 @@ subroutine read_irr_grid(info_spat, extent, sim, met)
             !call read_matrices(trim(dir)//trim(sim%eff_rete_fn)//'.asc',info_spat%eff_rete,sim,confini) - RR
         case (4)
             call read_grid(trim(dir)//trim(sim%irr_units_fn)//'.asc',info_spat%irr_unit_id,sim,extent)
-            call overlay_domain(info_spat%irr_unit_id,info_spat%domain)
+            call overlay_domain(info_spat%irr_unit_id, info_spat%domain, sim%irr_units_fn)
             if (sim%f_soiluse .eqv. .false.) then
                 call read_grid(trim(dir)//trim(sim%id_irr_meth_fn)//'.asc',info_spat%irr_meth_id,sim,extent)
                 call read_grid(trim(dir)//trim(sim%eff_irr_fn)//'.asc',info_spat%eff_met,sim,extent)
@@ -1007,21 +1007,21 @@ subroutine check_grid(info_spat, sim)
     integer::k
     character(len=30)::k_str
 
-    call overlay_domain(info_spat%theta(1)%sat,info_spat%domain)
-    call overlay_domain(info_spat%theta(2)%sat,info_spat%domain)
-    call overlay_domain(info_spat%theta(1)%fc,info_spat%domain)
-    call overlay_domain(info_spat%theta(2)%fc,info_spat%domain)
-    call overlay_domain(info_spat%theta(1)%wp,info_spat%domain)
-    call overlay_domain(info_spat%theta(2)%wp,info_spat%domain)
-    call overlay_domain(info_spat%theta(1)%r,info_spat%domain)
-    call overlay_domain(info_spat%theta(2)%r,info_spat%domain)
-    call overlay_domain(info_spat%k_sat(1),info_spat%domain)
-    call overlay_domain(info_spat%k_sat(2),info_spat%domain)
-    call overlay_domain(info_spat%fact_n(1),info_spat%domain)
-    call overlay_domain(info_spat%fact_n(2),info_spat%domain)
-    call overlay_domain(info_spat%slope,info_spat%domain)
-    call overlay_domain(info_spat%drainage,info_spat%domain)
-    call overlay_domain(info_spat%hydr_gr,info_spat%domain)
+    call overlay_domain(info_spat%theta(1)%sat, info_spat%domain, sim%thetaI_sat_fn )
+    call overlay_domain(info_spat%theta(2)%sat, info_spat%domain, sim%thetaII_sat_fn)
+    call overlay_domain(info_spat%theta(1)%fc,  info_spat%domain, sim%thetaI_FC_fn  )
+    call overlay_domain(info_spat%theta(2)%fc,  info_spat%domain, sim%thetaII_FC_fn )
+    call overlay_domain(info_spat%theta(1)%wp,  info_spat%domain, sim%thetaI_WP_fn  )
+    call overlay_domain(info_spat%theta(2)%wp,  info_spat%domain, sim%thetaII_WP_fn )
+    call overlay_domain(info_spat%theta(1)%r,   info_spat%domain, sim%thetaI_r_fn   )
+    call overlay_domain(info_spat%theta(2)%r,   info_spat%domain, sim%thetaII_r_fn  )
+    call overlay_domain(info_spat%k_sat(1),     info_spat%domain, sim%ksat_I_fn     )
+    call overlay_domain(info_spat%k_sat(2),     info_spat%domain, sim%ksat_II_fn    )
+    call overlay_domain(info_spat%fact_n(1),    info_spat%domain, sim%n_I_fn        )
+    call overlay_domain(info_spat%fact_n(2),    info_spat%domain, sim%n_II_fn       )
+    call overlay_domain(info_spat%slope,        info_spat%domain, sim%slope_fn      )
+    call overlay_domain(info_spat%drainage,     info_spat%domain, sim%dren_fn       )
+    call overlay_domain(info_spat%hydr_gr,      info_spat%domain, sim%hydr_group_fn )
 
     if(sim%f_init_wc .eqv. .true.)then  ! Initial moisture condition defined externally
         where(info_spat%domain%mat/=info_spat%domain%header%nan .and. &
@@ -1033,23 +1033,23 @@ subroutine check_grid(info_spat, sim)
             info_spat%theta(2)%old%mat = info_spat%theta(2)%fc%mat
         end where
     else                                ! Initial condition calculated from the first warm-up period
-        call overlay_domain(info_spat%theta(1)%old,info_spat%domain)
-        call overlay_domain(info_spat%theta(2)%old,info_spat%domain)
+        call overlay_domain(info_spat%theta(1)%old, info_spat%domain, sim%thetaI_FC_fn)
+        call overlay_domain(info_spat%theta(2)%old, info_spat%domain, sim%thetaII_FC_fn)
     end if
 
     ! check the parameters of the capillary rise model
     if(sim%f_cap_rise .eqv. .true.)then
-        call overlay_domain(info_spat%wat_tab,info_spat%domain)
+        call overlay_domain(info_spat%wat_tab, info_spat%domain, sim%wat_table_fn)
         if(minval(info_spat%wat_tab%mat,info_spat%wat_tab%mat/=info_spat%wat_tab%header%nan)<0.)then
             print*,"A null value has been set where groundwater levels are negative"
             where(info_spat%wat_tab%mat<0. .and. info_spat%wat_tab%mat/=info_spat%wat_tab%header%nan)info_spat%wat_tab%mat=0.
         end if
-        call overlay_domain(info_spat%a3,info_spat%domain)
-        call overlay_domain(info_spat%a4,info_spat%domain)
-        call overlay_domain(info_spat%b1,info_spat%domain)
-        call overlay_domain(info_spat%b2,info_spat%domain)
-        call overlay_domain(info_spat%b3,info_spat%domain)
-        call overlay_domain(info_spat%b4,info_spat%domain)
+        call overlay_domain(info_spat%a3, info_spat%domain, sim%ParRisCap_a3_fn)
+        call overlay_domain(info_spat%a4, info_spat%domain, sim%ParRisCap_a4_fn)
+        call overlay_domain(info_spat%b1, info_spat%domain, sim%ParRisCap_b1_fn)
+        call overlay_domain(info_spat%b2, info_spat%domain, sim%ParRisCap_b2_fn)
+        call overlay_domain(info_spat%b3, info_spat%domain, sim%ParRisCap_b3_fn)
+        call overlay_domain(info_spat%b4, info_spat%domain, sim%ParRisCap_b4_fn)
         ! Set the minimum value of water table depth
         ! TODO: check what happen if the depth is not set
         ! TODO: check the minimum value of water table
@@ -1061,14 +1061,14 @@ subroutine check_grid(info_spat, sim)
     ! weather station weights maps
     do k=1,size(info_spat%weight_ws)
         write(k_str,*) k
-        call overlay_domain(info_spat%weight_ws(k),info_spat%domain)
+        call overlay_domain(info_spat%weight_ws(k), info_spat%domain, trim(sim%meteoweight_fn)//" "//trim(adjustl(k_str)))
     end do
 
     info_spat%backup_domain = info_spat%domain
     info_spat%backup_domain%mat = info_spat%domain%mat
 
     ! land use
-    call overlay_domain(info_spat%soil_use_id,info_spat%domain)
+    call overlay_domain(info_spat%soil_use_id, info_spat%domain, sim%soiluse_fn)
     if(minval(info_spat%soil_use_id%mat,info_spat%soil_use_id%mat/=info_spat%soil_use_id%header%nan) < 1 &
             .or. maxval(info_spat%soil_use_id%mat) > sim%n_lus)then
         print *,"Soil use maps have soil uses not defined in crop database"
@@ -1091,7 +1091,7 @@ subroutine check_irr_grid(info_spat, sim)
     ios = 0
     select case (sim%mode)
         case (1)
-            call overlay_domain(info_spat%irr_unit_id,info_spat%domain)
+            call overlay_domain(info_spat%irr_unit_id, info_spat%domain, sim%irr_units_fn)
             ! fix not defined irrigation methods
             call set_default_par(info_spat%irr_meth_id, info_spat%domain, 1)
             call set_default_par(info_spat%eff_net,info_spat%domain, 1.0D0)
@@ -1103,7 +1103,7 @@ subroutine check_irr_grid(info_spat, sim)
             call set_default_par(info_spat%irr_meth_id, info_spat%domain, 1)
             !call check_mat_irrigation(info_spat%eff_rete,info_spat%domain, 1.0D0) - %RR%
         case (4)
-            call overlay_domain(info_spat%irr_unit_id,info_spat%domain)
+            call overlay_domain(info_spat%irr_unit_id, info_spat%domain, sim%irr_units_fn)
             call set_default_par(info_spat%irr_meth_id, info_spat%domain, 1)
             call set_default_par(info_spat%eff_met, info_spat%domain, 1.0D0)
             call set_default_par(info_spat%eff_net,info_spat%domain, 1.0D0)
@@ -1132,7 +1132,7 @@ subroutine read_rice_parameters(sim, theta2_rice)
     open(newunit=theta2_rice%unit_soil_rice,file=trim(dir)//trim(sim%soil_prop_x_rice_fn),status='old',action='read',iostat=ios)
     if (ios /= 0) then
         !%PS%: now rice soil parameters are optional
-        print *, "WARNING: Couldn't open the rice soil properties file: ", trim(dir)//trim(sim%soil_prop_x_rice_fn), &
+        print *, "Warning: Couldn't open the rice soil properties file: ", trim(dir)//trim(sim%soil_prop_x_rice_fn), &
                & ". Rice soil properties will not be modified."
         return
     end if

@@ -471,20 +471,30 @@ subroutine check_header_r(sim,header_r,file_name)
     end if
 end subroutine check_header_r
 
-subroutine overlay_domain_i(par_grid,domain_grid)
-    ! set par as NAN also where domain is NAN
-    type(grid_i),intent(inout)::domain_grid
-    type(grid_i),intent(out)::par_grid
+subroutine overlay_domain_i(par_grid, domain_grid, par_name)
+    ! Remove cells missing from the parameter map from the active domain (and vice versa)
+    type(grid_i), intent(inout) :: domain_grid
+    type(grid_i), intent(inout) :: par_grid
+    character(len=*), intent(in) :: par_name
 
+    if (any(par_grid%mat==par_grid%header%nan .and. domain_grid%mat/=domain_grid%header%nan)) then
+        print *, "Warning: parameter map '",trim(par_name),"' does not have valid data for the entire active domain;&
+               & the domain will be reduced to cells with valid data."
+    end if
     where(par_grid%mat==par_grid%header%nan) domain_grid%mat=domain_grid%header%nan
     where(domain_grid%mat==domain_grid%header%nan) par_grid%mat=par_grid%header%nan
 end subroutine overlay_domain_i
 
-subroutine overlay_domain_r(par_grid,domain_grid)
-    ! set par as NAN also where domain is NAN
-    type(grid_i),intent(inout)::domain_grid
-    type(grid_r),intent(out)::par_grid
+subroutine overlay_domain_r(par_grid, domain_grid, par_name)
+    ! Remove cells missing from the parameter map from the active domain (and vice versa)
+    type(grid_i), intent(inout) :: domain_grid
+    type(grid_r), intent(inout) :: par_grid
+    character(len=*), intent(in) :: par_name
 
+    if (any(par_grid%mat==par_grid%header%nan .and. domain_grid%mat/=domain_grid%header%nan)) then
+        print *, "Warning: parameter map '",trim(par_name),"' does not have valid data for the entire active domain;&
+               & the domain will be reduced to cells with valid data."
+    end if
     where(par_grid%mat==par_grid%header%nan) domain_grid%mat=domain_grid%header%nan
     where(domain_grid%mat==domain_grid%header%nan) par_grid%mat=par_grid%header%nan
 end subroutine overlay_domain_r

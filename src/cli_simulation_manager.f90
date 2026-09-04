@@ -360,7 +360,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             end do
 
             ! Soil uses that aren't simulated are removed from domain
-            call overlay_domain (info_spat%soil_use_id,info_spat%domain)
+            call overlay_domain(info_spat%soil_use_id, info_spat%domain, trim(landuse_file))
 
             ! update irrigation related parameters map as they can change during the simulation period
             ! TODO: add check if they exist
