@@ -32,8 +32,7 @@ module cli_simulation_manager
 
 use mod_utility, only: sp, dp, get_value_index, get_uniform_sample, days_x_month, calc_date, day_of_week
 use mod_parameters
-use mod_grid, only: read_grid, write_grid, print_mat_as_grid, overlay_domain, &
-                    & bound, id_to_par
+use mod_grid, only: read_grid, write_grid, print_mat_as_grid, overlay_domain, bound, id_to_par, set_default_par
 use mod_evapotranspiration, only: ET_reference, calculateDLH
 use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data
 use mod_runoff
@@ -134,7 +133,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     type(unit_file_scratch),dimension(:),allocatable::unit_Dxi
     integer::cont_td    ! cycles
     character(len=33)::str_td
-    character(len=255)::str_delete, landuse_file, upfilename
+    character(len=255)::str_delete, landuse_file, upfilename, yearly_irr_meth_map, yearly_irr_eff_map
     character(len=55)::s_year,s_years,s_doy
     logical :: file_exists
     !! percolation model
@@ -363,127 +362,54 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             call overlay_domain(info_spat%soil_use_id, info_spat%domain, trim(landuse_file))
 
             ! update irrigation related parameters map as they can change during the simulation period
-            ! TODO: add check if they exist
-            ! TODO: make a function for that
-            select case(pars%sim%mode)
-                case(1)
-                    call read_grid (trim(pars%sim%input_path)// &
-                        & trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years))//".asc", &
-                        & info_spat%irr_meth_id,pars%sim,boundaries)
-                    call validate_irr_method_map(info_spat%irr_meth_id, info_spat%domain, pars%sim%n_irr_meth, &
-                        & trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years)))
-                    info_spat%h_meth=info_spat%domain
-                    info_spat%h_meth%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_irr) ! Spreads h_irr for each irrigation method
-                    call init_irrigation_units(info_spat%domain,info_spat%irr_unit_id,info_spat%eff_net,irr_units,wat_src_tbl,&
-                        &pars,info_spat%h_meth)
-                        ! Spatial distribution of irrigation districts' (soil water content thresholds for irrigation application)
-                    alpha_ms_map=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_th_ms)    ! Spreads activation threshold for each irrigation method
-                    alpha_unm_map=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_th_unm)  ! Spreads activation threshold for each irrigation method
-                    fw_irr=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%f_wet)             ! Spreads fw for each irrigation method
-                    a_loss=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%a_loss)            ! Spreads irrigation application loss for each irrigation method
-                    b_loss=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%b_loss)
-                    c_loss=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%c_loss)
-                    f_interception=id_to_par(info_spat%irr_meth_id,dble(pars%irr%met(:)%f_interception))
-                    ! %EAC%: update percolation parameters
-                    call calc_perc_booster_pars(info_spat,pars%irr%met,pars%sim%quantiles)
+            !%PS%: refactored to avoid duplicated code
+            if (pars%sim%mode > 0) then
+                yearly_irr_meth_map = trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years))//".asc"
+                call read_grid(trim(pars%sim%input_path)//yearly_irr_meth_map, info_spat%irr_meth_id, pars%sim, boundaries) ! TODO: check if file exists
+                call validate_irr_method_map(info_spat%irr_meth_id, info_spat%domain, pars%sim%n_irr_meth, yearly_irr_meth_map)
 
-                    if (pars%sim%prt_debug_out == 'y') then
-                        call write_grid(trim(pars%sim%path)//&
-                            & 'out_'//trim(pars%sim%soiluse_fn)//'_'//trim(adjustl(s_years))//'.asc', &
-                            & info_spat%soil_use_id, error_flag)
-                        call write_grid(trim(pars%sim%path)//&
-                            & 'out'//trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years))//'.asc', &
-                            & info_spat%irr_meth_id, error_flag)
-                    end if
-                case(2)
-                    call read_grid (trim(pars%sim%input_path)// &
-                        & trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years))//".asc", &
-                        & info_spat%irr_meth_id,pars%sim,boundaries)
-                    call validate_irr_method_map(info_spat%irr_meth_id, info_spat%domain, pars%sim%n_irr_meth, &
-                        & trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years)))
-                    call read_grid (trim(pars%sim%input_path)// &
-                        & trim(pars%sim%eff_irr_fn)//'_'//trim(adjustl(s_years))//".asc",&
-                        & info_spat%eff_met,pars%sim,boundaries)
-                    call set_default_par (info_spat%eff_met,info_spat%domain,1.0D0)
-                    alpha_ms_map=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_th_ms)
-                    alpha_unm_map=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_th_unm)
-                    fw_irr=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%f_wet)
-                    f_interception=id_to_par(info_spat%irr_meth_id,dble(pars%irr%met(:)%f_interception))
-                    ! %EAC%: update percolation parameters
-                    call calc_perc_booster_pars(info_spat,pars%irr%met,pars%sim%quantiles)
+                ! Spreads parameters across the simulation domain according to each cell's method
+                !%PS%: note that a/b/c_losses and h_meth are not used in mode 2, but setting them anyway is safe and makes for clearer code
+                alpha_ms_map =  id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%irr_th_ms)
+                alpha_unm_map = id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%irr_th_unm)
+                fw_irr =        id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%f_wet)
+                a_loss =        id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%a_loss)
+                b_loss =        id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%b_loss)
+                c_loss =        id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%c_loss)
+                f_interception= id_to_par(info_spat%irr_meth_id, dble(pars%irr%met(:)%f_interception))
 
-                    if (pars%sim%prt_debug_out == 'y') then
-                        call write_grid(trim(pars%sim%path)//&
-                            & 'out_'//trim(pars%sim%soiluse_fn)//'_'//trim(adjustl(s_years))//'.asc', &
-                            & info_spat%soil_use_id, error_flag)
-                        call write_grid(trim(pars%sim%path)//&
-                            & 'out'//trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years))//'.asc', &
-                            & info_spat%irr_meth_id, error_flag)
-                        call write_grid(trim(pars%sim%path)//&
-                            & 'out'//trim(pars%sim%eff_irr_fn)//'_'//trim(adjustl(s_years))//'.asc', &
-                            & info_spat%eff_met, error_flag)
-                    end if
-                case(3)
-                    call read_grid (trim(pars%sim%input_path)// &
-                        & trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years))//".asc", &
-                        & info_spat%irr_meth_id,pars%sim,boundaries)
-                    call validate_irr_method_map(info_spat%irr_meth_id, info_spat%domain, pars%sim%n_irr_meth, &
-                        & trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years)))
-                    info_spat%h_meth=info_spat%domain
-                    info_spat%h_meth%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_irr)
-                    alpha_ms_map=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_th_ms)
-                    alpha_unm_map=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_th_unm)
-                    fw_irr=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%f_wet)
-                    a_loss=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%a_loss)
-                    b_loss=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%b_loss)
-                    c_loss=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%c_loss)
-                    f_interception=id_to_par(info_spat%irr_meth_id,dble(pars%irr%met(:)%f_interception))
-                    ! EAC: update percolation parameters
-                    call calc_perc_booster_pars(info_spat,pars%irr%met,pars%sim%quantiles)
+                info_spat%h_meth=info_spat%domain
+                info_spat%h_meth%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_irr)
 
-                    if (pars%sim%prt_debug_out == 'y') then
-                        call write_grid(trim(pars%sim%path)//&
-                            & 'out_'//trim(pars%sim%soiluse_fn)//'_'//trim(adjustl(s_years))//'.asc', &
-                            & info_spat%soil_use_id, error_flag)
-                        call write_grid(trim(pars%sim%path)//&
-                            & 'out'//trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years))//'.asc', &
-                            & info_spat%irr_meth_id, error_flag)
-                    end if
-                case(4)
-                    call read_grid (trim(pars%sim%input_path)// &
-                        & trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years))//".asc", &
-                        & info_spat%irr_meth_id,pars%sim,boundaries)
-                    call validate_irr_method_map(info_spat%irr_meth_id, info_spat%domain, pars%sim%n_irr_meth, &
-                        & trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years)))
-                    call read_grid (trim(pars%sim%input_path)// &
-                        & trim(pars%sim%eff_irr_fn)//'_'//trim(adjustl(s_years))//".asc",&
-                        & info_spat%eff_met,pars%sim,boundaries)
-                    call set_default_par (info_spat%eff_met,info_spat%domain,1.0D0)
-                    info_spat%h_meth=info_spat%domain
-                    info_spat%h_meth%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_irr)
-                    alpha_ms_map=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_th_ms)
-                    alpha_unm_map=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_th_unm)
-                    fw_irr=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%f_wet)
-                    a_loss=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%a_loss)
-                    b_loss=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%b_loss)
-                    c_loss=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%c_loss)
-                    f_interception=id_to_par(info_spat%irr_meth_id,dble(pars%irr%met(:)%f_interception))
-                    ! %EAC%: update percolation parameters
-                    call calc_perc_booster_pars(info_spat,pars%irr%met,pars%sim%quantiles)
+                call calc_perc_booster_pars(info_spat, pars%irr%met, pars%sim%quantiles)
 
-                    if (pars%sim%prt_debug_out == 'y') then
-                        call write_grid(trim(pars%sim%path)//&
-                            & 'out_'//trim(pars%sim%soiluse_fn)//'_'//trim(adjustl(s_years))//'.asc', &
-                            & info_spat%soil_use_id, error_flag)
-                        call write_grid(trim(pars%sim%path)//&
-                            & 'out'//trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years))//'.asc', &
-                            & info_spat%irr_meth_id, error_flag)
-                        call write_grid(trim(pars%sim%path)//&
-                            & 'out'//trim(pars%sim%eff_irr_fn)//'_'//trim(adjustl(s_years))//'.asc', &
-                            & info_spat%eff_met, error_flag)
+                ! Only update irrigation units in mode 1
+                if (pars%sim%mode == 1) then
+                    call init_irrigation_units(info_spat%domain, info_spat%irr_unit_id, info_spat%eff_net, &
+                                             & irr_units, wat_src_tbl, pars, info_spat%h_meth              )
+                end if
+
+                ! Only read efficiency maps in modes 2 and 4
+                if (pars%sim%mode == 2 .or. pars%sim%mode == 4) then
+                    yearly_irr_eff_map = trim(pars%sim%eff_irr_fn)//'_'//trim(adjustl(s_years))//".asc"
+                    call read_grid(trim(pars%sim%input_path)//yearly_irr_eff_map, info_spat%eff_met, pars%sim, boundaries)
+                    call set_default_par(info_spat%eff_met, info_spat%domain, 1.0D0)
+                end if
+
+            end if
+
+            ! Debug output
+            if (pars%sim%prt_debug_out == 'y') then
+                call write_grid(trim(pars%sim%path)//'out_'//trim(pars%sim%soiluse_fn)//'_'//trim(adjustl(s_years))//'.asc', &
+                    & info_spat%soil_use_id, error_flag)
+                if (pars%sim%mode > 0) then
+                    call write_grid(trim(pars%sim%path)//'out_'//yearly_irr_meth_map, info_spat%irr_meth_id, error_flag)
+                    if (pars%sim%mode == 2 .or. pars%sim%mode == 4) then
+                        call write_grid(trim(pars%sim%path)//'out_'//yearly_irr_eff_map, info_spat%eff_met, error_flag)
                     end if
-                case default
-            end select
+                end if
+            end if
+
         end if ! end change soil use map condition
 
         ! Read all phenological tables and allocation of info_pheno%prm%tab(:,:)
