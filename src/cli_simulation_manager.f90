@@ -61,9 +61,6 @@ end interface
 interface assignment(=) !iniz_meteo
     module procedure init_meteo
 end interface
-interface assignment(=) !iniz_pheno
-    module procedure init_pheno
-end interface
 
 contains
 
@@ -1798,39 +1795,6 @@ subroutine eq_wat_bal2(bil_out,bil_in)
     bil_out%h_caprise = bil_in%h_caprise
     bil_out%h_rise = bil_in%h_rise
 end subroutine eq_wat_bal2
-
-subroutine init_pheno(pheno,a)
-    ! TODO: probably to be updated
-   type(crop_pars_matrices),intent(inout)::pheno
-    real(dp),intent(in)::a
-
-    pheno%k_cb_old = pheno%k_cb   ! Store kcb of the current day in kcb_old
-    ! pheno%kcb_low = pheno%kcb_low
-
-    pheno%k_cb = a
-    pheno%h = a
-    pheno%d_r = a
-    pheno%lai = a
-    pheno%cn_day = int(a)
-
-    pheno%irrigation_class = int(a)
-    pheno%cn_class = int(a)
-    pheno%p = a
-    pheno%a = a
-    pheno%RF_t_max = a
-    pheno%RF_e = a
-    pheno%RF_t = a
-    pheno%T_lim = a
-    pheno%T_crit = a
-    pheno%HI = a
-    pheno%Ky_tot = a
-    pheno%Ky_pheno = a
-    pheno%k_cb_mid = a
-    pheno%k_cb_high = a
-    pheno%wp_adj = a
-    pheno%p_day = a
-    pheno%r_stress = a
-end subroutine init_pheno
 
 subroutine init_meteo(meteo,a)
    type(meteo_mat),intent(out)::meteo
