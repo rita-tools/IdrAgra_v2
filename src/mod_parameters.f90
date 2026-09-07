@@ -4,104 +4,103 @@ use mod_constants
 implicit none
 
 type simulation
-    character(len=200) :: path                      ! path of output
-    character(len=200) :: meteo_path                ! path of meteo tables
-    character(len=200) :: ws_list_fn                ! filename (with complete path) of weather stations list
-    character(len=200) :: pheno_path                ! path where phenophases files are stored
-    character(len=200) :: pheno_root                ! a common string to use to get folder
-    character(len=200) :: irr_met_path              ! path to irrigation methods folder
-    character(len=200) :: irr_met_list_fn           ! filename of a list of irrigation methods
-    character(len=200) :: watsour_path              ! path to water sources folder
-    character(len=200) :: watsources_fn             ! filename of water sources distribution
-    character(len=200) :: mon_sources_i_div_fn      ! filename of monitored sources (i) daily diversions
-    character(len=200) :: mon_sources_ii_div_fn     ! filename of monitored sources (ii) daily diversions
-    character(len=200) :: int_reuse_div_fn          ! filename of internal reuse daily diversions
-    character(len=200) :: cr_sources_list_fn        ! filename of collective runtime sources list
-    character(len=200) :: irrdistr_list_fn          ! filename of public irrigation districts' list
-    character(len=200) :: sched_irr_fn              ! filename of scheduled irrigation file
-    character(len=200) :: input_path                ! path to input file
-    character(len=200) :: initial_condition         ! path to initial condition input file
-    character(len=200) :: final_condition           ! path to final condition input file
-    character(len=255) :: domain_fn                 ! domain file name name
-    character(len=255) :: thetaI_FC_fn
-    character(len=255) :: thetaII_FC_fn
-    character(len=255) :: thetaI_WP_fn
-    character(len=255) :: thetaII_WP_fn
-    character(len=255) :: thetaI_r_fn
-    character(len=255) :: thetaII_r_fn
-    character(len=255) :: thetaI_SAT_fn
-    character(len=255) :: thetaII_SAT_fn
-    character(len=255) :: slope_fn
-    character(len=255) :: dren_fn
-    character(len=255) :: hydr_group_fn
-    character(len=255) :: ksat_I_fn
-    character(len=255) :: ksat_II_fn
-    character(len=255) :: n_I_fn
-    character(len=255) :: n_II_fn
-    character(len=255) :: thetaI_0_fn
-    character(len=255) :: thetaII_0_fn
-    character(len=255) :: thetaI_end_fn
-    character(len=255) :: thetaII_end_fn
-    character(len=255) :: soil_prop_x_rice_fn
-    character(len=255) :: eff_irr_fn
-    character(len=255) :: eff_net_fn
-    character(len=255) :: irr_units_fn
-    character(len=255) :: id_irr_meth_fn
-    character(len=255) :: wat_table_fn
-    character(len=255) :: ParRisCap_a3_fn
-    character(len=255) :: ParRisCap_a4_fn
-    character(len=255) :: ParRisCap_b1_fn
-    character(len=255) :: ParRisCap_b2_fn
-    character(len=255) :: ParRisCap_b3_fn
-    character(len=255) :: ParRisCap_b4_fn
-    character(len=255) :: soiluse_fn
-    character(len=255) :: meteoweight_fn
-    character(len=255) :: shapearea_fn
-    character(len=255) :: irandom_fn
+    character(len=200) :: path = '.\\sim_results\\'                     ! path of output
+    character(len=200) :: meteo_path = '.\\meteo_data\\'                ! path of meteo tables
+    character(len=200) :: ws_list_fn = 'weather_stations.dat'           ! filename (incl. path) of the weather station list
+    character(len=200) :: pheno_path = '.\\crop_series\\'               ! Path to the crop timeseries directory
+    character(len=200) :: pheno_root = 'pheno_'                         ! prefix shared by all folders in pheno_path
+    character(len=200) :: irr_met_path = '.\\irrmeth_data\\'            ! Path to irrigation methods folder
+    character(len=200) :: irr_met_list_fn = 'irrmethods.txt'            ! Filename of the list of irrigation methods
+    character(len=200) :: watsour_path = '.\\watsour_data\\'            ! Path to the water sources folder
+    character(len=200) :: watsources_fn = 'watsources.txt'              ! Filename of water sources distribution
+    character(len=200) :: mon_sources_i_div_fn = 'monit_sources_i.txt'  ! Filename of monitored sources (i) daily diversions
+    character(len=200) :: mon_sources_ii_div_fn = 'monit_sources_ii.txt'! Filename of monitored sources (ii) daily diversions
+    character(len=200) :: int_reuse_div_fn = 'int_reuse.txt'            ! filename of internal reuse daily diversions
+    character(len=200) :: cr_sources_list_fn = 'cr_sources.txt'         ! filename of collective runtime sources list
+    character(len=200) :: irrdistr_list_fn = 'irr_districts.txt'        ! filename of public irrigation districts' list
+    character(len=200) :: sched_irr_fn = 'scheduled_irrigation.txt'     ! filename of scheduled irrigation file
+    character(len=200) :: input_path = '.\\spatial_data\\'              ! Path to spatial data directory (contains most .asc files)
+    character(len=200) :: initial_condition = '.\\spatial_data\\'       ! path to initial condition input file
+    character(len=200) :: final_condition = '.\\sim_results\\'          ! path to final condition output file
+    character(len=255) :: domain_fn = 'domain'                          ! Name of the domain .asc file
+    character(len=255) :: thetaI_FC_fn = 'ThetaI_FC'
+    character(len=255) :: thetaII_FC_fn = 'ThetaII_FC'
+    character(len=255) :: thetaI_WP_fn = 'ThetaI_WP'
+    character(len=255) :: thetaII_WP_fn = 'ThetaII_WP'
+    character(len=255) :: thetaI_r_fn = 'ThetaI_r'
+    character(len=255) :: thetaII_r_fn = 'ThetaII_r'
+    character(len=255) :: thetaI_SAT_fn = 'ThetaI_sat'
+    character(len=255) :: thetaII_SAT_fn = 'ThetaII_sat'
+    character(len=255) :: slope_fn = 'slope'
+    character(len=255) :: dren_fn = 'hydr_cond'
+    character(len=255) :: hydr_group_fn = 'hydr_group'
+    character(len=255) :: ksat_I_fn = 'Ksat_I'
+    character(len=255) :: ksat_II_fn = 'Ksat_II'
+    character(len=255) :: n_I_fn = 'N_I'
+    character(len=255) :: n_II_fn = 'N_II'
+    character(len=255) :: thetaI_0_fn = 'IC_thetaI'
+    character(len=255) :: thetaII_0_fn = 'IC_thetaII'
+    character(len=255) :: thetaI_end_fn = 'FC_thetaI'
+    character(len=255) :: thetaII_end_fn = 'FC_thetaII'
+    character(len=255) :: soil_prop_x_rice_fn = 'rice_soilparam.txt'
+    character(len=255) :: eff_irr_fn = 'appl_eff'
+    character(len=255) :: eff_net_fn = 'conv_eff'
+    character(len=255) :: irr_units_fn = 'irr_units'
+    character(len=255) :: id_irr_meth_fn = 'irr_meth'
+    character(len=255) :: wat_table_fn = 'waterdepth'
+    character(len=255) :: ParRisCap_a3_fn = 'CapRisePar_a3'
+    character(len=255) :: ParRisCap_a4_fn = 'CapRisePar_a4'
+    character(len=255) :: ParRisCap_b1_fn = 'CapRisePar_b1'
+    character(len=255) :: ParRisCap_b2_fn = 'CapRisePar_b2'
+    character(len=255) :: ParRisCap_b3_fn = 'CapRisePar_b3'
+    character(len=255) :: ParRisCap_b4_fn = 'CapRisePar_b4'
+    character(len=255) :: soiluse_fn = 'soiluse'
+    character(len=255) :: meteoweight_fn = 'meteo'
+    character(len=255) :: shapearea_fn = 'shapearea'
+    character(len=255) :: irandom_fn = 'irandom'
 
-
-    integer :: step_out                         ! monthly output = 0, weekly output = 1, user defined = 2
-    integer :: mode                             ! type of simulation:
+    integer :: step_out = 0                     ! monthly output = 0, weekly output = 1, user defined = 2
+    integer :: mode = 2                         ! type of simulation:
                                                 ! 0 = without irrigation, 1 = need mode at field capacity, 2 = need mode at fixed volume, 3 = Use mode, 4 = scheduled irrigation
-    logical :: f_soiluse                        ! land use change between years (true) otherwise false
-    integer :: weekday                          ! day of the week of the weekly outputs (1 = Monday, 2 = Tuesday, ..., 7 = Sunday)
-    integer,dimension(:),pointer::clock
+    logical :: f_soiluse = .false.              ! land use change between years (true) otherwise false
+    integer :: weekday = 1                      ! day of the week of the weekly outputs (1 = Monday, 2 = Tuesday, ..., 7 = Sunday)
+    integer, dimension(3) :: clock = [10, 100, 30]
     integer,dimension(:),pointer::intervals
     integer :: start_year                       ! first year of simulation
     integer :: sim_years                        ! number of years for the simulation
     integer :: meteo_years                      ! number of available weather time series
     integer,dimension(:),pointer :: year_step   ! number of days for each simulation years
-    logical :: f_init_wc                        ! if true, use user provided values otherwise calculate from first year run
+    logical :: f_init_wc = .false.              ! if true, use user provided values otherwise calculate from first year run
     logical :: f_theta_out                      ! id true, write final soil moisture condition
-    integer :: rand_seed                        ! seed to initialize the random number generator
-    logical :: rand_symmetry                    ! states if the randomization of emergence date is symmetric [-n,+n] or asymmetric [0, 2n]
-    integer :: sowing_range                     ! range of variability of the sowing day [days]
-    logical :: repeatable                       ! if true, al random generated are repeated over times
-    integer :: imax                             ! maximum number of rows in the raster map
-    integer :: jmax                             ! maximum number of columns in the raster map
-    real(dp) :: cell_size                       ! lateral dimension of the square cell of the raster map
-    real(dp) :: x0                              ! x coordinate of the reference corner
-    real(dp) :: y0                              ! y coordinate of the reference corner
-    integer :: n_voronoi                        ! number of voronoi polygons
-    integer :: n_lus                            ! total number of land uses
-    integer :: n_crops                          ! max number of crops per year
+    integer :: rand_seed = -999                 ! seed to initialize the random number generator
+    logical :: rand_symmetry = .true.           ! states if the randomization of emergence date is symmetric [-n,+n] or asymmetric [0, 2n]
+    integer :: sowing_range = 0                 ! range of variability of the sowing day [days]
+    logical :: repeatable = .true.              ! if true, al random generated are repeated over times
+    integer :: imax = 1                         ! maximum number of rows in the raster map
+    integer :: jmax = 1                         ! maximum number of columns in the raster map
+    real(dp) :: cell_size = 250                 ! lateral dimension of the square cell of the raster map
+    real(dp) :: x0 = 1.0                        ! x coordinate of the reference corner
+    real(dp) :: y0 = 1.0                        ! y coordinate of the reference corner
+    integer :: n_voronoi = 1                    ! number of voronoi polygons
+    integer :: n_lus = 1                        ! total number of land uses
+    integer :: n_crops = 1                      ! max number of crops per year
     integer,dimension(:),pointer :: lu_list     ! list of ids if the simulated land uses
     integer,dimension(:),pointer :: no_lu_list  ! list of ids if the NOT simulated land uses
-    logical :: f_cap_rise                       ! if true, capillary rise is calculated
-    logical :: f_shapearea                      ! if true, use shapes area (for vectorialization)
+    logical :: f_cap_rise = .false.             ! if true, capillary rise is calculated
+    logical :: f_shapearea = .false.            ! if true, use shapes area (for vectorialization)
     logical :: f_irandom                        ! if true, use user defined random values
-    integer :: n_ws                             ! maximum number of weather station
-    integer :: start_irr_season                 ! start irrigation season [doy]
-    integer :: end_irr_season                   ! end irrigation season [doy]
+    integer :: n_ws = 1                         ! maximum number of weather station
+    integer :: start_irr_season = 91            ! start irrigation season [doy]
+    integer :: end_irr_season = 304             ! end irrigation season [doy]
     integer :: n_irr_meth                       ! number of irrigation methods
-    logical :: f_out_cells                      ! if true, print outputs file for control points (aka cells)
+    logical :: f_out_cells = .false.            ! if true, print outputs file for control points (aka cells)
     real(dp),dimension(:),pointer :: res_canopy ! plant resistance
-    real(dp),dimension(:,:),pointer :: quantiles! extremes of variability of the k_sat (percolation model): 10th e 90th for 1st layer, 10th e 90th for 2nd layer
-    real(dp) :: lambda_cn                       ! lambda parameters for curve number [-]
+    real(dp), dimension(2,2) :: quantiles = reshape([0.575118, 0.472116, 8.026400, 7.706101], [2,2])
+    real(dp) :: lambda_cn = 0.2                 ! lambda parameters for curve number [-]
     real(dp) :: h_prec_lim = 5.0                ! minimum meaningful precipitation [mm]
 
-    type(date) :: start_simulation              ! start simulation date
-    type(date) :: end_simulation                ! end simulation date
+    type(date) :: start_simulation = date(29, 2, 1600, 2305507, 0) ! sentinel: use meteo start date
+    type(date) :: end_simulation = date(29, 2, 1600, 2305507, 0)   ! sentinel: use meteo end date
     integer :: forecast_day = 5                 ! number of days to use to cumulate precipitation
     real(dp) :: h_maxpond = 0.0D0               ! overall maximum pond (mm). It will replaced by irrigation method
     real(dp) :: fc_ratio = 1.0D0                ! fraction of FC to fill with irrigation
@@ -174,8 +173,8 @@ type simulation
 end type simulation
 
 type layer_depth
-    real(dp) :: ze_fix                          ! depth of the evaporative (1st from top) layer [m]
-    real(dp) :: zr_fix                          ! depth of the transpirative (2nd from top) layer [m] (used when crop is missing) [m]
+    real(dp) :: ze_fix = 0.10 ! depth of the evaporative (1st from top) layer [m]
+    real(dp) :: zr_fix = 0.90 ! depth of the transpirative (2nd from top) layer [m] (used when crop is missing)
 end type layer_depth
 
 type par_method
@@ -215,7 +214,7 @@ type par_irr_event
 end type par_irr_event
 
 type water_source
-    integer :: n_withdrawals                    ! number of withdrawals for each water sources
+    integer :: n_withdrawals = 0                ! number of withdrawals for each water sources
     logical :: f_exists                         ! if true, allocate the variable
     logical :: f_allocate_timeserie             ! if true, allocate the array
 end type water_source
@@ -240,7 +239,7 @@ type parameters
     integer :: n_bac
     type(layer_depth) :: depth
     type(par_irr_event) :: irr
-    integer :: n_dotaz
+    integer :: n_dotaz = 0
     type(water_source) :: ms_i
     type(water_source) :: ms_ii
     type(water_source) :: intreu

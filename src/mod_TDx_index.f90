@@ -13,9 +13,9 @@ type clock
 end type clock
 
 type TDx_index
-    character(len=255)::mode
+    character(len=255)::mode = 'none'
     type(clock)::temp
-    integer::n
+    integer::n = 0
 end type TDx_index
 
 

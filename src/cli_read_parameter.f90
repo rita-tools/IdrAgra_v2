@@ -28,8 +28,6 @@ subroutine read_all_parameters(file_xml, xml, xml_dtx, ErrorFlag, debug)
     line = 0; tablestart = 0
     ios = 0
 
-    call make_default(xml, xml_dtx)
-
     call read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,debug)
 
     inquire(file="cells.txt", exist=xml%sim%f_out_cells) ! update "output_cells"
@@ -113,8 +111,6 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
     actcroplen = 0
     dir_ic = xml%sim%initial_condition
     dir_fc = xml%sim%final_condition
-    allocate(xml%sim%clock(3))
-
     open(newunit=unit_txt, file=trim(file_xml), status="old", action="read", iostat=ios)
 
     if (ios /= 0 ) then

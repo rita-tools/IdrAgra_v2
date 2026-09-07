@@ -1,6 +1,6 @@
 program main
 use mod_utility, only: lower_case, print_execution_time
-use mod_parameters!, only: read_parameters, make_default, print_parameters  ! variables and methods to read file *.xml paramters
+use mod_parameters, only: parameters, water_sources_table, source_info
 use mod_grid, only: write_grid, min_domain, bound      ! variables and methods to handle spatial input
 use mod_meteo!, only: meteo_series_length, read_meteo_parameters,
     ! close_meteo_file, read_meteo_data
@@ -57,7 +57,6 @@ do i = 1, iargc()
                 showpreview = .true.
             case ('-default', '-d')         ! print all default value
                 call print_header()
-                call make_default(xml, xml_TDx)
                 print *, '=== DEFAULT VALUES ==='
                 call print_parameters(xml,xml_TDx)
                 print *, '=== END DEFAULT ==='
@@ -210,123 +209,6 @@ print *, 'source available on https://github.com/rita-tools/IdrAgra_v2'
 print *, '============================================================'
 print *, ''
 end subroutine print_header
-
-
-! TODO: replace with direct initialization of the variable
-subroutine make_default(xml, xml_dtx)
-use mod_parameters
-use mod_TDx_index
-type(parameters), intent(inout) :: xml
-type(TDx_index), intent(inout) :: xml_dtx
-
-xml%sim%path =                   '.\\sim_results\\'
-xml%sim%input_path =             '.\\spatial_data\\'
-xml%sim%initial_condition =      xml%sim%input_path
-xml%sim%final_condition =        xml%sim%path
-xml%sim%domain_fn =                 'domain'
-xml%sim%thetaI_FC_fn =            'ThetaI_FC'
-xml%sim%thetaII_FC_fn =           'ThetaII_FC'
-xml%sim%thetaI_WP_fn =            'ThetaI_WP'
-xml%sim%thetaII_WP_fn =           'ThetaII_WP'
-xml%sim%thetaI_r_fn =             'ThetaI_r'
-xml%sim%thetaII_r_fn =            'ThetaII_r'
-xml%sim%thetaI_SAT_fn =           'ThetaI_sat'
-xml%sim%thetaII_SAT_fn =          'ThetaII_sat'
-xml%sim%slope_fn =            'slope'
-xml%sim%dren_fn =                'hydr_cond'
-xml%sim%hydr_group_fn =             'hydr_group'
-xml%sim%ksat_I_fn =              'Ksat_I'
-xml%sim%ksat_II_fn =             'Ksat_II'
-xml%sim%n_I_fn =                 'N_I'
-xml%sim%n_II_fn =                'N_II'
-xml%sim%thetaI_0_fn =             'IC_thetaI'
-xml%sim%thetaII_0_fn =            'IC_thetaII'
-xml%sim%thetaI_end_fn =           'FC_thetaI'
-xml%sim%thetaII_end_fn =          'FC_thetaII'
-xml%sim%soil_prop_x_rice_fn =   'rice_soilparam.txt'
-xml%sim%eff_irr_fn =          'appl_eff'
-xml%sim%eff_net_fn =            'conv_eff'
-xml%sim%irr_units_fn =           'irr_units'
-xml%sim%id_irr_meth_fn =       'irr_meth'
-xml%sim%wat_table_fn =            'waterdepth'
-xml%sim%ParRisCap_a3_fn =        'CapRisePar_a3'
-xml%sim%ParRisCap_a4_fn =        'CapRisePar_a4'
-xml%sim%ParRisCap_b1_fn =        'CapRisePar_b1'
-xml%sim%ParRisCap_b2_fn =        'CapRisePar_b2'
-xml%sim%ParRisCap_b3_fn =        'CapRisePar_b3'
-xml%sim%ParRisCap_b4_fn =        'CapRisePar_b4'
-xml%sim%soiluse_fn =             'soiluse'
-xml%sim%meteoweight_fn =         'meteo'
-xml%sim%shapearea_fn =           'shapearea'
-xml%sim%irandom_fn =             'irandom'
-
-xml%sim%meteo_path =             '.\\meteo_data\\'
-xml%sim%ws_list_fn =         'weather_stations.dat'
-xml%sim%pheno_path =             '.\\crop_series\\'
-xml%sim%pheno_root =             'pheno_'
-xml%sim%irr_met_path =           '.\\irrmeth_data\\'
-xml%sim%irr_met_list_fn =       'irrmethods.txt'
-xml%sim%watsour_path =           '.\\watsour_data\\'
-xml%sim%watsources_fn =    'watsources.txt'
-xml%sim%mon_sources_i_div_fn =    'monit_sources_i.txt'
-xml%sim%mon_sources_ii_div_fn =   'monit_sources_ii.txt'
-xml%sim%int_reuse_div_fn =          'int_reuse.txt'
-xml%sim%cr_sources_list_fn =        'cr_sources.txt'
-xml%sim%irrdistr_list_fn =          'irr_districts.txt'
-xml%sim%sched_irr_fn =     'scheduled_irrigation.txt'
-xml%sim%step_out =                  0
-xml%sim%mode =                   2
-xml%sim%f_soiluse =                .false.
-xml%sim%h_prec_lim =              5.0
-
-! Initializes start_simulation and end_simulation (to be overwritten)
-xml%sim%start_simulation%day   = 29
-xml%sim%start_simulation%month = 02
-xml%sim%start_simulation%year  = 1600
-xml%sim%start_simulation%doy = calc_doy(xml%sim%start_simulation%day, xml%sim%start_simulation%month, &
-    & xml%sim%start_simulation%year)
-xml%sim%end_simulation%doy = xml%sim%start_simulation%doy
-
-allocate(xml%sim%clock(3))
-xml%sim%clock(1) =               10
-xml%sim%clock(2) =              100
-xml%sim%clock(3) =               30
-xml%sim%weekday =                 1
-xml%sim%f_init_wc =                 .false.
-xml%sim%rand_seed =             -999 ! Blank
-xml%sim%rand_symmetry =         .true.
-xml%sim%sowing_range =                0
-xml%sim%repeatable =            .true.
-xml%sim%imax =                    1
-xml%sim%jmax =                    1
-xml%sim%cell_size =                  250
-xml%sim%x0 =                      1.0
-xml%sim%y0 =                      1.0
-xml%sim%n_lus =               1
-xml%sim%n_crops =               1
-xml%sim%f_cap_rise =             .false.
-xml%sim%n_ws =                1
-xml%sim%n_voronoi =              1
-xml%sim%start_irr_season =       91
-xml%sim%end_irr_season =        304
-xml%sim%f_out_cells =          .false.
-xml%sim%lambda_cn =               0.2
-xml%sim%f_shapearea =        .false.
-xml%depth%ze_fix =                0.10
-xml%depth%zr_fix =                0.90
-xml%n_dotaz =                     0
-xml%ms_i%n_withdrawals =                    0
-xml%ms_ii%n_withdrawals =                   0
-xml%intreu%n_withdrawals =                  0
-xml%cr%n_withdrawals =                      0
-
-allocate(xml%sim%quantiles(2,2))
-xml%sim%quantiles = reshape((/0.575118, 0.472116, 8.026400, 7.706101/),(/2,2/))
-
-xml_dtx%mode =                    'none'
-xml_dtx%n =                       0
-end subroutine make_default
-
 
 subroutine print_parameters(xml,xml_dtx)
 use mod_parameters, only: parameters
