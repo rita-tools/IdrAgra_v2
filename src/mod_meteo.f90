@@ -30,20 +30,19 @@ end type meteo_info
 ! It contains the weather parameters spatially distributed
 ! The distribution is made over the domain with the weights defined in info_spat%weigth_ws(:)
 type meteo_mat
-    real(dp),dimension(:,:),pointer::T_ave      ! Daily average temperature [°C]
-    real(dp),dimension(:,:),pointer::T_max      ! maximum daily temperature [°C]
-    real(dp),dimension(:,:),pointer::T_min      ! minimum daily temperature [°C]
-    real(dp),dimension(:,:),pointer::P          ! precipitation [mm]
-    real(dp),dimension(:,:),pointer::P_cum      ! cumulate precipitation [mm]
-    real(dp),dimension(:,:),pointer::RH_max     ! maximum daily air moisture [%]
-    real(dp),dimension(:,:),pointer::RH_min     ! minimum daily air moisture [%]
-    real(dp),dimension(:,:),pointer::Wind_vel   ! wind velocity at 2 m height [m/s]
-    real(dp),dimension(:,:),pointer::Rad_sol    ! global solar radiation [MJ m^-2 d^-1]
-    real(dp),dimension(:,:),pointer::lat        ! Latitude [m]
-    real(dp),dimension(:,:),pointer::alt        ! Altitude [m a.s.l.]
-    real(dp),dimension(:,:),pointer::et0        ! evapotranspiration [mm]
+    real(dp), dimension(:,:), allocatable :: T_ave    ! Daily average temperature [°C]
+    real(dp), dimension(:,:), allocatable :: T_max    ! maximum daily temperature [°C]
+    real(dp), dimension(:,:), allocatable :: T_min    ! minimum daily temperature [°C]
+    real(dp), dimension(:,:), allocatable :: P        ! precipitation [mm]
+    real(dp), dimension(:,:), allocatable :: P_cum    ! cumulate precipitation [mm]
+    real(dp), dimension(:,:), allocatable :: RH_max   ! maximum daily air moisture [%]
+    real(dp), dimension(:,:), allocatable :: RH_min   ! minimum daily air moisture [%]
+    real(dp), dimension(:,:), allocatable :: Wind_vel ! wind velocity at 2 m height [m/s]
+    real(dp), dimension(:,:), allocatable :: Rad_sol  ! global solar radiation [MJ m^-2 d^-1]
+    real(dp), dimension(:,:), allocatable :: lat      ! Latitude [m]
+    real(dp), dimension(:,:), allocatable :: alt      ! Altitude [m a.s.l.]
+    real(dp), dimension(:,:), allocatable :: et0      ! evapotranspiration [mm]
 end type meteo_mat
-
 
 contains
 
@@ -409,5 +408,22 @@ subroutine resolve_weather_station_id(filename, station_header, station_id, id_f
         id_mismatch = .false.
     end if
 end subroutine resolve_weather_station_id
+
+subroutine reset_meteo(meteo)
+    type(meteo_mat), intent(inout) :: meteo
+    ! Resets weather variables for each simulation cell (dimensions are 'row, column')
+    meteo%T_max(:,:) = 0.0_dp
+    meteo%T_min(:,:) = 0.0_dp
+    meteo%P(:,:) = 0.0_dp
+    meteo%P_cum(:,:) = 0.0_dp
+    meteo%RH_max(:,:) = 0.0_dp
+    meteo%RH_min(:,:) = 0.0_dp
+    meteo%Wind_vel(:,:) = 0.0_dp
+    meteo%Rad_sol(:,:) = 0.0_dp
+    meteo%lat(:,:) = 0.0_dp
+    meteo%alt(:,:) = 0.0_dp
+    meteo%et0(:,:) = 0.0_dp
+    meteo%T_ave(:,:) = 0.0_dp
+end subroutine reset_meteo
 
 end module mod_meteo

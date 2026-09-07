@@ -34,7 +34,7 @@ use mod_utility, only: sp, dp, get_value_index, get_uniform_sample, days_x_month
 use mod_parameters
 use mod_grid, only: read_grid, write_grid, print_mat_as_grid, overlay_domain, bound, id_to_par, set_default_par
 use mod_evapotranspiration, only: ET_reference, calculateDLH
-use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data
+use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data, reset_meteo
 use mod_runoff
 use mod_crop_soil_water
 use mod_crop_phenology, only: crop_pheno_info, crop_matrices, populate_crop_pars_matrices
@@ -57,9 +57,6 @@ interface assignment(=) !eq_extensive
 end interface
 interface assignment(=) !eq_bil
     module procedure eq_wat_bal1,eq_wat_bal2,init_wat_bal1,init_wat_bal2
-end interface
-interface assignment(=) !iniz_meteo
-    module procedure init_meteo
 end interface
 
 contains
@@ -1796,24 +1793,6 @@ subroutine eq_wat_bal2(bil_out,bil_in)
     bil_out%h_rise = bil_in%h_rise
 end subroutine eq_wat_bal2
 
-subroutine init_meteo(meteo,a)
-   type(meteo_mat),intent(out)::meteo
-    real(dp),intent(in)::a
-
-    meteo%T_max = a
-    meteo%T_min = a
-    meteo%P = a
-    meteo%P_cum = a
-    meteo%RH_max = a
-    meteo%RH_min = a
-    meteo%Wind_vel = a
-    meteo%Rad_sol = a
-    meteo%lat = a
-    meteo%alt = a
-    meteo%et0 = a
-    meteo%T_ave = a
-end subroutine init_meteo
-
 subroutine create_meteo_matrices(info_meteo, dir_meteo, meteo_weight, meteo, domain, doy, res_canopy)
     ! distribute weather variables to the domain according to the weights of each weather stations
    type(meteo_info),dimension(:),intent(in)::info_meteo
@@ -1825,8 +1804,7 @@ subroutine create_meteo_matrices(info_meteo, dir_meteo, meteo_weight, meteo, dom
     real(dp),intent(in)::res_canopy
     integer::i,j,k
 
-    !inizializzazione della variabile meteo
-    meteo = 0.0D0
+    call reset_meteo(meteo)
     do k=1,size(meteo_weight,3)
         forall(i=1:size(domain%mat,1),j=1:size(domain%mat,2),domain%mat(i,j)/=domain%header%nan)
                         meteo%T_max(i,j)    = info_meteo(dir_meteo(i,j,k))%T_max*meteo_weight(i,j,k) + meteo%T_max(i,j)
