@@ -6,7 +6,7 @@ use mod_meteo!, only: meteo_series_length, read_meteo_parameters,
     ! close_meteo_file, read_meteo_data
 use mod_TDx_index                                     ! variables and methods to handle meteorological data
 
-use cli_crop_parameters, only: init_crop_phenology_pars, close_pheno_file, crop_pheno_info ! variables and methods to handle crop parameters
+use cli_crop_parameters, only: init_crop_phenology_pars, destroy_info_pheno, crop_pheno_info ! variables and methods to handle crop parameters
 use cli_watsources                                                          ! variables and methods to handle irrigation units water supply
 use cli_simulation_manager                                                  ! simulation manager: control IO and daily cycle
 use cli_read_parameter
@@ -135,7 +135,7 @@ if(xml%sim%f_init_wc .eqv. .false.)then ! Generates soil initial condition
     ! Closes input files
     if (xml%sim%mode == 1) call close_water_sources_dudy(info_sources,xml)        ! USE mode
     call close_meteo_file(info_meteo)
-    call close_pheno_file(info_pheno)
+    call destroy_info_pheno(info_pheno)
     print *, '=== INITIAL CONDITION SET ==='
 end if
 
@@ -176,7 +176,7 @@ call simulation_manager(xml,xml_TDx,info_spat,watsour,info_sources,info_meteo,in
 ! Closes input files
 if (xml%sim%mode == 1) call close_water_sources_dudy(info_sources,xml)        ! USE mode
 call close_meteo_file(info_meteo)
-call close_pheno_file(info_pheno)
+call destroy_info_pheno(info_pheno)
 
 ! Memorization of time in which simulation ends
 call date_and_time(values=t_stop)

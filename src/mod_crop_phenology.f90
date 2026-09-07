@@ -4,13 +4,17 @@ use mod_utility, only: round, round_2darray
 implicit none
 
 type file_phenology_r
-    integer::unit                           ! unit associated to the file
-    real(dp),dimension(:,:),pointer::tab    ! daily crop parameters for each land uses
+!   integer::unit                        !%PS%: now phenology files are opened only once per year: unit can change, filename stays the same
+    character(len=255)::filename         ! daily-series file reopened for each annual slice
+    integer::next_pos                    ! stream position of the next unread record
+    real(dp),dimension(:,:),pointer::tab ! daily crop parameters for each land use
 end type file_phenology_r
 
 type file_phenology_i
-    integer::unit                           ! unit associated to the file
-    integer,dimension(:,:),pointer::tab     ! daily crop parameters for each land uses
+!   integer::unit                        !%PS%: now phenology files are opened only once per year: unit can change, filename stays the same
+    character(len=255)::filename         ! daily-series file reopened for each annual slice
+    integer::next_pos                    ! stream position of the next unread record
+    integer,dimension(:,:),pointer::tab  ! daily crop parameters for each land uses
 end type file_phenology_i
 
 type k_cb_matrices

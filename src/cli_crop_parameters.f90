@@ -14,27 +14,61 @@ interface read_crop_pars
     module procedure read_crop_pars_r, read_crop_pars_i
 end interface
 
+interface init_daily_crop_par_file
+    module procedure init_daily_crop_par_file_r, init_daily_crop_par_file_i
+end interface
+
 interface spread_col
     module procedure spread_col_i, spread_col_r
 end interface
 
 contains
 
-subroutine open_daily_crop_par_file(file_unit, file_name, error_flag)
-    ! open day-dependent crop parameters file
+subroutine init_daily_crop_par_file_r(file_pars, file_name)
+    ! Store and validate a real-valued daily crop parameter file.
     character(len=*), intent(in) :: file_name
-    integer, intent(out) :: file_unit
-    integer, intent(out) :: error_flag
-    integer :: ios ! check opening errors
-    error_flag = 0
-    open(newunit=file_unit, file=trim(file_name), status='old', action="read", iostat=ios)
-    if (ios /= 0 ) then
-        print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. &
-            & Execution will be aborted..."
+    type(file_phenology_r), intent(out) :: file_pars
+
+    call init_daily_crop_par_file_common(file_pars%filename, file_pars%next_pos, file_name)
+end subroutine init_daily_crop_par_file_r
+
+subroutine init_daily_crop_par_file_i(file_pars, file_name)
+    ! Store and validate an integer-valued daily crop parameter file.
+    character(len=*), intent(in) :: file_name
+    type(file_phenology_i), intent(out) :: file_pars
+
+    call init_daily_crop_par_file_common(file_pars%filename, file_pars%next_pos, file_name)
+end subroutine init_daily_crop_par_file_i
+
+subroutine init_daily_crop_par_file_common(stored_name, next_pos, file_name)
+    ! Validate the file, skip its header, remember the first data position, and close it.
+    character(len=*), intent(out) :: stored_name
+    integer, intent(out) :: next_pos
+    character(len=*), intent(in) :: file_name
+    integer :: unit, ios
+    character(len=500) :: io_message
+
+    stored_name = trim(file_name)
+
+    open(newunit=unit, file=trim(stored_name), status='old', action='read', &
+       & access='stream', form='formatted', iostat=ios, iomsg=io_message    )
+    if (ios /= 0) then
+        print *, 'Cannot open phenology file ', trim(stored_name), ': ', trim(io_message)
+        print *, 'Execution will be aborted...'
         stop
     end if
-    read( file_unit,*)
-end subroutine open_daily_crop_par_file
+
+    read(unit, '(A)', iostat=ios, iomsg=io_message)
+    if (ios /= 0) then
+        print *, 'Cannot read the header of phenology file ', trim(stored_name), ': ', trim(io_message)
+        print *, 'Execution will be aborted...'
+        stop
+    end if
+
+    ! Save the position in the file as next_pos (read_crop_pars() will start reading data from here)
+    inquire(unit=unit, pos=next_pos)
+    close(unit)
+end subroutine init_daily_crop_par_file_common
 
 subroutine init_crop_par_from_file(file_name, n_crop, n_crop_alt, string_elements, n_crops_by_year, error_flag)
     ! init static crop parameters from parameter file
@@ -281,30 +315,80 @@ subroutine read_crop_par_file(file_name, string_elements, ze_fix, unit_param, er
 end subroutine read_crop_par_file
 
 subroutine read_crop_pars_r(file_pars,n_days,n_crop)
-    ! read crop parameters table from specified unit (real values)
+    ! read crop phenology series from the specified file (real values)
     integer,intent(in) :: n_days                    ! number of days (i.e. 365 o 366)
     integer,intent(in)::n_crop                      ! number of crops
     type(file_phenology_r), intent(inout) :: file_pars
-    integer :: i
+    integer :: i, unit, ios
+    character(len=500) :: io_message
 
     allocate(file_pars%tab(n_days,n_crop))
+
+    ! Open the required file
+    open(newunit=unit, file=trim(file_pars%filename), status='old', action='read', &
+       & access='stream', form='formatted', iostat=ios, iomsg=io_message           )
+    if (ios /= 0) then
+        print *, 'Cannot open phenology file ', trim(file_pars%filename), ': ', trim(io_message)
+        print *, 'Execution will be aborted...'
+        stop
+    end if
+
+    ! Read one year of data starting from next_pos, i.e. the place where last year's reading terminated
     do i=1,size(file_pars%tab,1)
-        read(file_pars%unit, *) file_pars%tab(i,:)
+        if (i == 1) then
+            read(unit, *, pos=file_pars%next_pos, iostat=ios, iomsg=io_message) file_pars%tab(i,:)
+        else
+            read(unit, *, iostat=ios, iomsg=io_message) file_pars%tab(i,:)
+        end if
+        if (ios /= 0) then
+            print *, 'Cannot read day ', i, ' from phenology file ', trim(file_pars%filename), ': ', trim(io_message)
+            print *, 'Execution will be aborted...'
+            stop
+        end if
     end do
+
+    ! Save the current position of the cursor before closing the file 
+    inquire(unit=unit, pos=file_pars%next_pos)
+    close(unit)
 
 end subroutine read_crop_pars_r
 
 subroutine read_crop_pars_i(file_pars,n_days,n_crop)
-! read crop parameters table from specified unit (int values)
+    ! read crop phenology series from the specified file (int values)
     integer,intent(in) :: n_days                ! number of days (i.e. 365 o 366)
     integer,intent(in)::n_crop                  ! number of crops
     type(file_phenology_i), intent(inout) :: file_pars
-    integer :: i
+    integer :: i, unit, ios
+    character(len=500) :: io_message
 
     allocate(file_pars%tab(n_days,n_crop))
+
+    ! Open the required file
+    open(newunit=unit, file=trim(file_pars%filename), status='old', action='read', &
+       & access='stream', form='formatted', iostat=ios, iomsg=io_message           )
+    if (ios /= 0) then
+        print *, 'Cannot open phenology file ', trim(file_pars%filename), ': ', trim(io_message)
+        print *, 'Execution will be aborted...'
+        stop
+    end if
+
+    ! Read one year of data starting from next_pos, i.e. the place where last year's reading terminated
     do i=1,size(file_pars%tab,1)
-        read(file_pars%unit, *) file_pars%tab(i,:)
+        if (i == 1) then
+            read(unit, *, pos=file_pars%next_pos, iostat=ios, iomsg=io_message) file_pars%tab(i,:)
+        else
+            read(unit, *, iostat=ios, iomsg=io_message) file_pars%tab(i,:)
+        end if
+        if (ios /= 0) then
+            print *, 'Cannot read day ', i, ' from phenology file ', trim(file_pars%filename), ': ', trim(io_message)
+            print *, 'Execution will be aborted...'
+            stop
+        end if
     end do
+
+    ! Save the current position of the cursor before closing the file 
+    inquire(unit=unit, pos=file_pars%next_pos)
+    close(unit)
 
 end subroutine read_crop_pars_i
 
@@ -339,15 +423,15 @@ subroutine init_crop_phenology_pars(sim, info_pheno, info_meteo, ze_fix, verbose
 
     do i=1,size(info_pheno)
         dir_name = info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)
-        call open_daily_crop_par_file(info_pheno(i)%k_cb%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"Kcb.dat",errorflag)
-        call open_daily_crop_par_file(info_pheno(i)%h%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"H.dat",errorflag)
-        call open_daily_crop_par_file(info_pheno(i)%z_r%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"Sr.dat",errorflag)
-        call open_daily_crop_par_file(info_pheno(i)%lai%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"LAI.dat",errorflag)
-        call open_daily_crop_par_file(info_pheno(i)%cn_day%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CNvalue.dat",errorflag)
-        call open_daily_crop_par_file(info_pheno(i)%f_c%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"fc.dat",errorflag)
+        call init_daily_crop_par_file(info_pheno(i)%k_cb,      trim(dir)//trim(froot)//trim(dir_name)//delimiter//"Kcb.dat")
+        call init_daily_crop_par_file(info_pheno(i)%h,         trim(dir)//trim(froot)//trim(dir_name)//delimiter//"H.dat")
+        call init_daily_crop_par_file(info_pheno(i)%z_r,       trim(dir)//trim(froot)//trim(dir_name)//delimiter//"Sr.dat")
+        call init_daily_crop_par_file(info_pheno(i)%lai,       trim(dir)//trim(froot)//trim(dir_name)//delimiter//"LAI.dat")
+        call init_daily_crop_par_file(info_pheno(i)%cn_day,    trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CNvalue.dat")
+        call init_daily_crop_par_file(info_pheno(i)%f_c,       trim(dir)//trim(froot)//trim(dir_name)//delimiter//"fc.dat")
         ! EDIT: add support for seasonal p_raw
-        call open_daily_crop_par_file(info_pheno(i)%r_stress%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"r_stress.dat",errorflag)
-        call open_daily_crop_par_file(info_pheno(i)%crop_slot%unit,trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropId.dat",errorflag)
+        call init_daily_crop_par_file(info_pheno(i)%r_stress,  trim(dir)//trim(froot)//trim(dir_name)//delimiter//"r_stress.dat")
+        call init_daily_crop_par_file(info_pheno(i)%crop_slot, trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropId.dat")
 
         ! TODO - add tabulated ky
 
@@ -417,7 +501,7 @@ subroutine read_all_crop_pars(n_days, n_crop, info_pheno)
     type(crop_pheno_info),dimension(:),intent(inout)::info_pheno
     integer::i
 
-    do i=1,size(info_pheno)
+    do i=1,size(info_pheno) ! i.e. the number of weather stations
         call read_crop_pars(info_pheno(i)%k_cb,n_days,n_crop)
         call read_crop_pars(info_pheno(i)%h,n_days,n_crop)
         call read_crop_pars(info_pheno(i)%z_r,n_days,n_crop)
@@ -574,24 +658,20 @@ subroutine destroy_infofeno_tab(info_pheno)
 
 end subroutine destroy_infofeno_tab
 
-subroutine close_pheno_file(info_pheno)
+subroutine destroy_info_pheno(info_pheno)
     ! close all phenological opened files
     type(crop_pheno_info),dimension(:),allocatable,intent(inout)::info_pheno
     integer::i
 
+    !%PS%: now pheno files are closed after each year, here we only need to deallocate info_pheno and its components
+    !todo: because some components of info_pheno are pointers, deallocating it does not automatically free all of the memory up.
+    !      Consider using allocatable instead of pointers or extending this subroutine to properly deallocate all pointers.
+
     do i=1,size(info_pheno)
-        close(info_pheno(i)%k_cb%unit)
-        close(info_pheno(i)%h%unit)
-        close(info_pheno(i)%z_r%unit)
-        close(info_pheno(i)%lai%unit)
-        close(info_pheno(i)%cn_day%unit)
-        close(info_pheno(i)%f_c%unit)
-        close(info_pheno(i)%r_stress%unit)
-        close(info_pheno(i)%crop_slot%unit)
         if(associated(info_pheno(i)%cycle_crop_slot)) deallocate(info_pheno(i)%cycle_crop_slot)
     end do
     deallocate(info_pheno)
-end subroutine close_pheno_file
+end subroutine destroy_info_pheno
 
 subroutine check_pheno_parameters(info_pheno,info_meteo)
 ! check if phenological parameters match weather station data
