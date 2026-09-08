@@ -825,7 +825,7 @@ subroutine read_spatial_info(info_spat, extent, sim, tab_CN2, tab_CN3, theta2_ri
         case (0)
             print *, 'Irrigation distribution parameters are not set'
         case (1:4)
-            call read_irr_grid(info_spat, extent, sim, met)
+            call read_irr_grid(info_spat, extent, sim)
             call check_irr_grid(info_spat, sim)
             call calc_perc_booster_pars(info_spat, met, sim%quantiles)
         case default
@@ -938,11 +938,10 @@ subroutine read_grid_files(info_spat, extent, sim)
 
 end subroutine read_grid_files
 
-subroutine read_irr_grid(info_spat, extent, sim, met)
+subroutine read_irr_grid(info_spat, extent, sim)
     ! distributed parameters for irrigation
     type(bound),intent(in)::extent
     type(simulation),intent(inout)::sim
-    type(par_method),dimension(:),intent(inout)::met
     type(spatial_info),intent(inout)::info_spat
     character(len=300)::dir
     character(len=30)::start_year
