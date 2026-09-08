@@ -34,7 +34,7 @@ use mod_utility, only: sp, dp, get_value_index, get_uniform_sample, days_x_month
 use mod_parameters
 use mod_grid, only: read_grid, write_grid, print_mat_as_grid, overlay_domain, bound, id_to_par, set_default_par
 use mod_evapotranspiration, only: ET_reference, calculateDLH
-use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data, reset_meteo
+use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data, create_meteo_matrices
 use mod_runoff
 use mod_crop_soil_water
 use mod_crop_phenology, only: crop_pheno_info, crop_matrices, populate_crop_pars_matrices
@@ -756,9 +756,10 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 & .and. (pars%sim%start_simulation%day > 1 .or. pars%sim%start_simulation%month > 1)) then
                 call create_meteo_matrices(info_meteo,dir_meteo,meteo_weight,meteo,info_spat%domain,&
                     & doy + pars%sim%start_simulation%doy - calc_doy(1, 1, pars%sim%start_simulation%year),&
-                    & pars%sim%res_canopy(y))
+                    & pars%sim%res_canopy(y), pars%sim)
             else
-                call create_meteo_matrices(info_meteo,dir_meteo,meteo_weight,meteo,info_spat%domain,doy,pars%sim%res_canopy(y))
+                call create_meteo_matrices(info_meteo,dir_meteo,meteo_weight,meteo,info_spat%domain,doy,&
+                    & pars%sim%res_canopy(y), pars%sim)
             end if
 
             ! calculate average latitude %PS%: switched from "forall" to an equivalent "do-do-if" structure to avoid compile-time warnings
@@ -1792,37 +1793,6 @@ subroutine eq_wat_bal2(bil_out,bil_in)
     bil_out%h_caprise = bil_in%h_caprise
     bil_out%h_rise = bil_in%h_rise
 end subroutine eq_wat_bal2
-
-subroutine create_meteo_matrices(info_meteo, dir_meteo, meteo_weight, meteo, domain, doy, res_canopy)
-    ! distribute weather variables to the domain according to the weights of each weather stations
-   type(meteo_info),dimension(:),intent(in)::info_meteo
-    integer,dimension(:,:,:),intent(in)::dir_meteo
-    type(meteo_mat),intent(inout)::meteo
-    real(dp),dimension(:,:,:),intent(in)::meteo_weight
-    type(grid_i),intent(in)::domain
-    integer,intent(in)::doy
-    real(dp),intent(in)::res_canopy
-    integer::i,j,k
-
-    call reset_meteo(meteo)
-    do k=1,size(meteo_weight,3)
-        forall(i=1:size(domain%mat,1),j=1:size(domain%mat,2),domain%mat(i,j)/=domain%header%nan)
-                        meteo%T_max(i,j)    = info_meteo(dir_meteo(i,j,k))%T_max*meteo_weight(i,j,k) + meteo%T_max(i,j)
-                        meteo%T_min(i,j)    = info_meteo(dir_meteo(i,j,k))%T_min*meteo_weight(i,j,k) + meteo%T_min(i,j)
-                        meteo%P(i,j)        = info_meteo(dir_meteo(i,j,k))%P*meteo_weight(i,j,k) + meteo%P(i,j)
-                        meteo%P_cum(i,j)    = info_meteo(dir_meteo(i,j,k))%P_cum*meteo_weight(i,j,k) + meteo%P_cum(i,j)
-                        meteo%RH_max(i,j)   = info_meteo(dir_meteo(i,j,k))%RH_max*meteo_weight(i,j,k) + meteo%RH_max(i,j)
-                        meteo%RH_min(i,j)   = info_meteo(dir_meteo(i,j,k))%RH_min*meteo_weight(i,j,k) + meteo%RH_min(i,j)
-                        meteo%Wind_vel(i,j) = info_meteo(dir_meteo(i,j,k))%wind_vel*meteo_weight(i,j,k) + meteo%Wind_vel(i,j)
-                        meteo%Rad_sol(i,j)  = info_meteo(dir_meteo(i,j,k))%sol_rad*meteo_weight(i,j,k) + meteo%Rad_sol(i,j)
-                        meteo%lat(i,j)      = info_meteo(dir_meteo(i,j,k))%lat_deg*meteo_weight(i,j,k) + meteo%lat(i,j)
-                        meteo%alt(i,j)      = info_meteo(dir_meteo(i,j,k))%alt_m*meteo_weight(i,j,k) + meteo%alt(i,j)
-        end forall
-    end do
-    ! calculate ET0 from distributed parameters
-    meteo%et0 = ET_reference(meteo%T_max, meteo%T_min, meteo%RH_max, meteo%RH_min, meteo%Wind_vel, meteo%Rad_sol,&
-                                   meteo%lat, meteo%alt, res_canopy, doy, domain%header%imax, domain%header%jmax)
-end subroutine create_meteo_matrices
 
 function calc_interception(p,pheno)
     ! Calculate the interception according to Von Hoyningen-Hune (1983) and Braden (1985)

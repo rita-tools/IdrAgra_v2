@@ -3,6 +3,7 @@ use mod_constants, only: sp, dp
 use mod_utility, only: date, lower_case, days_x_month, calc_doy, split_date
 use mod_parameters, only: simulation, par_method
 use mod_evapotranspiration, only: ET_reference
+use mod_grid, only: grid_i
 implicit none
 
 ! store weather station data
@@ -19,7 +20,7 @@ type meteo_info
     real(dp)::T_max                 ! maximum daily temperature [°C]
     real(dp)::T_min                 ! minimum daily temperature [°C]
     real(dp)::P                     ! daily precipitation [mm]
-    real(dp)::P_cum                 ! daily cumulative precipitation [mm]
+    real(dp)::P_cum                 ! cumulative precipitation from the next forecast_day days [mm] (currently unused)
     real(dp)::RH_max                ! maximum volumetric air moisture [%]
     real(dp)::RH_min                ! minimum volumetric air moisture [%]
     real(dp)::wind_vel              ! wind velocity at 2 m height [m/s]
@@ -408,6 +409,81 @@ subroutine resolve_weather_station_id(filename, station_header, station_id, id_f
         id_mismatch = .false.
     end if
 end subroutine resolve_weather_station_id
+
+subroutine create_meteo_matrices(info_meteo, dir_meteo, meteo_weight, meteo, domain, doy, res_canopy, sim)
+    ! Distribute weather variables using station weights or the closest station.
+    type(meteo_info), dimension(:), intent(in) :: info_meteo
+    integer, dimension(:,:,:), intent(in) :: dir_meteo
+    type(meteo_mat), intent(inout) :: meteo
+    real(dp), dimension(:,:,:), intent(in) :: meteo_weight
+    type(grid_i), intent(in) :: domain
+    integer, intent(in) :: doy
+    real(dp), intent(in) :: res_canopy
+    type(simulation),intent(in) :: sim
+    integer :: i, j, k, station
+    real(dp) :: weight
+
+    call reset_meteo(meteo)
+
+    ! For interpolated variables
+    do k=1,size(meteo_weight,3)
+        do j=1,size(domain%mat,2)
+            do i=1,size(domain%mat,1)
+                if (domain%mat(i,j)/=domain%header%nan) then
+                    station = dir_meteo(i,j,k)
+                    weight = meteo_weight(i,j,k)
+                    if (sim%interpolate_temp) then
+                        meteo%T_max(i,j) =    meteo%T_max(i,j) +    info_meteo(station)%T_max *    weight
+                        meteo%T_min(i,j) =    meteo%T_min(i,j) +    info_meteo(station)%T_min *    weight
+                    end if
+                    if (sim%interpolate_rain) then
+                        meteo%P(i,j) =        meteo%P(i,j) +        info_meteo(station)%P *        weight
+                        meteo%P_cum(i,j) =    meteo%P_cum(i,j) +    info_meteo(station)%P_cum *    weight
+                    end if
+                    if (sim%interpolate_hum) then
+                        meteo%RH_max(i,j) =   meteo%RH_max(i,j) +   info_meteo(station)%RH_max *   weight
+                        meteo%RH_min(i,j) =   meteo%RH_min(i,j) +   info_meteo(station)%RH_min *   weight
+                    end if
+                    if (sim%interpolate_wind) then
+                        meteo%Wind_vel(i,j) = meteo%Wind_vel(i,j) + info_meteo(station)%wind_vel * weight
+                    end if
+                    if (sim%interpolate_rad) then
+                        meteo%Rad_sol(i,j) =  meteo%Rad_sol(i,j) +  info_meteo(station)%sol_rad *  weight
+                    end if
+                    meteo%lat(i,j) =          meteo%lat(i,j) +      info_meteo(station)%lat_deg *  weight
+                    meteo%alt(i,j) =          meteo%alt(i,j) +      info_meteo(station)%alt_m *    weight
+                end if
+            end do
+        end do
+    end do
+
+    ! For non-interpolated variables
+    do j=1,size(domain%mat,2)
+        do i=1,size(domain%mat,1)
+            if (domain%mat(i,j)/=domain%header%nan) then
+                station = dir_meteo(i,j,1) ! Use the closest station's data
+                if (.not. sim%interpolate_temp) then
+                    meteo%T_max(i,j) = info_meteo(station)%T_max
+                    meteo%T_min(i,j) = info_meteo(station)%T_min
+                end if
+                if (.not. sim%interpolate_rain) then
+                    meteo%P(i,j) = info_meteo(station)%P
+                    meteo%P_cum(i,j) = info_meteo(station)%P_cum
+                end if
+                if (.not. sim%interpolate_hum) then
+                    meteo%RH_max(i,j) = info_meteo(station)%RH_max
+                    meteo%RH_min(i,j) = info_meteo(station)%RH_min
+                end if
+                if (.not. sim%interpolate_wind) meteo%Wind_vel(i,j) = info_meteo(station)%wind_vel
+                if (.not. sim%interpolate_rad) meteo%Rad_sol(i,j) = info_meteo(station)%sol_rad
+            end if
+        end do
+    end do
+
+    ! calculate ET0 from distributed parameters
+    meteo%et0 = ET_reference(meteo%T_max, meteo%T_min, meteo%RH_max, meteo%RH_min, meteo%Wind_vel, meteo%Rad_sol,&
+                                   meteo%lat, meteo%alt, res_canopy, doy, domain%header%imax, domain%header%jmax)
+end subroutine create_meteo_matrices
 
 subroutine reset_meteo(meteo)
     type(meteo_mat), intent(inout) :: meteo

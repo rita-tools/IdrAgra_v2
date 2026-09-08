@@ -257,6 +257,16 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
                         read(buffer, *, iostat=ios)xml%sim%n_ws
                     case ('meteostattotnum') ! number of areas of weather stations TODO: check
                         read(buffer, *, iostat=ios)xml%sim%n_voronoi
+                    case ('interpolatetemperature')
+                        read(buffer, *, iostat=ios) xml%sim%interpolate_temp
+                    case ('interpolaterain')
+                        read(buffer, *, iostat=ios) xml%sim%interpolate_rain
+                    case ('interpolatehumidity')
+                        read(buffer, *, iostat=ios) xml%sim%interpolate_hum
+                    case ('interpolatewind')
+                        read(buffer, *, iostat=ios) xml%sim%interpolate_wind
+                    case ('interpolateradiation')
+                        read(buffer, *, iostat=ios) xml%sim%interpolate_rad
                     case ('monthlyflag') ! monthly outputs flag
                         select case (trim(adjustl(buffer)))
                             case ('monthly', 'month', 'm', 't')

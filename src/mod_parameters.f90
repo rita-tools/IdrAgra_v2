@@ -90,6 +90,11 @@ type simulation
     logical :: f_shapearea = .false.            ! if true, use shapes area (for vectorialization)
     logical :: f_irandom                        ! if true, use user defined random values
     integer :: n_ws = 1                         ! maximum number of weather station
+    logical :: interpolate_temp = .true.        ! if false, each cell's temperature is equal to the closest station's (not interpolated)
+    logical :: interpolate_rain = .true.        ! if false, each cell's precipitation is equal to the closest station's (not interpolated)
+    logical :: interpolate_hum = .true.         ! if false, each cell's humidity is equal to the closest station's (not interpolated)
+    logical :: interpolate_wind = .true.        ! if false, each cell's wind is equal to the closest station's (not interpolated)
+    logical :: interpolate_rad = .true.         ! if false, each cell's radiation is equal to the closest station's (not interpolated)
     integer :: start_irr_season = 91            ! start irrigation season [doy]
     integer :: end_irr_season = 304             ! end irrigation season [doy]
     integer :: n_irr_meth                       ! number of irrigation methods

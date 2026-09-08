@@ -104,6 +104,13 @@ MeteoStatTotNum = 2
 # meteorological/phenological calculations.
 MeteoStatWeightNum = 2
 
+# Whether simulation cells receive interpolated weather data (T, default&recommended) or the closest station's value (F, sometimes useful for rainfall).
+InterpolateTemperature = T
+InterpolateRain = T
+InterpolateHumidity = T
+InterpolateWind = T
+InterpolateRadiation = T
+
 # SoilUsesNum: number of soil-use classes included in each phenological
 # series.
 SoilUsesNum = 7
