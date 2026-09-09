@@ -1,6 +1,6 @@
 module cli_crop_parameters
 use mod_constants, only: sp, dp
-use mod_utility, only: lower_case, string_to_integers, string_to_reals, split_string, count_element
+use mod_utility, only: lower_case, string_to_integers, string_to_reals, split_string, count_elements
 use mod_parameters, only: simulation
 use mod_meteo, only: meteo_info
 use mod_crop_phenology
@@ -74,29 +74,25 @@ subroutine init_crop_par_from_file(file_name, n_crop, n_crop_alt, string_element
     ! init static crop parameters from parameter file
     character(len=*), intent(in) :: file_name
     integer, intent(in) :: n_crop
-    integer, intent(inout) :: n_crop_alt
+    integer, intent(out) :: n_crop_alt
     integer, intent(out) :: string_elements
     integer, dimension(n_crop), intent(out) :: n_crops_by_year
     integer, intent(out) :: error_flag
-    integer :: free_unit
-    integer :: ios
-    integer :: line, p
+    integer :: free_unit, ios, p
+    integer, dimension(:), allocatable :: crop_counts
     character(len=n_crop*20) :: buffer, label !EAC: use mcrop_max x 20
     character(len=10), dimension(:), allocatable :: dummy, dummy_clean
 
     error_flag = 0
     open(newunit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios)
     if (ios /= 0 ) then
-        print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. &
-            & Execution will be aborted..."
+        print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. Execution will be aborted..."
         stop
     end if
 
     do while (ios == 0)
         read (free_unit, '(A)', iostat=ios) buffer
         if (ios == 0) then
-            line = line + 1
-            buffer = trim(buffer)
             call lower_case(buffer)
             p = scan(buffer, achar(9))  ! find the first tab ---> tab=achar(9)
             label = buffer(1:p-1)
@@ -110,10 +106,17 @@ subroutine init_crop_par_from_file(file_name, n_crop, n_crop_alt, string_element
                     allocate(dummy_clean(string_elements))
                     dummy_clean = dummy(1:string_elements)
                     deallocate(dummy)
-                    n_crops_by_year = 0
-                    ! find and count duplicates
-                    call count_element(dummy_clean,n_crops_by_year)
+                    call count_elements(dummy_clean, crop_counts)
                     deallocate(dummy_clean)
+                    if (size(crop_counts) > n_crop) then
+                        print *, "Invalid crop parameters in ", trim(file_name), "."
+                        print *, "The header contains ", size(crop_counts), " unique crop IDs, but SoilUsesNum is ", n_crop, "."
+                        print *, "Set SoilUsesNum to at least the number of unique crop IDs in idragra_parameters.txt."
+                        stop
+                    end if
+                    n_crops_by_year = 0
+                    n_crops_by_year(:size(crop_counts)) = crop_counts
+                    deallocate(crop_counts)
                     n_crop_alt = maxval(n_crops_by_year)
                case default
             end select

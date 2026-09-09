@@ -24,29 +24,40 @@ end interface
 
 contains
 
-! Count the frequency of unique values from vec
-subroutine count_element(vec,vec_el)
+! Count occurrences of each unique string, preserving first-seen order.
+! e.g. ["a","a","b","a","c","c"] --> [3, 1, 2]
+subroutine count_elements(strings, counts)
     implicit none
-    character(len=*),dimension(:),intent(in) :: vec
-    integer,dimension(:),intent(inout) :: vec_el
+    character(len=*), dimension(:), intent(in) :: strings
+    integer, dimension(:), allocatable, intent(out) :: counts
 
-    integer :: i
-    logical,dimension(size(vec)) :: mask
-    integer,dimension(size(vec)) :: count_vec
+    integer :: i, n_unique_strings
+    logical :: already_counted
 
-    ! Select the unique elements
-    mask(1)=.true.
-    do i=size(vec),2,-1
-        mask(i)= .not.(any(vec(:i-1)==vec(i)))
+    n_unique_strings = 0
+
+    ! Determine the result size from the number of first occurrences.
+    do i = 1, size(strings)
+        already_counted = .false.
+        if (i > 1) already_counted = any(strings(:i-1) == strings(i))
+        if (already_counted) cycle
+
+        n_unique_strings = n_unique_strings + 1
     end do
 
-    ! Count the number of occurrences of elements
-    do i=1,size(vec)
-        count_vec(i) = count(vec(i)==vec)
-    end do
+    allocate(counts(n_unique_strings))
 
-    vec_el = pack(count_vec, mask)
-end subroutine count_element
+    ! Store counts in the same first-seen order.
+    n_unique_strings = 0
+    do i = 1, size(strings)
+        already_counted = .false.
+        if (i > 1) already_counted = any(strings(:i-1) == strings(i))
+        if (already_counted) cycle
+
+        n_unique_strings = n_unique_strings + 1
+        counts(n_unique_strings) = count(strings == strings(i))
+    end do
+end subroutine count_elements
 
 subroutine split_string(string, delimiter, substrings, substring_count)
     ! split a string into two sides of a delimiter token
