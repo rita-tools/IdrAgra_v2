@@ -27,7 +27,6 @@ contains
 ! Count occurrences of each unique string, preserving first-seen order.
 ! e.g. ["a","a","b","a","c","c"] --> [3, 1, 2]
 subroutine count_elements(strings, counts)
-    implicit none
     character(len=*), dimension(:), intent(in) :: strings
     integer, dimension(:), allocatable, intent(out) :: counts
 
@@ -61,7 +60,6 @@ end subroutine count_elements
 
 subroutine split_string(string, delimiter, substrings, substring_count)
     ! split a string into two sides of a delimiter token
-    implicit none
     character(len=*), intent(in) :: string
     character, intent(in) :: delimiter
     character(len=*), intent(out) :: substrings(*)
@@ -190,7 +188,6 @@ end function make_numbered_name
 subroutine get_uniform_sample(irandom, amplitude, rand_symmetry,repeatable)
     ! Get a matrix of random number from a matrix of integer values
     ! values are included between [-amplitude, +amplitude]
-    implicit none
     integer,dimension(:,:),intent(out)::irandom
     integer,intent(in)::amplitude
     logical,intent(in)::rand_symmetry
@@ -215,7 +212,6 @@ end subroutine get_uniform_sample
 function calc_doy(idd,imm,iyyy)
     ! Calculate the day of the year from day, month, year
     ! source: Numerical recipes in FORTRAN 90
-    implicit none
     integer, intent(in) :: imm, idd, iyyy
     integer :: calc_doy
     integer, parameter :: igreg=15+31*(10+12*1582) ! Gregorian Calendar adopted Oct. 15, 1582.
@@ -239,7 +235,6 @@ end function calc_doy
 subroutine calc_date(julian_day,idd, imm,iyyy)
     ! Calculate the date from the julian date
     ! source: Numerical recipes in FORTRAN 90
-    implicit none
     integer, intent(in) :: julian_day
     integer, intent(out) :: imm, idd, iyyy
     integer :: ja,jalpha,jb,jc,jd,je
@@ -268,7 +263,6 @@ end subroutine calc_date
 function day_of_week(idd, imm, iyy)
     ! Calculate the day of the week [0- Sat, 1-Sun, ..., 6-Fri]
     ! source: Rosetta Code
-    implicit none
     integer, intent(in) :: idd, imm, iyy
     integer :: day_of_week, j, k, mm, yy
 
@@ -386,7 +380,6 @@ end function string_to_reals
 
 pure recursive function replace_str(string,search,substitute) result(modifiedString)
     ! https://stackoverflow.com/questions/58938347/how-do-i-replace-a-character-in-the-string-with-another-charater-in-fortran
-    implicit none
     character(len=*), intent(in)  :: string, search, substitute
     character(len=:), allocatable :: modifiedString
     integer                       :: i, stringLen, searchLen
@@ -415,14 +408,12 @@ pure recursive function replace_str(string,search,substitute) result(modifiedStr
 end function replace_str
 
 function round(val, n)
-    implicit none
     real(dp) :: val, round
     integer :: n
     round = anint(val*10.0**n)/10.0**n
 end function round
 
 function round_2darray(mat, n) result(res)
-    implicit none
     real(dp), dimension(:,:)::mat
     real(dp), allocatable ::res(:,:)
     integer :: n
@@ -431,7 +422,6 @@ function round_2darray(mat, n) result(res)
 end function round_2darray
 
 pure elemental function pdf_normal(x, x_mean, x_std) result(pdf)
-    implicit none
     real(dp), intent(in):: x, x_mean, x_std
     real(dp):: pdf
 
