@@ -1,0 +1,152 @@
+/* A lower-contrast palette for long reference-reading sessions. */
+body,
+body[data-theme="light"] {
+  --color-background-primary: #f7f7f4;
+  --color-background-secondary: #efefeb;
+  --color-foreground-primary: #454a4f;
+  --color-foreground-secondary: #5d6369;
+  --color-foreground-muted: #6b7278;
+  --color-brand-primary: #607b7e;
+  --color-brand-content: #526f73;
+}
+
+/* Present all parameter groups as one continuous reference list. */
+#furo-main-content > section > section {
+  border-left: 1px solid color-mix(in srgb, var(--color-foreground-muted) 28%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--color-foreground-muted) 28%, transparent);
+  padding: 0 1rem;
+}
+
+#furo-main-content > section > section:first-of-type {
+  border-radius: 0.45rem 0.45rem 0 0;
+  border-top: 1px solid color-mix(in srgb, var(--color-foreground-muted) 28%, transparent);
+  margin-top: 1.5rem;
+}
+
+#furo-main-content > section > section:last-child {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-foreground-muted) 28%, transparent);
+  border-radius: 0 0 0.45rem 0.45rem;
+  margin-bottom: 2rem;
+}
+
+#furo-main-content > section > section + section {
+  border-top: 1px solid color-mix(in srgb, var(--color-foreground-muted) 24%, transparent);
+}
+
+#furo-main-content > section > section > h2 {
+  background: color-mix(in srgb, var(--color-background-secondary) 72%, transparent);
+  font-size: 1.05rem;
+  margin: 0 -1rem;
+  padding: 0.65rem 1rem;
+}
+
+#furo-main-content > section > section > section {
+  padding: 0.15rem 0.15rem 0.65rem;
+}
+
+#furo-main-content > section > section > section + section {
+  border-top: 1px solid color-mix(in srgb, var(--color-foreground-muted) 18%, transparent);
+}
+
+/* Keep metadata separate from the heading's anchor and navigation label. */
+#furo-main-content section:has(> h3 + .parameter-meta) {
+  column-gap: 1.5rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+}
+
+#furo-main-content section:has(> h3 + .parameter-meta) > h3 {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+#furo-main-content section:has(> h3 + .parameter-meta) > .parameter-meta {
+  align-self: center;
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+}
+
+#furo-main-content section:has(> h3 + .parameter-meta) > :not(h3):not(.parameter-meta) {
+  grid-column: 1 / -1;
+}
+
+.parameter-meta {
+  color: var(--color-foreground-muted);
+  font-size: 0.825rem;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.parameter-meta p {
+  margin: 0;
+}
+
+.meta-keywords strong {
+  color: var(--color-brand-content);
+  font-weight: 600;
+}
+
+.meta-required-soft {
+  background: rgba(143, 91, 72, 0.075);
+  border-radius: 0.35rem;
+  color: #805f55;
+  padding: 0.32rem 0.58rem;
+}
+
+.meta-required-soft strong {
+  color: #8b5d50;
+  font-weight: 650;
+}
+
+body[data-theme="dark"] {
+  --color-background-primary: #202220;
+  --color-background-secondary: #292b28;
+  --color-foreground-primary: #c8cac6;
+  --color-foreground-secondary: #b3b6b1;
+  --color-foreground-muted: #a1a69f;
+  --color-brand-primary: #8fa9ab;
+  --color-brand-content: #91abad;
+}
+
+body[data-theme="dark"] .meta-required-soft {
+  background: rgba(177, 117, 94, 0.11);
+  color: #c9a59a;
+}
+
+body[data-theme="dark"] .meta-required-soft strong {
+  color: #d0a093;
+}
+
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="light"]) {
+    --color-background-primary: #202220;
+    --color-background-secondary: #292b28;
+    --color-foreground-primary: #c8cac6;
+    --color-foreground-secondary: #b3b6b1;
+    --color-foreground-muted: #a1a69f;
+    --color-brand-primary: #8fa9ab;
+    --color-brand-content: #91abad;
+  }
+
+  body:not([data-theme="light"]) .meta-required-soft {
+    background: rgba(177, 117, 94, 0.11);
+    color: #c9a59a;
+  }
+
+  body:not([data-theme="light"]) .meta-required-soft strong {
+    color: #d0a093;
+  }
+}
+
+/* Long names and metadata stack cleanly instead of colliding. */
+@media (max-width: 60rem) {
+  #furo-main-content section:has(> h3 + .parameter-meta) {
+    display: block;
+  }
+
+  .parameter-meta {
+    margin: -0.35rem 0 0.9rem;
+    white-space: normal;
+  }
+}
