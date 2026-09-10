@@ -40,6 +40,7 @@ When launching the IdrAgra exe, the model looks for `idragra_parameters.txt` in 
 
 Folder in which simulation results are written.
 
+(parameter-inputpath)=
 ### `InputPath`
 
 :::{container} parameter-summary
@@ -48,6 +49,7 @@ Folder in which simulation results are written.
 
 Folder containing spatialized model inputs.
 
+(parameter-meteopath)=
 ### `MeteoPath`
 
 :::{container} parameter-summary
@@ -64,6 +66,7 @@ Folder containing meteorological station data.
 
 Root-level file listing the meteorological input files.
 
+(parameter-phenopath)=
 ### `PhenoPath`
 
 :::{container} parameter-summary
@@ -80,6 +83,7 @@ Folder containing crop phenology parameter files.
 
 Common prefix used by phenology files associated with meteorological stations.
 
+(parameter-irrmethpath)=
 ### `IrrMethPath`
 
 :::{container} parameter-summary
@@ -96,6 +100,7 @@ Folder containing irrigation-method files.
 
 File listing the irrigation-method input files.
 
+(parameter-watsourpath)=
 ### `WatSourPath`
 
 :::{container} parameter-summary
@@ -107,6 +112,7 @@ Folder containing water-source input files.
 {.parameter-list-group}
 ## Simulation mode, period and conditions
 
+(parameter-mode)=
 ### `Mode`
 
 :::{container} parameter-summary
@@ -149,7 +155,7 @@ If false, IdrAgra begins the simulation with all soils at field capacity but run
 **Type:** Boolean  ·  **Required:** no code default
 :::
 
-FinalThetaFlag: save the final soil-moisture state for possible reuse as an initial condition in a subsequent simulation [T/F].
+If true, the final soil_moisture_condition is stored in the `FinalConditionPath\\FinalCondition.asc` file, which can be reused as an initial condition in a subsequent simulation.
 
 {.parameter-dependent}
 #### `FinalConditionPath`
@@ -157,8 +163,6 @@ FinalThetaFlag: save the final soil-moisture state for possible reuse as an init
 :::{container} parameter-summary
 **Type:** String  ·  **Default:** `.\\sim_results\\`
 :::
-
-Final-condition output. Used when FinalThetaFlag = T.
 
 {.parameter-dependent}
 #### `FinalCondition`
@@ -173,7 +177,7 @@ Final-condition output. Used when FinalThetaFlag = T.
 **Type:** Date  ·  **Default:** `date(29, 2, 1600, 2305507, 0)`
 :::
 
-StartSimulation / EndSimulation: inclusive simulation dates [dd/mm/yyyy].
+First day of the simulation [dd/mm/yyyy].
 
 ### `EndSimulation`
 
@@ -181,13 +185,17 @@ StartSimulation / EndSimulation: inclusive simulation dates [dd/mm/yyyy].
 **Type:** Date  ·  **Default:** `date(29, 2, 1600, 2305507, 0)`
 :::
 
+Last day of the simulation [dd/mm/yyyy].
+
+(parameter-capflag)=
 ### `CapillaryFlag`
 
 :::{container} parameter-summary
 **Type:** Boolean  ·  **Default:** `false`
 :::
 
-CapillaryFlag: enable capillary-rise simulation [T/F].
+Whether to enable capillary-rise simulation.\
+Requires the user to provide input water table depth data (details on format can be found {ref}`here <water-table-input-files>`)
 
 ### `SoilUseVarFlag`
 
@@ -195,7 +203,8 @@ CapillaryFlag: enable capillary-rise simulation [T/F].
 **Type:** Boolean  ·  **Default:** `false`
 :::
 
-SoilUseVarFlag: allow soil use to vary between years [T/F].
+Whether to allow soil use to vary between years.\
+If true, the model expects 
 
 {.parameter-list-group}
 ## Meteorology, land use, and sowing

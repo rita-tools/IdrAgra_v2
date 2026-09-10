@@ -8,3 +8,4 @@ demo/simout/**
 *.zip
 /demo/final_condition
 docs/_build/
+__pycache__/

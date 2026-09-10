@@ -7,6 +7,7 @@ configuration reference material, practical guidance, and worked examples.
 :maxdepth: 2
 :caption: Configuration reference
 
+overview
 parameters
 project_structure
 command_line_args
