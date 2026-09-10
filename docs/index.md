@@ -8,4 +8,7 @@ configuration reference material, practical guidance, and worked examples.
 :caption: Configuration reference
 
 parameters
+project_structure
+command_line_args
+rice
 :::

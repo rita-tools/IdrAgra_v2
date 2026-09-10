@@ -1,7 +1,8 @@
-# `IdrAgra_parameters.txt` guide
+# IdrAgra_parameters.txt guide
 
 `idragra_parameters.txt` is the main file which determines how the model behaves.
-For instance, it contains options and switches to set:
+
+For example, it contains options and switches to set:
 - the simulation mode (e.g. USE or NEED)
 - the simulation start and end dates
 - whether to simulate capillary uptake or not
@@ -13,105 +14,106 @@ and so on.
 
 In this page we list all of the available settings. Note that most of them are technically optional, due to the model applying internal defaults, which are specified for each entry; settings missing a default are highligthed as required settings.
 
-When launching the IdrAgra exe, the model looks idragra_parameters.txt in that same directory. However, a different path and/or filename can be specified using the `-f` command line argument.
+When launching the IdrAgra exe, the model looks for `idragra_parameters.txt` in that same directory. However, a different path and/or filename can be specified using the `-f` [command line argument](command_line_args.md).
 
 ## About the file structure
 
-- Blank lines are ignored by IdrAgra and skipped.
+- Blank lines are ignored by the model and skipped.
 - Anything that comes after "#" is a comment and is also ignored.
 - Variables can appear in any order.
 - The accepted structure is "VariableName = value".
+- Both the variable name and its value are NOT case-sensitive
 - Any number of spaces and tabs is accepted before and after the "=" symbol.
 - It is not allowed to set multiple variables on the same line.
 - Folder paths are relative to the directory from which IdrAgra is run (usually the exe's location), and must use `\\` as the delimiter.
 - If a path includes spaces (not recommended), it must be enclosed in quotes (Path = "a path")
+- Boolean variables accept only "T" (true) and "F" (false) as values.
 
 {.parameter-list-group .parameter-list-first}
 ## Input and output paths
 
 ### `OutputPath`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `.\\sim_results\\`
 :::
 
-OutputPath: folder in which simulation results are written.
+Folder in which simulation results are written.
 
 ### `InputPath`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `.\\spatial_data\\`
 :::
 
-InputPath: folder containing spatialized model inputs.
+Folder containing spatialized model inputs.
 
 ### `MeteoPath`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `.\\meteo_data\\`
 :::
 
-MeteoPath: folder containing meteorological station data.
+Folder containing meteorological station data.
 
 ### `MeteoFileName`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `weather_stations.dat`
 :::
 
-MeteoFileName: root-level file listing the meteorological input files.
+Root-level file listing the meteorological input files.
 
 ### `PhenoPath`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `.\\crop_series\\`
 :::
 
-PhenoPath: folder containing crop phenology parameter files.
+Folder containing crop phenology parameter files.
 
 ### `PhenoFileRoot`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `pheno_`
 :::
 
-PhenoFileRoot: common prefix used by phenology files associated with  
-meteorological stations.
+Common prefix used by phenology files associated with meteorological stations.
 
 ### `IrrMethPath`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `.\\irrmeth_data\\`
 :::
 
-IrrMethPath: folder containing irrigation-method files.
+Folder containing irrigation-method files.
 
 ### `IrrMethFileName`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `irrmethods.txt`
 :::
 
-IrrMethFileName: file listing the irrigation-method input files.
+File listing the irrigation-method input files.
 
 ### `WatSourPath`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `.\\watsour_data\\`
 :::
 
-WatSourPath: folder containing water-source input files.
+Folder containing water-source input files.
 
 {.parameter-list-group}
 ## Simulation mode, period and conditions
 
 ### `Mode`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Integer  ·  **Default:** `2`
 :::
 
-Mode: irrigation simulation mode [0...4].
+Irrigation simulation mode [0...4].\
   0 = no irrigation  
   1 = irrigation consumptions  
   2 = satisfy field-capacity requirements  
@@ -120,42 +122,39 @@ Mode: irrigation simulation mode [0...4].
 
 ### `InitialThetaFlag`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Boolean  ·  **Default:** `false`
 :::
 
-InitialThetaFlag: read the initial soil-moisture state from an external  
-file [T/F]. When F, IdrAgra generates the initial condition internally.
+If true, the initial soil-moisture condition is read from the `InitialConditionPath\\InitialCondition.asc` file.\
+If false, IdrAgra begins the simulation with all soils at field capacity but runs a warmup year reusing the first year of data.
 
 {.parameter-dependent}
 #### `InitialConditionPath`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `.\\spatial_data\\`
 :::
-
-Initial-condition input. Used when InitialThetaFlag = T.
 
 {.parameter-dependent}
 #### `InitialCondition`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `IC_thetaI`
 :::
 
 ### `FinalThetaFlag`
 
-:::{container} parameter-meta meta-required-soft
+:::{container} parameter-summary parameter-summary--required
 **Type:** Boolean  ·  **Required:** no code default
 :::
 
-FinalThetaFlag: save the final soil-moisture state for possible reuse as  
-an initial condition in a subsequent simulation [T/F].
+FinalThetaFlag: save the final soil-moisture state for possible reuse as an initial condition in a subsequent simulation [T/F].
 
 {.parameter-dependent}
 #### `FinalConditionPath`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `.\\sim_results\\`
 :::
 
@@ -164,13 +163,13 @@ Final-condition output. Used when FinalThetaFlag = T.
 {.parameter-dependent}
 #### `FinalCondition`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `FC_thetaI`
 :::
 
 ### `StartSimulation`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Date  ·  **Default:** `date(29, 2, 1600, 2305507, 0)`
 :::
 
@@ -178,13 +177,13 @@ StartSimulation / EndSimulation: inclusive simulation dates [dd/mm/yyyy].
 
 ### `EndSimulation`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Date  ·  **Default:** `date(29, 2, 1600, 2305507, 0)`
 :::
 
 ### `CapillaryFlag`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Boolean  ·  **Default:** `false`
 :::
 
@@ -192,7 +191,7 @@ CapillaryFlag: enable capillary-rise simulation [T/F].
 
 ### `SoilUseVarFlag`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Boolean  ·  **Default:** `false`
 :::
 
@@ -203,7 +202,7 @@ SoilUseVarFlag: allow soil use to vary between years [T/F].
 
 ### `MeteoStatTotNum`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Integer  ·  **Default:** `1`
 :::
 
@@ -211,7 +210,7 @@ MeteoStatTotNum: total number of meteorological stations.
 
 ### `MeteoStatWeightNum`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Integer  ·  **Default:** `1`
 :::
 
@@ -220,7 +219,7 @@ meteorological/phenological calculations.
 
 ### `InterpolateTemperature`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Boolean  ·  **Default:** `true`
 :::
 
@@ -228,31 +227,31 @@ Whether simulation cells receive interpolated weather data (T, default&recommend
 
 ### `InterpolateRain`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Boolean  ·  **Default:** `true`
 :::
 
 ### `InterpolateHumidity`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Boolean  ·  **Default:** `true`
 :::
 
 ### `InterpolateWind`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Boolean  ·  **Default:** `true`
 :::
 
 ### `InterpolateRadiation`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Boolean  ·  **Default:** `true`
 :::
 
 ### `SoilUsesNum`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Integer  ·  **Default:** `1`
 :::
 
@@ -261,7 +260,7 @@ series.
 
 ### `SimulatedSoilUses`
 
-:::{container} parameter-meta meta-required-soft
+:::{container} parameter-summary parameter-summary--required
 **Type:** Integer array  ·  **Required:** no code default
 :::
 
@@ -269,7 +268,7 @@ SimulatedSoilUses: IDs of the soil-use classes to simulate.
 
 ### `RandSowDaysSym`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `symmetric`
 :::
 
@@ -277,7 +276,7 @@ RandSowDaysSym: shape of the sowing-date randomization window.
 
 ### `RandSowDaysWind`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Integer  ·  **Default:** `0`  ·  **Unit:** days
 :::
 
@@ -286,7 +285,7 @@ randomization window.
 
 ### `Repeatable`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Boolean  ·  **Default:** `true`
 :::
 
@@ -295,7 +294,7 @@ across equivalent runs [T/F].
 
 ### `Forecast_day`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Integer  ·  **Default:** `5`
 :::
 
@@ -307,7 +306,7 @@ calculations.
 
 ### `MonthlyFlag`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `monthly`
 :::
 
@@ -317,7 +316,7 @@ unless a weekly or periodic schedule is selected.
 
 ### `WeekDay`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String or Integer  ·  **Default:** `monday`
 :::
 
@@ -325,7 +324,7 @@ WeekDay: used only when MonthlyFlag selects a weekly schedule.
 
 ### `StartDate`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Integer  ·  **Default:** `10`
 :::
 
@@ -334,13 +333,13 @@ first and last day of year [1...366] included in that schedule.
 
 ### `EndDate`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Integer  ·  **Default:** `100`
 :::
 
 ### `DeltaDate`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Integer  ·  **Default:** `30`  ·  **Unit:** d
 :::
 
@@ -351,7 +350,7 @@ DeltaDate: used only with a periodic schedule; interval between outputs [d].
 
 ### `01q_eva`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Real  ·  **Default:** `0.575118`
 :::
 
@@ -360,13 +359,13 @@ Lower and upper Ksat calibration breakpoints for the evaporative layer. IdrAgra 
 
 ### `09q_eva`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Real  ·  **Default:** `8.026400`
 :::
 
 ### `01q_trasp`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Real  ·  **Default:** `0.472116`
 :::
 
@@ -376,13 +375,13 @@ As above, these are direct calibration inputs rather than statistics calculated 
 
 ### `09q_trasp`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Real  ·  **Default:** `7.706101`
 :::
 
 ### `zEvap`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Real  ·  **Default:** `0.10`  ·  **Unit:** m
 :::
 
@@ -390,7 +389,7 @@ zEvap: evaporative-layer depth [m].
 
 ### `zRoot`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Real  ·  **Default:** `0.90`  ·  **Unit:** m
 :::
 
@@ -398,7 +397,7 @@ zRoot: transpirative/root-zone depth [m].
 
 ### `LambdaCN`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Real  ·  **Default:** `0.2`  ·  **Unit:** -
 :::
 
@@ -407,7 +406,7 @@ formulation [-].
 
 ### `lim_prec`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Real  ·  **Default:** `5.0`  ·  **Unit:** mm
 :::
 
@@ -416,7 +415,7 @@ calculations [mm].
 
 ### `h_maxpond`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Real  ·  **Default:** `0.0D0`  ·  **Unit:** mm
 :::
 
@@ -425,7 +424,7 @@ During the irrigation season, irrigation-method values override this value.
 
 ### `fc_ratio`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Real  ·  **Default:** `1.0D0`  ·  **Unit:** -
 :::
 
@@ -436,7 +435,7 @@ fc_ratio: field-capacity target multiplier [-]. Used only in Mode 2.
 
 ### `StartIrrSeason`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Integer  ·  **Default:** `91`
 :::
 
@@ -445,13 +444,13 @@ Values specified by an individual irrigation-method file override these.
 
 ### `EndIrrSeason`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Integer  ·  **Default:** `304`
 :::
 
 ### `WatSources_fn`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `watsources.txt`
 :::
 
@@ -459,37 +458,37 @@ Water-source and irrigation-network input filenames. Most source/diversion files
 
 ### `mon_sources_i_div_fn`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `monit_sources_i.txt`
 :::
 
 ### `mon_sources_ii_div_fn`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `monit_sources_ii.txt`
 :::
 
 ### `int_reuse_div_fn`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `int_reuse.txt`
 :::
 
 ### `cr_sources_list_fn`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `cr_sources.txt`
 :::
 
 ### `IrrDistr_list_fn`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `irr_districts.txt`
 :::
 
 ### `sched_irr_fn`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `scheduled_irrigation.txt`
 :::
 
@@ -500,7 +499,7 @@ Decide which output files
 
 ### `prt_all`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `y`
 :::
 
@@ -510,7 +509,7 @@ prt_all = n.
 
 ### `prt_annual`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `y`
 :::
 
@@ -518,7 +517,7 @@ prt_annual: print annual summaries [y/n].
 
 ### `prt_yield`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `y`
 :::
 
@@ -526,7 +525,7 @@ prt_yield: print crop-yield output [y/n].
 
 ### `prt_stp_irr`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `y`
 :::
 
@@ -535,7 +534,7 @@ irrigation
 
 ### `prt_stp_cap_rise`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `y`
 :::
 
@@ -543,7 +542,7 @@ capillary rise
 
 ### `prt_stp_deep_perc`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `y`
 :::
 
@@ -551,7 +550,7 @@ deep percolation
 
 ### `prt_stp_et_act`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `y`
 :::
 
@@ -559,7 +558,7 @@ actual evapotranspiration
 
 ### `prt_stp_et_pot`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `y`
 :::
 
@@ -570,7 +569,7 @@ potential evapotranspiration
 
 ### `DTxMode`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** String  ·  **Default:** `none`
 :::
 
@@ -584,7 +583,7 @@ DTxMode: experimental DTx calculation mode [none/analysis/application].
 
 ### `DTxNumXs`
 
-:::{container} parameter-meta meta-required-soft
+:::{container} parameter-summary parameter-summary--required
 **Type:** Integer  ·  **Required:** no code default
 :::
 
@@ -592,7 +591,7 @@ DTxNumXs: number of DTx integration periods listed in DTx_x.
 
 ### `DTx_x`
 
-:::{container} parameter-meta meta-required-soft
+:::{container} parameter-summary parameter-summary--required
 **Type:** Integer array  ·  **Required:** no code default  ·  **Unit:** days
 :::
 
@@ -600,7 +599,7 @@ DTx_x: integration periods in days. For example, DT10 represents the transpirati
 
 ### `DTxDeltaDate`
 
-:::{container} parameter-meta meta-required-soft
+:::{container} parameter-summary parameter-summary--required
 **Type:** Integer  ·  **Required:** no code default  ·  **Unit:** days
 :::
 
@@ -608,7 +607,7 @@ DTxDeltaDate: interval, in days, between DTx calculations.
 
 ### `DTxDelayDays`
 
-:::{container} parameter-meta meta-required-soft
+:::{container} parameter-summary parameter-summary--required
 **Type:** Integer  ·  **Required:** no code default  ·  **Unit:** days
 :::
 
@@ -617,7 +616,7 @@ calculations begin.
 
 ### `DTxMinCard`
 
-:::{container} parameter-meta meta-keywords
+:::{container} parameter-summary
 **Type:** Integer  ·  **Default:** `0`
 :::
 
