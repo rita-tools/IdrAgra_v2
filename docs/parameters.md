@@ -1,80 +1,33 @@
 # `IdrAgra_parameters.txt` guide
 
-IdrAgra v2.3.0 compact feature demo
+`idragra_parameters.txt` is the main file which determines how the model behaves.
+For instance, it contains options and switches to set:
+- the simulation mode (e.g. USE or NEED)
+- the simulation start and end dates
+- whether to simulate capillary uptake or not
+- whether to run warmup or not
+- the paths to input and output files
+- which output files are printed and how frequently
 
-Anything that comes after "#" is a comment and is ignored by IdrAgra.  
-Folder paths are relative to the directory from which IdrAgra is run.
+and so on.
 
-## 0. Output controls
+In this page we list all of the available settings. Note that most of them are technically optional, due to the model applying internal defaults, which are specified for each entry; settings missing a default are highligthed as required settings.
 
-### `prt_all`
+When launching the IdrAgra exe, the model looks idragra_parameters.txt in that same directory. However, a different path and/or filename can be specified using the `-f` command line argument.
 
-:::{container} parameter-meta meta-keywords
-**Type:** String  ·  **Default:** `y`
-:::
+## About the file structure
 
-prt_all: master switch for the complete standard output set [y/n].  
-Individual switches below may be used to enable selected outputs when  
-prt_all = n.
+- Blank lines are ignored by IdrAgra and skipped.
+- Anything that comes after "#" is a comment and is also ignored.
+- Variables can appear in any order.
+- The accepted structure is "VariableName = value".
+- Any number of spaces and tabs is accepted before and after the "=" symbol.
+- It is not allowed to set multiple variables on the same line.
+- Folder paths are relative to the directory from which IdrAgra is run (usually the exe's location), and must use `\\` as the delimiter.
+- If a path includes spaces (not recommended), it must be enclosed in quotes (Path = "a path")
 
-### `prt_annual`
-
-:::{container} parameter-meta meta-keywords
-**Type:** String  ·  **Default:** `y`
-:::
-
-prt_annual: print annual summaries [y/n].
-
-### `prt_yield`
-
-:::{container} parameter-meta meta-keywords
-**Type:** String  ·  **Default:** `y`
-:::
-
-prt_yield: print crop-yield output [y/n].
-
-### `prt_stp_irr`
-
-:::{container} parameter-meta meta-keywords
-**Type:** String  ·  **Default:** `y`
-:::
-
-Time-step output switches [y/n].  
-irrigation
-
-### `prt_stp_cap_rise`
-
-:::{container} parameter-meta meta-keywords
-**Type:** String  ·  **Default:** `y`
-:::
-
-capillary rise
-
-### `prt_stp_deep_perc`
-
-:::{container} parameter-meta meta-keywords
-**Type:** String  ·  **Default:** `y`
-:::
-
-deep percolation
-
-### `prt_stp_et_act`
-
-:::{container} parameter-meta meta-keywords
-**Type:** String  ·  **Default:** `y`
-:::
-
-actual evapotranspiration
-
-### `prt_stp_et_pot`
-
-:::{container} parameter-meta meta-keywords
-**Type:** String  ·  **Default:** `y`
-:::
-
-potential evapotranspiration
-
-## 1. Input and output paths
+{.parameter-list-group .parameter-list-first}
+## Input and output paths
 
 ### `OutputPath`
 
@@ -149,7 +102,8 @@ IrrMethFileName: file listing the irrigation-method input files.
 
 WatSourPath: folder containing water-source input files.
 
-## 2. Simulation mode, period and conditions
+{.parameter-list-group}
+## Simulation mode, period and conditions
 
 ### `Mode`
 
@@ -157,7 +111,7 @@ WatSourPath: folder containing water-source input files.
 **Type:** Integer  ·  **Default:** `2`
 :::
 
-Mode: irrigation simulation mode [0...4].  
+Mode: irrigation simulation mode [0...4].
   0 = no irrigation  
   1 = irrigation consumptions  
   2 = satisfy field-capacity requirements  
@@ -173,6 +127,22 @@ Mode: irrigation simulation mode [0...4].
 InitialThetaFlag: read the initial soil-moisture state from an external  
 file [T/F]. When F, IdrAgra generates the initial condition internally.
 
+{.parameter-dependent}
+#### `InitialConditionPath`
+
+:::{container} parameter-meta meta-keywords
+**Type:** String  ·  **Default:** `.\\spatial_data\\`
+:::
+
+Initial-condition input. Used when InitialThetaFlag = T.
+
+{.parameter-dependent}
+#### `InitialCondition`
+
+:::{container} parameter-meta meta-keywords
+**Type:** String  ·  **Default:** `IC_thetaI`
+:::
+
 ### `FinalThetaFlag`
 
 :::{container} parameter-meta meta-required-soft
@@ -181,6 +151,22 @@ file [T/F]. When F, IdrAgra generates the initial condition internally.
 
 FinalThetaFlag: save the final soil-moisture state for possible reuse as  
 an initial condition in a subsequent simulation [T/F].
+
+{.parameter-dependent}
+#### `FinalConditionPath`
+
+:::{container} parameter-meta meta-keywords
+**Type:** String  ·  **Default:** `.\\sim_results\\`
+:::
+
+Final-condition output. Used when FinalThetaFlag = T.
+
+{.parameter-dependent}
+#### `FinalCondition`
+
+:::{container} parameter-meta meta-keywords
+**Type:** String  ·  **Default:** `FC_thetaI`
+:::
 
 ### `StartSimulation`
 
@@ -194,34 +180,6 @@ StartSimulation / EndSimulation: inclusive simulation dates [dd/mm/yyyy].
 
 :::{container} parameter-meta meta-keywords
 **Type:** Date  ·  **Default:** `date(29, 2, 1600, 2305507, 0)`
-:::
-
-### `InitialConditionPath`
-
-:::{container} parameter-meta meta-keywords
-**Type:** String  ·  **Default:** `.\\spatial_data\\`
-:::
-
-Initial-condition input. Used when InitialThetaFlag = T.
-
-### `InitialCondition`
-
-:::{container} parameter-meta meta-keywords
-**Type:** String  ·  **Default:** `IC_thetaI`
-:::
-
-### `FinalConditionPath`
-
-:::{container} parameter-meta meta-keywords
-**Type:** String  ·  **Default:** `.\\sim_results\\`
-:::
-
-Final-condition output. Used when FinalThetaFlag = T.
-
-### `FinalCondition`
-
-:::{container} parameter-meta meta-keywords
-**Type:** String  ·  **Default:** `FC_thetaI`
 :::
 
 ### `CapillaryFlag`
@@ -240,7 +198,8 @@ CapillaryFlag: enable capillary-rise simulation [T/F].
 
 SoilUseVarFlag: allow soil use to vary between years [T/F].
 
-## 3. Meteorology, land use, and sowing
+{.parameter-list-group}
+## Meteorology, land use, and sowing
 
 ### `MeteoStatTotNum`
 
@@ -343,7 +302,8 @@ across equivalent runs [T/F].
 Forecast_day: forecast horizon or reference day used by forecast-related  
 calculations.
 
-## 4. Periodic output
+{.parameter-list-group}
+## Periodic output
 
 ### `MonthlyFlag`
 
@@ -386,7 +346,8 @@ first and last day of year [1...366] included in that schedule.
 
 DeltaDate: used only with a periodic schedule; interval between outputs [d].
 
-## 5. Soil-water, runoff, and layer parameters
+{.parameter-list-group}
+## Soil-water, runoff, and layer parameters
 
 ### `01q_eva`
 
@@ -394,10 +355,7 @@ DeltaDate: used only with a periodic schedule; interval between outputs [d].
 **Type:** Real  ·  **Default:** `0.575118`
 :::
 
-Lower and upper Ksat calibration breakpoints for the evaporative layer.  
-IdrAgra does not calculate these percentiles: the supplied values are used  
-directly to interpolate the irrigation-related percolation-booster  
-coefficients. They affect irrigated simulations (Modes 1...4).  
+Lower and upper Ksat calibration breakpoints for the evaporative layer. IdrAgra does not calculate these percentiles: the supplied values are used directly to interpolate the irrigation-related percolation-booster coefficients. They affect irrigated simulations (Modes 1...4).
 01q_eva: lower breakpoint; 09q_eva: upper breakpoint.
 
 ### `09q_eva`
@@ -412,9 +370,8 @@ coefficients. They affect irrigated simulations (Modes 1...4).
 **Type:** Real  ·  **Default:** `0.472116`
 :::
 
-Lower and upper Ksat calibration breakpoints for the transpirative layer.  
-As above, these are direct calibration inputs rather than statistics  
-calculated by IdrAgra.  
+Lower and upper Ksat calibration breakpoints for the transpirative layer.
+As above, these are direct calibration inputs rather than statistics calculated by IdrAgra.
 01q_trasp: lower breakpoint; 09q_trasp: upper breakpoint.
 
 ### `09q_trasp`
@@ -463,7 +420,7 @@ calculations [mm].
 **Type:** Real  ·  **Default:** `0.0D0`  ·  **Unit:** mm
 :::
 
-h_maxpond: general/out-of-season maximum surface-ponding depth [mm].  
+h_maxpond: general/out-of-season maximum surface-ponding depth [mm].
 During the irrigation season, irrigation-method values override this value.
 
 ### `fc_ratio`
@@ -472,10 +429,10 @@ During the irrigation season, irrigation-method values override this value.
 **Type:** Real  ·  **Default:** `1.0D0`  ·  **Unit:** -
 :::
 
-fc_ratio: field-capacity target multiplier [-]. Used only in Mode 2;  
-changing it has no effect in this demo while Mode = 1.
+fc_ratio: field-capacity target multiplier [-]. Used only in Mode 2.
 
-## 6. Irrigation season and source files
+{.parameter-list-group}
+## Irrigation season and source files
 
 ### `StartIrrSeason`
 
@@ -483,7 +440,7 @@ changing it has no effect in this demo while Mode = 1.
 **Type:** Integer  ·  **Default:** `91`
 :::
 
-StartIrrSeason / EndIrrSeason: default irrigation-method season [1...366].  
+StartIrrSeason / EndIrrSeason: default irrigation-method season [1...366].
 Values specified by an individual irrigation-method file override these.
 
 ### `EndIrrSeason`
@@ -498,8 +455,7 @@ Values specified by an individual irrigation-method file override these.
 **Type:** String  ·  **Default:** `watsources.txt`
 :::
 
-Water-source and irrigation-network input filenames. Most source/diversion  
-files are used by Mode 1; sched_irr_fn is used only by Mode 4.
+Water-source and irrigation-network input filenames. Most source/diversion files are used by Mode 1; sched_irr_fn is used only by Mode 4.
 
 ### `mon_sources_i_div_fn`
 
@@ -537,7 +493,80 @@ files are used by Mode 1; sched_irr_fn is used only by Mode 4.
 **Type:** String  ·  **Default:** `scheduled_irrigation.txt`
 :::
 
-## 7. DTx settings (experimental; inactive in this demo)
+{.parameter-list-group}
+## Output controls
+
+Decide which output files
+
+### `prt_all`
+
+:::{container} parameter-meta meta-keywords
+**Type:** String  ·  **Default:** `y`
+:::
+
+prt_all: master switch for the complete standard output set [y/n].
+Individual switches below may be used to enable selected outputs when  
+prt_all = n.
+
+### `prt_annual`
+
+:::{container} parameter-meta meta-keywords
+**Type:** String  ·  **Default:** `y`
+:::
+
+prt_annual: print annual summaries [y/n].
+
+### `prt_yield`
+
+:::{container} parameter-meta meta-keywords
+**Type:** String  ·  **Default:** `y`
+:::
+
+prt_yield: print crop-yield output [y/n].
+
+### `prt_stp_irr`
+
+:::{container} parameter-meta meta-keywords
+**Type:** String  ·  **Default:** `y`
+:::
+
+Time-step output switches [y/n].
+irrigation
+
+### `prt_stp_cap_rise`
+
+:::{container} parameter-meta meta-keywords
+**Type:** String  ·  **Default:** `y`
+:::
+
+capillary rise
+
+### `prt_stp_deep_perc`
+
+:::{container} parameter-meta meta-keywords
+**Type:** String  ·  **Default:** `y`
+:::
+
+deep percolation
+
+### `prt_stp_et_act`
+
+:::{container} parameter-meta meta-keywords
+**Type:** String  ·  **Default:** `y`
+:::
+
+actual evapotranspiration
+
+### `prt_stp_et_pot`
+
+:::{container} parameter-meta meta-keywords
+**Type:** String  ·  **Default:** `y`
+:::
+
+potential evapotranspiration
+
+{.parameter-list-group .parameter-list-last}
+## DTx settings (deprecated)
 
 ### `DTxMode`
 
@@ -545,11 +574,9 @@ files are used by Mode 1; sched_irr_fn is used only by Mode 4.
 **Type:** String  ·  **Default:** `none`
 :::
 
-DTx support is incomplete. Keep all values in this block even when the mode  
-is "none", because the current code does not provide safe defaults for every  
-internal DTx dimension.
+DTx support is incomplete. Keep all values in this block even when the mode is "none", because the current code does not provide safe defaults for every internal DTx dimension.
 
-DTxMode: experimental DTx calculation mode [none/analysis/application].  
+DTxMode: experimental DTx calculation mode [none/analysis/application].
   none        = disable DTx calculations  
   analysis    = accumulate samples and fit gamma-distribution parameters  
   application = export current-run accumulated deficit maps; despite its  
@@ -569,8 +596,7 @@ DTxNumXs: number of DTx integration periods listed in DTx_x.
 **Type:** Integer array  ·  **Required:** no code default  ·  **Unit:** days
 :::
 
-DTx_x: integration periods in days. For example, DT10 represents the  
-transpirative deficit accumulated over 10 days.
+DTx_x: integration periods in days. For example, DT10 represents the transpirative deficit accumulated over 10 days.
 
 ### `DTxDeltaDate`
 
@@ -595,6 +621,4 @@ calculations begin.
 **Type:** Integer  ·  **Default:** `0`
 :::
 
-DTxMinCard: minimum sample cardinality required for a valid estimate in  
-analysis mode. This two-year demo cannot normally satisfy a value of 3;  
-the value is retained because DTx is disabled.
+DTxMinCard: minimum sample cardinality required for a valid estimate in analysis mode.

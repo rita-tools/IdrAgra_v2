@@ -10,65 +10,80 @@ body[data-theme="light"] {
   --color-brand-content: #526f73;
 }
 
-/* Present all parameter groups as one continuous reference list. */
-#furo-main-content > section > section {
+/* Only H2 sections explicitly marked in Markdown join the reference box. */
+.parameter-list-group {
   border-left: 1px solid color-mix(in srgb, var(--color-foreground-muted) 28%, transparent);
   border-right: 1px solid color-mix(in srgb, var(--color-foreground-muted) 28%, transparent);
   padding: 0 1rem;
 }
 
-#furo-main-content > section > section:first-of-type {
+.parameter-list-first {
   border-radius: 0.45rem 0.45rem 0 0;
   border-top: 1px solid color-mix(in srgb, var(--color-foreground-muted) 28%, transparent);
   margin-top: 1.5rem;
 }
 
-#furo-main-content > section > section:last-child {
+.parameter-list-last {
   border-bottom: 1px solid color-mix(in srgb, var(--color-foreground-muted) 28%, transparent);
   border-radius: 0 0 0.45rem 0.45rem;
   margin-bottom: 2rem;
 }
 
-#furo-main-content > section > section + section {
+.parameter-list-group + .parameter-list-group {
   border-top: 1px solid color-mix(in srgb, var(--color-foreground-muted) 24%, transparent);
 }
 
-#furo-main-content > section > section > h2 {
+.parameter-list-group > h2 {
   background: color-mix(in srgb, var(--color-background-secondary) 72%, transparent);
   font-size: 1.05rem;
   margin: 0 -1rem;
   padding: 0.65rem 1rem;
 }
 
-#furo-main-content > section > section > section {
+.parameter-list-group > section {
   padding: 0.15rem 0.15rem 0.65rem;
 }
 
-#furo-main-content > section > section > section + section {
+.parameter-list-group > section + section {
   border-top: 1px solid color-mix(in srgb, var(--color-foreground-muted) 18%, transparent);
 }
 
 /* Keep metadata separate from the heading's anchor and navigation label. */
-#furo-main-content section:has(> h3 + .parameter-meta) {
+#furo-main-content section:has(> :is(h3, h4) + .parameter-meta) {
   column-gap: 1.5rem;
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
 }
 
-#furo-main-content section:has(> h3 + .parameter-meta) > h3 {
+#furo-main-content section:has(> :is(h3, h4) + .parameter-meta) > :is(h3, h4) {
   grid-column: 1;
   grid-row: 1;
 }
 
-#furo-main-content section:has(> h3 + .parameter-meta) > .parameter-meta {
+#furo-main-content section:has(> :is(h3, h4) + .parameter-meta) > .parameter-meta {
   align-self: center;
   grid-column: 2;
   grid-row: 1;
   justify-self: end;
 }
 
-#furo-main-content section:has(> h3 + .parameter-meta) > :not(h3):not(.parameter-meta) {
+#furo-main-content section:has(> :is(h3, h4) + .parameter-meta) > :not(h3):not(h4):not(.parameter-meta) {
   grid-column: 1 / -1;
+}
+
+.parameter-dependent {
+  background: color-mix(in srgb, var(--color-background-secondary) 42%, transparent);
+  border-radius: 0.3rem;
+  margin-left: 1.25rem;
+  padding: 0.05rem 0.65rem 0.45rem;
+}
+
+.parameter-dependent + .parameter-dependent {
+  margin-top: 0.3rem;
+}
+
+.parameter-dependent > h4 {
+  font-size: 0.95rem;
 }
 
 .parameter-meta {
@@ -141,7 +156,7 @@ body[data-theme="dark"] .meta-required-soft strong {
 
 /* Long names and metadata stack cleanly instead of colliding. */
 @media (max-width: 60rem) {
-  #furo-main-content section:has(> h3 + .parameter-meta) {
+  #furo-main-content section:has(> :is(h3, h4) + .parameter-meta) {
     display: block;
   }
 

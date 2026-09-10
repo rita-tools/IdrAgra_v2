@@ -18,6 +18,7 @@ html_static_path = ["_static"]
 html_css_files = ["parameter-reference.css"]
 
 myst_enable_extensions = [
+    "attrs_block",
     "colon_fence",
     "deflist",
     "dollarmath",
