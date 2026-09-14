@@ -10,6 +10,12 @@ configuration reference material, practical guidance, and worked examples.
 pages/overview
 pages/parameters
 pages/project_structure
+pages/irrigation
+pages/use_mode
+pages/need_modes
+pages/scheduled_mode
 pages/command_line_args
+pages/outputs
 pages/rice
+pages/idragratools_workflow
 :::

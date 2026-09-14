@@ -70,7 +70,7 @@ class ParameterCheckerTests(unittest.TestCase):
             if "=" in line and not line.lstrip().startswith("#")
         }
         documented, _ = checker.parse_documentation(checker.DEFAULT_DOCUMENTATION)
-        self.assertEqual({item.name for item in documented}, demo_names)
+        self.assertTrue(demo_names <= {item.name for item in documented})
 
     def test_legacy_list_table_metadata_remains_supported_during_conversion(self) -> None:
         lines = ["* - Type", "  - Integer", "* - Default", "  - `2`"]

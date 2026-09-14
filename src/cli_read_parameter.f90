@@ -421,7 +421,7 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
                     case ('prt_cell_all')
                         read(buffer, *, iostat=ios) xml%sim%prt_cell_all
                         ! call the function to set print option on/off (y/n)
-                        call print_cell_all(xml%sim%prt_debug, xml%sim)
+                        call print_cell_all(xml%sim%prt_cell_all, xml%sim)
                     ! set specific options for printing
                     case ('prt_stp_rain')
                         read(buffer, *, iostat=ios) xml%sim%prt_stp_rain

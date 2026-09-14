@@ -61,7 +61,7 @@ type simulation
 
     integer :: step_out = 0                     ! monthly output = 0, weekly output = 1, user defined = 2
     integer :: mode = 2                         ! type of simulation:
-                                                ! 0 = without irrigation, 1 = need mode at field capacity, 2 = need mode at fixed volume, 3 = Use mode, 4 = scheduled irrigation
+                                                ! 0 = without irrigation, 1 = USE mode, 2 = NEED mode at field capacity, 3 = NEED mode at fixed volume, 4 = scheduled irrigation
     logical :: f_soiluse = .false.              ! land use change between years (true) otherwise false
     integer :: weekday = 1                      ! day of the week of the weekly outputs (1 = Monday, 2 = Tuesday, ..., 7 = Sunday)
     integer, dimension(3) :: clock = [10, 100, 30]

@@ -2,6 +2,10 @@
 
 `idragra_parameters.txt` is the main file which determines how the model behaves.
 
+:::{container} llm-review-note
+**LLM-authored draft — review required.** Explanatory prose in this reference includes LLM-written material. Parameter names, types, and defaults are checked automatically against the current Fortran parser and declarations, but modelling guidance still requires maintainer review.
+:::
+
 For example, it contains options and switches to set:
 - the simulation mode (e.g. USE or NEED)
 - the simulation start and end dates
@@ -12,7 +16,7 @@ For example, it contains options and switches to set:
 
 and so on.
 
-In this page we list all of the available settings. Note that most of them are technically optional, due to the model applying internal defaults, which are specified for each entry; settings missing a default are highligthed as required settings.
+In this page we list all of the available settings. Note that most of them are technically optional, due to the model applying internal defaults, which are specified for each entry; settings missing a default are highlighted as required settings.
 
 When launching the IdrAgra exe, the model looks for `idragra_parameters.txt` in that same directory. However, a different path and/or filename can be specified using the `-f` [command line argument](command_line_args.md).
 
@@ -20,7 +24,7 @@ When launching the IdrAgra exe, the model looks for `idragra_parameters.txt` in 
 
 - Blank lines are ignored by the model and skipped.
 - Anything that comes after "#" is a comment and is also ignored.
-- Variables can appear in any order.
+- Most variables can appear in any order, but dependency-sensitive settings must precede the values that use them. In particular, place `SoilUsesNum` before `SimulatedSoilUses` and `DTxNumXs` before any `DTx_x` values. Group output switches such as `prt_all` also act where they occur, so a later group switch can replace earlier individual choices.
 - The accepted structure is "VariableName = value".
 - Both the variable name and its value are NOT case-sensitive
 - Any number of spaces and tabs is accepted before and after the "=" symbol.
@@ -32,6 +36,7 @@ When launching the IdrAgra exe, the model looks for `idragra_parameters.txt` in 
 {.parameter-list-group .parameter-list-first}
 ## Input and output paths
 
+(parameter-outputpath)=
 ### `OutputPath`
 
 :::{container} parameter-summary
@@ -58,6 +63,7 @@ Folder containing spatialized model inputs.
 
 Folder containing meteorological station data.
 
+(parameter-meteofilename)=
 ### `MeteoFileName`
 
 :::{container} parameter-summary
@@ -75,6 +81,7 @@ Root-level file listing the meteorological input files.
 
 Folder containing crop phenology parameter files.
 
+(parameter-phenofileroot)=
 ### `PhenoFileRoot`
 
 :::{container} parameter-summary
@@ -92,6 +99,7 @@ Common prefix used by phenology files associated with meteorological stations.
 
 Folder containing irrigation-method files.
 
+(parameter-irrmethfilename)=
 ### `IrrMethFileName`
 
 :::{container} parameter-summary
@@ -126,6 +134,7 @@ Irrigation simulation mode [0...4].\
   3 = fixed irrigation volumes  
   4 = fixed irrigation dates and volumes read from file
 
+(parameter-initialtheta)=
 ### `InitialThetaFlag`
 
 :::{container} parameter-summary
@@ -135,6 +144,7 @@ Irrigation simulation mode [0...4].\
 If true, the initial soil-moisture condition is read from the `InitialConditionPath\\InitialCondition.asc` file.\
 If false, IdrAgra begins the simulation with all soils at field capacity but runs a warmup year reusing the first year of data.
 
+(parameter-initialconditionpath)=
 {.parameter-dependent}
 #### `InitialConditionPath`
 
@@ -142,6 +152,7 @@ If false, IdrAgra begins the simulation with all soils at field capacity but run
 **Type:** String  ·  **Default:** `.\\spatial_data\\`
 :::
 
+(parameter-initialcondition)=
 {.parameter-dependent}
 #### `InitialCondition`
 
@@ -149,6 +160,7 @@ If false, IdrAgra begins the simulation with all soils at field capacity but run
 **Type:** String  ·  **Default:** `IC_thetaI`
 :::
 
+(parameter-finaltheta)=
 ### `FinalThetaFlag`
 
 :::{container} parameter-summary parameter-summary--required
@@ -157,6 +169,7 @@ If false, IdrAgra begins the simulation with all soils at field capacity but run
 
 If true, the final soil_moisture_condition is stored in the `FinalConditionPath\\FinalCondition.asc` file, which can be reused as an initial condition in a subsequent simulation.
 
+(parameter-finalconditionpath)=
 {.parameter-dependent}
 #### `FinalConditionPath`
 
@@ -164,6 +177,7 @@ If true, the final soil_moisture_condition is stored in the `FinalConditionPath\
 **Type:** String  ·  **Default:** `.\\sim_results\\`
 :::
 
+(parameter-finalcondition)=
 {.parameter-dependent}
 #### `FinalCondition`
 
@@ -197,6 +211,7 @@ Last day of the simulation [dd/mm/yyyy].
 Whether to enable capillary-rise simulation.\
 Requires the user to provide input water table depth data (details on format can be found {ref}`here <water-table-input-files>`)
 
+(parameter-soilusevarflag)=
 ### `SoilUseVarFlag`
 
 :::{container} parameter-summary
@@ -209,6 +224,7 @@ If true, the model expects
 {.parameter-list-group}
 ## Meteorology, land use, and sowing
 
+(parameter-meteostattotnum)=
 ### `MeteoStatTotNum`
 
 :::{container} parameter-summary
@@ -217,6 +233,7 @@ If true, the model expects
 
 MeteoStatTotNum: total number of meteorological stations.
 
+(parameter-meteostatweightnum)=
 ### `MeteoStatWeightNum`
 
 :::{container} parameter-summary
@@ -258,6 +275,7 @@ Whether simulation cells receive interpolated weather data (T, default&recommend
 **Type:** Boolean  ·  **Default:** `true`
 :::
 
+(parameter-soilusesnum)=
 ### `SoilUsesNum`
 
 :::{container} parameter-summary
@@ -267,6 +285,7 @@ Whether simulation cells receive interpolated weather data (T, default&recommend
 SoilUsesNum: number of soil-use classes included in each phenological  
 series.
 
+(parameter-simulatedsoiluses)=
 ### `SimulatedSoilUses`
 
 :::{container} parameter-summary parameter-summary--required
@@ -310,9 +329,11 @@ across equivalent runs [T/F].
 Forecast_day: forecast horizon or reference day used by forecast-related  
 calculations.
 
+(parameter-periodic-output)=
 {.parameter-list-group}
 ## Periodic output
 
+(parameter-monthlyflag)=
 ### `MonthlyFlag`
 
 :::{container} parameter-summary
@@ -422,6 +443,7 @@ formulation [-].
 lim_prec: minimum precipitation threshold used by rainfall/runoff  
 calculations [mm].
 
+(parameter-h-maxpond)=
 ### `h_maxpond`
 
 :::{container} parameter-summary
@@ -431,6 +453,7 @@ calculations [mm].
 h_maxpond: general/out-of-season maximum surface-ponding depth [mm].
 During the irrigation season, irrigation-method values override this value.
 
+(parameter-fc-ratio)=
 ### `fc_ratio`
 
 :::{container} parameter-summary
@@ -442,6 +465,7 @@ fc_ratio: field-capacity target multiplier [-]. Used only in Mode 2.
 {.parameter-list-group}
 ## Irrigation season and source files
 
+(parameter-startirrseason)=
 ### `StartIrrSeason`
 
 :::{container} parameter-summary
@@ -451,12 +475,14 @@ fc_ratio: field-capacity target multiplier [-]. Used only in Mode 2.
 StartIrrSeason / EndIrrSeason: default irrigation-method season [1...366].
 Values specified by an individual irrigation-method file override these.
 
+(parameter-endirrseason)=
 ### `EndIrrSeason`
 
 :::{container} parameter-summary
 **Type:** Integer  ·  **Default:** `304`
 :::
 
+(parameter-watsources-fn)=
 ### `WatSources_fn`
 
 :::{container} parameter-summary
@@ -489,18 +515,21 @@ Water-source and irrigation-network input filenames. Most source/diversion files
 **Type:** String  ·  **Default:** `cr_sources.txt`
 :::
 
+(parameter-irrdistr-list-fn)=
 ### `IrrDistr_list_fn`
 
 :::{container} parameter-summary
 **Type:** String  ·  **Default:** `irr_districts.txt`
 :::
 
+(parameter-sched-irr-fn)=
 ### `sched_irr_fn`
 
 :::{container} parameter-summary
 **Type:** String  ·  **Default:** `scheduled_irrigation.txt`
 :::
 
+(parameter-output-controls)=
 {.parameter-list-group}
 ## Output controls
 
@@ -572,6 +601,342 @@ actual evapotranspiration
 :::
 
 potential evapotranspiration
+
+### `prt_step`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_debug`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_cell_all`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_stp_rain`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_stp_transp_act`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_stp_transp_pot`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_stp_irr_loss`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_stp_irr_nm_priv`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_stp_irr_nm_col`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_stp_runoff`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_dbg_eva_act`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_dbg_eff_rain`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_dbg_perc1`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_dbg_perc2`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_dbg_h_soil1`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_dbg_h_soil2`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_rain`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_rain_crop_season`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_irr`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_irr_loss`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_eva_act_crop_season`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_eva_pot_crop_season`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_transp_act`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_transp_pot`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_runoff`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_net_flux_gw`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_total_eff`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_n_irr_events`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_h_irr_mean`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_biomass_pot`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_yield_pot`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_yield_act`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_T_act_sum`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_T_pot_sum`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_f_WS_stage`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_f_WS`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_f_HS`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_f_HS_sum`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_dbg_eva_act_tot`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_dbg_rain_eff`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_dbg_iter1`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_yr_dbg_iter2`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_cell_convergence`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_cell_evaporation`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_cell_runoff`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_cell_et0`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_debug_out`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
+
+### `prt_init_cond`
+
+:::{container} parameter-summary
+**Type:** String
+**Default:** `y`
+:::
 
 {.parameter-list-group .parameter-list-last}
 ## DTx settings (deprecated)
