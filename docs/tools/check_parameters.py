@@ -29,7 +29,7 @@ DEFAULT_DECLARATIONS = (
     REPOSITORY_ROOT / "src" / "mod_parameters.f90",
     REPOSITORY_ROOT / "src" / "mod_TDx_index.f90",
 )
-DEFAULT_DOCUMENTATION = REPOSITORY_ROOT / "docs" / "parameters.md"
+DEFAULT_DOCUMENTATION = REPOSITORY_ROOT / "docs" / "pages" / "parameters.md"
 
 ROOT_TYPES = {
     "xml": "parameters",
@@ -185,7 +185,8 @@ def parse_declarations(paths: Sequence[Path]) -> dict[str, dict[str, Declaration
             type_start = re.match(r"^type\s*(?:::)?\s*([a-z_]\w*)\s*$", line, re.I)
             if type_start and not line.casefold().startswith("type("):
                 current_type = type_start.group(1).casefold()
-                types.setdefault(current_type, {})
+                if current_type is not None:
+                    types.setdefault(current_type, {})
                 continue
             if re.match(r"^end\s*type\b", line, re.I):
                 current_type = None
