@@ -1,7 +1,7 @@
 version: 2
 
 formats:
-  -pdf #Additionally builds a downloadable pdf
+  - pdf #Additionally builds a downloadable pdf
 
 build:
   os: ubuntu-24.04
