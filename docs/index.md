@@ -7,9 +7,9 @@ configuration reference material, practical guidance, and worked examples.
 :maxdepth: 2
 :caption: Configuration reference
 
-overview
-parameters
-project_structure
-command_line_args
-rice
+pages/overview
+pages/parameters
+pages/project_structure
+pages/command_line_args
+pages/rice
 :::

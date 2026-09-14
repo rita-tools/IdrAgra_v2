@@ -11,7 +11,7 @@ source_suffix = {
     ".rst": "restructuredtext",
 }
 
-root_doc = "pages/index"
+root_doc = "index"
 
 html_theme = "furo"
 html_static_path = ["_static"]
