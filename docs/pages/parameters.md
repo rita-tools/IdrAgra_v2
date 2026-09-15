@@ -2,10 +2,6 @@
 
 `idragra_parameters.txt` is the main file which determines how the model behaves.
 
-:::{container} llm-review-note
-**LLM-authored draft — review required.** Explanatory prose in this reference includes LLM-written material. Parameter names, types, and defaults are checked automatically against the current Fortran parser and declarations, but modelling guidance still requires maintainer review.
-:::
-
 For example, it contains options and switches to set:
 - the simulation mode (e.g. USE or NEED)
 - the simulation start and end dates
@@ -127,12 +123,12 @@ Folder containing water-source input files.
 **Type:** Integer  ·  **Default:** `2`
 :::
 
-Irrigation simulation mode [0...4].\
-  0 = no irrigation  
-  1 = irrigation consumptions  
-  2 = satisfy field-capacity requirements  
-  3 = fixed irrigation volumes  
-  4 = fixed irrigation dates and volumes read from file
+Irrigation simulation mode:\
+  0 = no irrigation\
+  1 = USE mode\
+  2 = NEED mode; field-capacity target\
+  3 = NEED mode; fixed irrigation amount\
+  4 = Scheduled irrigation: dates and volumes read from file
 
 (parameter-initialtheta)=
 ### `InitialThetaFlag`

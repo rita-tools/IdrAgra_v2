@@ -1,66 +1,45 @@
 # Model overview
 
-IdrAgra is a spatially-distributed conceptual agro-hydrological model...
+IdrAgra (standing for *Idrologia Agraria*, Italian for "agricultural hydrology") is a distributed-parameter conceptual model, which allows the simulation of irrigation water distribution in agricultural areas and the estimation of the hydrological balance on a daily basis.
 
+On each simulation day, IdrAgra represents crop development and the soil-crop-atmosphere water balance, accounting for precipitation, irrigation, canopy interception, runoff, evaporation, transpiration, percolation, ponding, and optional capillary rise. These calculations are used to estimate irrigation demand and water distribution according to the selected simulation mode, as well as the effects of water and heat stress on crop yield.
+
+Note that while most of the model's input-output is at the daily scale, IdrAgra internally updates the water balance at an hourly time-step.
+
+## Theoretical framework
+
+The simulation of evapotranspiration and water-stress response are theoretically grounded in FAO's Irrigation and Drainage Paper 56 ([Allen et al., 1998](https://www.fao.org/4/x0490e/x0490e00.htm)), specifically in its [dual crop coefficient approach](<https://www.fao.org/4/x0490e/x0490e0c.htm#chapter%207%20%20%20etc%20%20%20dual%20crop%20coefficient%20(kc%20=%20kcb%20+%20ke)>). Crop development is simulated using growing-degree-day-based phenology.
+
+The discretization of the soil profile into two distinct layers (referred to as the "*evapo-transpirative*"[^evaporative-layer] and "*transpirative*" layers), is also coherent with FAO56. Layers act as stacked "reservoirs", capable of holding an amount of water ranging from residual humidity up to saturation, and exchanging fluxes with each other as well as the soil surface, the water table (if present) and the crop.
+
+After accounting for canopy interception (von Hoyningen-Huene, 1981) and surface runoff ([SCS's Curve Number method](https://www.hec.usace.army.mil/confluence/hmsdocs/hmstrm/canopy-surface-infiltration-and-runoff-volume/infiltration/scs-curve-number-loss-model)), the remaining rainfall may enter the soil profile. From there, water percolates downwards according to each layer's unsaturated hydraulic conductivity, which is calculated using a Brooks-Corey-type equation. Percolation might be boosted around irrigation events to facilitate infiltration, with the booster acting as an empirical proxy for otherwise not simulated phenomena like hydraulic gradients and preferential flow.
+
+If the user provides water table data, the model can additionally calculate capillary uptake through the bottom of the profile using the empirical model developed by [Liu et al. (2006)](https://www.sciencedirect.com/science/article/pii/S0378377406000321).
 
 (simulation-unit)=
 ## Simulation unit
 
-IdrAgra's domain is comprised of cells (sometimes referred to as "fields"), which are portions of land considered uniform in terms of weather, soil, landuse and management.\ 
+The domain of an IdrAgra simulation is comprised of **cells** (sometimes referred to as "fields"), which are portions of land considered uniform in terms of weather, soil, landuse and management.
 
-It is at the cell level that the model performs most operations, such as solving the soil-crop-atmosphere balance, applying irrigation water, and calculating yield. 
-Each cell is identified by its position in the simulation's domain (row, column)
+The cell is IdrAgra's smallest independent computational unit: it is at the cell level that the model performs most operations, such as solving the soil-crop-atmosphere balance, applying irrigation water, and calculating yield.\
+Each cell is identified by its position in the simulation's domain (row, column) and receives spatialized input data such as soil properties, land use and irrigation method through dedicated .asc files. Other inputs, such as weather and crop phenology series, are provided at the weather station level, but are spatialized to the cell level internally.
 
-:::{container} llm-review-note
-**LLM-authored draft — review required.** The sections below summarize the 2025 technical manual and were checked against the current Fortran implementation. They should be reviewed by a model maintainer before being treated as authoritative.
-:::
-
-## What the model represents
-
-IdrAgra is a spatially distributed agro-hydrological model. It combines four closely connected parts:
-
-1. **Crop phenology**, which supplies daily crop development and canopy/root parameters.
-2. **Soil-crop water balance**, which accounts for precipitation, irrigation, interception, runoff, evaporation, transpiration, percolation, ponding, and optionally capillary rise.
-3. **Irrigation**, which determines field applications from crop demand, available water, or a supplied calendar, depending on the selected mode.
-4. **Crop yield**, which estimates potential biomass and the effects of water and heat stress on actual yield.
-
-The simulation advances one calendar day at a time. Within each day, the current code solves the two-layer soil-water balance in 24 hourly steps, distributes daily meteorological and irrigation quantities across those steps, and accumulates the requested daily, periodic, and annual results.
-
-## Spatial and temporal scale
-
-The surface domain is represented by an ESRI ASCII grid. A valid grid cell is the smallest independent computational unit: it has one soil profile, land use, irrigation method, and set of interpolated meteorological and phenological inputs. Neighboring cells do not exchange soil water laterally in the current implementation.
-
-The optional `shapearea.asc` map lets an exported polygon-based project retain the actual area represented by each computational point. When that file is absent, water-volume calculations use the square of the ASCII-grid cell size.
+While cells are usually squared grid elements, it is possible for IdrAgra to simulate any kind of cell shape. To do so, use the optional `shapearea.asc` file to indicate the area [m<sup>2</sup>] represented by each cell. The easiest way to set up a non grid-based simulation is through [IdrAgraTools](idragratools_workflow), a QGIS plugin that acts as IdrAgra's pre- and post-processor.
 
 ## Simulation modes
 
-The technical manual groups irrigation runs into the conceptual **USE** and **NEED** families. IdrAgra provides five choices through {ref}`Mode <parameter-mode>`:
+The way irrigation is accounted for by the model varies considerably according to the simulation mode selected by the user.\
+The main distinction is between the so-called "**NEED**" and "**USE**" modes, with the former simulating an ideal scenario in which irrigation events are triggered by RAW depletion, and the latter attempting to simulate a real-world scenario in which irrigation scheduling is turn-based and is constrained by water availability in the distribution network.
 
-| Mode | Current executable behavior | Practical meaning |
+IdrAgra provides five choices through {ref}`Mode <parameter-mode>`:
+
+| Mode | Descriptive name | Practical meaning |
 |---:|---|---|
-| 0 | No irrigation | Run crop and water-balance calculations without irrigation applications. |
-| 1 | [USE](use_mode.md) | Route monitored and estimated source water through irrigation units, then distribute the available volume among eligible cells. Demand may remain unsatisfied. |
-| 2 | [NEED, field-capacity target](need_modes.md) | Calculate the application needed to replenish the profile toward field capacity, adjusted by {ref}`fc_ratio <parameter-fc-ratio>`. |
-| 3 | [NEED, fixed volume](need_modes.md) | Trigger irrigation from soil-water status and apply the irrigation method's fixed depth. |
-| 4 | [Scheduled](scheduled_mode.md) | Read dated irrigation depths from the file selected by {ref}`sched_irr_fn <parameter-sched-irr-fn>` and apply them to irrigation units. |
+| 0 | No irrigation | Run crop and water-balance calculations without irrigation applications |
+| 1 | [USE](use_mode.md) | Simulate water movement from sources to irrigation units, then distribute the available volume among eligible cells |
+| 2 | [NEED, field-capacity target](need_modes.md) | triggered by RAW depletion; apply amount needed to restore field capacity |
+| 3 | [NEED, fixed volume](need_modes.md) | triggered by RAW depletion; apply method-dependent fixed amount |
+| 4 | [Scheduled](scheduled_mode.md) | Irrigation depths and dates are read from {ref}`file <parameter-sched-irr-fn>` |
 
-Modes 2 and 3 calculate unconstrained field requirements and therefore belong to the manual's broader NEED concept. Mode 1 represents the manual's USE concept, where source availability, conveyance, and delivery order can limit irrigation.
 
-:::{container} manual-code-divergence
-**Manual/code divergence to review.** The technical manual mainly presents USE and NEED, while the model also supports no-irrigation Mode 0 and scheduled Mode 4. Use the mode numbering shown above when preparing `idragra_parameters.txt`.
-:::
-
-## Main data flow
-
-For each simulated day, IdrAgra:
-
-1. reads the next daily meteorological record and daily crop-parameter records;
-2. updates yearly land-use and irrigation-method maps when configured, and updates the water-table map if a matching dated file exists;
-3. interpolates meteorological and phenological information to cells;
-4. determines irrigation according to the selected mode and irrigation season;
-5. calculates interception and Curve Number runoff;
-6. solves the evaporative- and transpirative-layer balances over 24 hourly substeps;
-7. updates ponding, crop stress, biomass, and yield state; and
-8. writes enabled cell, periodic, annual, and diagnostic outputs.
-
-Meteorological variables can be inverse-distance weighted from several stations or taken from the nearest station, independently for temperature, precipitation, humidity, wind, and radiation. The spatial weight rasters are inputs generated outside the core executable; IdrAgra reads rather than calculates them.
+[^evaporative-layer]: Note that the "evapo-transpirative" layer is sometimes referred to simply as the “evaporative" layer because, in earlier versions of the model, it was not affected by transpiration fluxes.
