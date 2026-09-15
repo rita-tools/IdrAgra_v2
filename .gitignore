@@ -7,3 +7,5 @@ demo/simout/**
 .codex_tmp
 *.zip
 /demo/final_condition
+docs/_build/
+__pycache__/
