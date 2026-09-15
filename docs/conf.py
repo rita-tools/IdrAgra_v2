@@ -26,4 +26,6 @@ myst_enable_extensions = [
     "substitution",
 ]
 
+exclude_patterns = ["_build", "readme.md"]
+
 nitpicky = True
