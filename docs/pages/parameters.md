@@ -68,23 +68,23 @@ Folder containing meteorological station data.
 
 Root-level file listing the meteorological input files.
 
+### Standalone crop inputs
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `CropRotationFile` | `landuses/soil_uses.txt` | Rotation slots for each land-use ID |
+| `CropParameterPath` | `landuses/crop_parameters` | Raw crop definition directory |
+| `CropTemperatureWindow` | `2` | Half-width of centred temperature averaging, 0?30 days |
+| `CropCO2` | `0` | Constant CO2 in ppm; zero leaves WP unchanged and canopy resistance at 70 s/m |
+| `RandSowDaysSeed` | `1` effectively | Seed for deterministic sowing offsets |
+
 (parameter-phenopath)=
-### `PhenoPath`
-
-:::{container} parameter-summary
-**Type:** String  ·  **Default:** `.\\crop_series\\`
-:::
-
-Folder containing crop phenology parameter files.
-
 (parameter-phenofileroot)=
-### `PhenoFileRoot`
+### Obsolete `PhenoPath` and `PhenoFileRoot`
 
-:::{container} parameter-summary
-**Type:** String  ·  **Default:** `pheno_`
-:::
-
-Common prefix used by phenology files associated with meteorological stations.
+These settings are accepted with a migration notice but have no effect.
+Supply the raw crop inputs above; there is no table-driven phenology mode.
+See [standalone phenology](standalone_phenology.md).
 
 (parameter-irrmethpath)=
 ### `IrrMethPath`

@@ -586,13 +586,18 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
             ! %AB% recalculate n
             ! n_cells_tobe_irr = count(irr_mask)! %EAC% no more required
 
-            if (irr_units(k)%f_un_priv==1) then
-                allocate(s_transp_ratio(n_cells_tobe_irr)); s_transp_ratio = s_h_transp_pot/sum(s_h_transp_pot)
+            if (irr_units(k)%f_un_priv==1 .and. n_cells_tobe_irr>0) then
+                allocate(s_transp_ratio(n_cells_tobe_irr)); s_transp_ratio = 0.0_dp
+                if(sum(s_h_transp_pot)>0.0_dp) s_transp_ratio = s_h_transp_pot/sum(s_h_transp_pot)
                 allocate(s_def_day(n_cells_tobe_irr)); s_def_day = 0.
                 where(s_h_transp_pot/=0.) s_def_day=(s_h_old-s_h_raw)/s_h_transp_pot
                 ! %AB% skip at least one cell that could be irrigated by monitored sources
                 ! dist = int(sum(vtmm-vRaw)/sum(vTrasp_pot))*IU(k)%n_irrigable_cells ! OLD version
-                dist = 1 + nint((sum(s_transp_ratio*s_def_day)/sum(s_transp_ratio))*irr_units(k)%n_irrigable_cells)
+                ! Newly sown crops may have no transpiration yet. Soil thresholds still
+                ! decide eligibility; avoid normalizing an empty/zero-demand distribution.
+                dist = 1
+                if(sum(s_transp_ratio)>0.0_dp) &
+                    dist = 1 + nint((sum(s_transp_ratio*s_def_day)/sum(s_transp_ratio))*irr_units(k)%n_irrigable_cells)
 
 
                 if(dist>n_cells_tobe_irr) dist=n_cells_tobe_irr

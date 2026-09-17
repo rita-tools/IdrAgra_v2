@@ -41,12 +41,11 @@ MeteoPath = meteodata\\
 # MeteoFileName: root-level file listing the meteorological input files.
 MeteoFileName = weather_stations.dat
 
-# PhenoPath: folder containing crop phenology parameter files.
-PhenoPath = pheno\\
-
-# PhenoFileRoot: common prefix used by phenology files associated with
-# meteorological stations.
-PhenoFileRoot = pheno_
+# Raw crop definitions and ordered rotation slots (no CropCoef output required).
+CropRotationFile = landuses/soil_uses.txt
+CropParameterPath = landuses/crop_parameters
+CropTemperatureWindow = 2  # centred temperature mean: two days either side
+CropCO2 = 0                # use original WP and canopy resistance 70 s/m
 
 # IrrMethPath: folder containing irrigation-method files.
 IrrMethPath = irrmethods\\

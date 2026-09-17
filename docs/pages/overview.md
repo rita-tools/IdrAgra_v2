@@ -22,7 +22,7 @@ If the user provides water table data, the model can additionally calculate capi
 The domain of an IdrAgra simulation is comprised of **cells** (sometimes referred to as "fields"), which are portions of land considered uniform in terms of weather, soil, landuse and management.
 
 The cell is IdrAgra's smallest independent computational unit: it is at the cell level that the model performs most operations, such as solving the soil-crop-atmosphere balance, applying irrigation water, and calculating yield.\
-Each cell is identified by its position in the simulation's domain (row, column) and receives spatialized input data such as soil properties, land use and irrigation method through dedicated .asc files. Other inputs, such as weather and crop phenology series, are provided at the weather station level, but are spatialized to the cell level internally.
+Each cell is identified by its position in the simulation's domain (row, column) and receives spatialized input data such as soil properties, land use and irrigation method through dedicated .asc files. Weather inputs are provided at station level and spatialized internally. Crop phenology advances daily in each cell from raw crop definitions and rotation rules.
 
 While cells are usually squared grid elements, it is possible for IdrAgra to simulate any kind of cell shape. To do so, use the optional `shapearea.asc` file to indicate the area [m<sup>2</sup>] represented by each cell. The easiest way to set up a non grid-based simulation is through [IdrAgraTools](idragratools_workflow), a QGIS plugin that acts as IdrAgra's pre- and post-processor.
 

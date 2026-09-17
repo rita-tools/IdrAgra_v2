@@ -2,6 +2,16 @@
 ## Project description ##
 ### IdrAgra - Idrologia Agraria (in Italian) ###
 IdrAgra is a distributed-parameter agro-hydrological model that allows the simulation of the irrigation water distribution in agricultural areas and the estimation of the hydrological balance on a daily basis.
+## Standalone phenology development
+
+This branch reads raw crop definitions and rotation lists directly. CropCoef is
+no longer a preprocessing requirement. The demo contains the required inputs in
+`demo/landuses`; run IdrAgra from the `demo` directory.
+
+See [standalone phenology](docs/pages/standalone_phenology.md) for migration,
+first-pass modelling choices, output changes, and remaining limitations.
+Run `python tests/run_standalone.py` for a checked build and integration tests.
+
 ## Contact ##
 prof. Claudio Gandolfi
 

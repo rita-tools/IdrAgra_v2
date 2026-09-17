@@ -37,14 +37,13 @@ use mod_evapotranspiration, only: ET_reference, calculateDLH
 use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data, create_meteo_matrices
 use mod_runoff
 use mod_crop_soil_water
-use mod_crop_phenology, only: crop_pheno_info, crop_matrices, populate_crop_pars_matrices
+use mod_daily_phenology, only: begin_crop_run, advance_crops, finish_crop_day, end_crop_run
 use mod_TDx_index
 use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva
 use mod_common, only: wat_matrix, soil2_rice, hourly, unit_file_scratch
 use mod_irrigation
 
 use cli_watsources
-use cli_crop_parameters, only: read_all_crop_pars, destroy_infofeno_tab, check_pheno_parameters, k_cb_matrices
 use cli_save_outputs
 use cli_read_parameter
 implicit none
@@ -61,21 +60,20 @@ end interface
 
 contains
 
-subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, info_meteo, info_pheno, tab_CN2, tab_CN3,&
-    & theta2_rice, sim_years,boundaries, debug, summary)
+subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, info_meteo, tab_CN2, tab_CN3,&
+    & theta2_rice, sim_years,boundaries, debug, summary, warmup)
 
     type(parameters),intent(inout)::pars
     type(TDx_index),intent(in)::pars_TDx
     real(dp),dimension(:,:,:),intent(in):: tab_CN2, tab_CN3
     integer,intent(in)::sim_years
     type(bound),intent(in)::boundaries
-    logical,intent(in)::debug,summary
+    logical,intent(in)::debug,summary,warmup
     type(soil2_rice),intent(in)::theta2_rice
     type(spatial_info),intent(inout)::info_spat
     type(water_sources_table),dimension(:),intent(inout)::wat_src_tbl
     type(source_info),intent(inout)::info_sources
     type(meteo_info),dimension(:),intent(inout)::info_meteo
-    type(crop_pheno_info),dimension(:),intent(inout)::info_pheno
 
     type(balance1_matrices)::wat_bal1,wat_bal1_old
     type(balance2_matrices)::wat_bal2,wat_bal2_old
@@ -90,15 +88,12 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     type(step_debug_map)::deb_map
     type(annual_map)::yr_map
     type(annual_debug_map)::yr_deb_map
-    type(yield_t)::yield
     type(irr_units_table),dimension(:),allocatable::irr_units      ! Allocated in mod_watsources
     type(scheduled_irrigation),dimension(:),allocatable::irr_sch ! Allocated in 'open_scheduled_irrigation' function
-    type(crop_matrices)::crop_map
 
-    integer:: unit_crop
+    integer :: crop_date
     integer::i,j,k,y,current_year,doy,hour,z,w                           ! for cycles
     !integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::irandom ! %EAC% use irandom map instead
-    integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::dir_phenofases
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::dir_meteo
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::meteo_weight
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,pars%sim%n_irr_meth)::h_irr ! z depends on number of irrigation methods
@@ -174,21 +169,12 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         & info_spat%domain%header%imax,info_spat%domain%header%jmax, info_spat%domain%mat)
 
     ! Make sure that RF-related variables are nan outside the simulation domain
+    pheno%k_cb=0.0_dp
+    pheno%k_cb_old=0.0_dp
     pheno%d_t_max  = dble(info_spat%domain%header%nan)
     pheno%RF_t_max = dble(info_spat%domain%header%nan)
     pheno%RF_t     = dble(info_spat%domain%header%nan)
     pheno%RF_e     = dble(info_spat%domain%header%nan)
-
-    ! dir_phenofases: for each cell the appropriate meteorological station is selected
-    ! (by linking to its progressive number in meteorological stations list)
-    dir_phenofases(:,:) = int(info_spat%weight_ws(1)%mat(:,:))
-    do j=1,size(info_spat%domain%mat,2)
-        do i=1,size(info_spat%domain%mat,1)
-            if(info_spat%backup_domain%mat(i,j)/=info_spat%backup_domain%header%nan) then !%PS% changed from %domain to %backup_domain to avoid problems with cells that are not simulated in the first year but become part of the active domain later
-                dir_phenofases(i,j) = get_value_index(info_meteo%station_id, dir_phenofases(i,j))
-            end if
-        end do
-    end do
 
     ! dir_meteo: for each cell, the appropriate meteorological stations are selected
     ! (by changing meteorological station ID to its progressive number in meteorological stations list)
@@ -208,6 +194,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             end do
         end do
     end do
+
+    call begin_crop_run(pars%sim,info_meteo,info_spat%domain,warmup)
 
     ! Creates scratch files for TDx calculation
     scratch_td: if(trim(pars_TDx%mode)/="none")then
@@ -317,14 +305,13 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             write (s_years,*) current_year
         end if
 
-        ! Yearly irandom: change irandom map each year at the beginning, if the file exists
-        ! if not, it will be generated in the following step
-        inquire (file=trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//trim(adjustl(s_years))//'.asc', exist=pars%sim%f_irandom)
-        if (pars%sim%f_irandom .eqv. .true.) then
-            print *,'Init irandom: ', trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//trim(adjustl(s_years))//'.asc'
-            call read_grid(trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//trim(adjustl(s_years))//'.asc', info_spat%irandom,pars%sim,boundaries)
+        upfilename=trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//trim(adjustl(s_years))//'.asc'
+        inquire(file=trim(upfilename),exist=pars%sim%f_irandom)
+        if(.not.pars%sim%f_irandom) then
+            upfilename=trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'.asc'
+            inquire(file=trim(upfilename),exist=pars%sim%f_irandom)
         end if
-
+        if(pars%sim%f_irandom) call read_grid(trim(upfilename),info_spat%irandom,pars%sim,boundaries)
 
         ! Yearly soil use: change soil use map each year at the beginning
         if (pars%sim%f_soiluse .eqv. .true.) then
@@ -406,78 +393,6 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
         end if ! end change soil use map condition
 
-        ! Read all phenological tables and allocation of info_pheno%prm%tab(:,:)
-        call read_all_crop_pars(pars%sim%year_step(y), pars%sim%n_lus, info_pheno)
-        if (pars%sim%prt_debug_out == 'y') then
-            call check_pheno_parameters(info_pheno,info_meteo)
-            call init_cell_output_file(unit_crop,trim(pars%sim%path)//'Kcb_levels.csv',&
-                &'MeteoStat; SoilUse; nCrop; low; mid; high')
-            do i=1, size(info_pheno)
-                do j = 1, size(info_pheno(i)%k_cb%tab, 2)
-                    do z = 1, info_pheno(i)%n_crops_by_year(j)
-                        write(unit_crop,*) trim(info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)), &
-                            & '; ', j, '; ', z, '; ', &
-                            & info_pheno(i)%kcb_phases%low(j,z), '; ', &
-                            & info_pheno(i)%kcb_phases%mid(j,z), '; ', info_pheno(i)%kcb_phases%high(j,z)
-                    end do
-                end do
-            end do
-            close(unit_crop)
-            call init_cell_output_file(unit_crop,trim(pars%sim%path)//trim(adjustl(s_years))//'_PhenoLengths.csv',&
-                &'MeteoStat; SoilUse; nCrop; ii0; iie; iid')
-            do i=1,size(info_pheno)
-                do j=1,size(info_pheno(i)%ii0,1)
-                    do z=1,size(info_pheno(i)%ii0,2)
-                        if (info_pheno(i)%ii0(j,z)>0) then
-                            write(unit_crop,*)trim(info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)), &
-                                & '; ',j,'; ', z, '; ',info_pheno(i)%ii0(j,z),'; ',&
-                                & info_pheno(i)%iie(j,z),'; ',info_pheno(i)%iid(j,z)
-                        end if
-                    end do
-                end do
-            end do
-            close(unit_crop)
-        end if
-
-        ! Randomization and spatial distribution of crop emergence
-        if (pars%sim%f_irandom .eqv. .false.) then
-            call get_uniform_sample(info_spat%irandom%mat,pars%sim%sowing_range,pars%sim%rand_symmetry,pars%sim%repeatable)
-        end if
-
-        call allocate_crop_map (crop_map,info_spat%domain%mat,pars%sim%n_crops,info_spat%domain%header%nan)
-        ! make_random_emergence calculates reference data to estimate crop emergence date
-        ! which will be calculated in populate_crop_pars_matrices
-        call make_random_emergence(info_pheno,meteo_weight,dir_meteo,info_spat%domain,info_spat%soil_use_id%mat, &
-            & crop_map, info_spat%irandom%mat, pars%sim%year_step(y))
-
-        if (pars%sim%prt_debug_out == 'y') then
-            ! write debug files of reference data for crop randomization
-            call print_mat_as_grid(trim(pars%sim%path)//trim(adjustl(s_years))//"_irandom.asc", &
-                & info_spat%irandom%header,info_spat%irandom%mat,error_flag)
-            do i=1,size(crop_map%ii0,3)
-                write(str,*)i
-                call print_mat_as_grid(trim(pars%sim%path)//trim(adjustl(s_years))//"_ii0_" &
-                    & //trim(adjustl(str))//".asc",info_spat%domain%header,crop_map%ii0(:,:,i), &
-                    & error_flag)
-                call print_mat_as_grid(trim(pars%sim%path)//trim(adjustl(s_years))//"_iie_" &
-                    & //trim(adjustl(str))//".asc",info_spat%domain%header,crop_map%iie(:,:,i), &
-                    & error_flag)
-                call print_mat_as_grid(trim(pars%sim%path)//trim(adjustl(s_years))//"_dij_" &
-                    & //trim(adjustl(str))//".asc",info_spat%domain%header,crop_map%dij(:,:,i), &
-                    & error_flag)
-            end do
-        end if
-        ! Writing crop parameters in cult matrix
-        call populate_crop_yield_matrices(info_pheno,dir_phenofases,info_spat%domain,info_spat%soil_use_id%mat,crop_map,y)
-
-        ! Inizialization of kcb_low and phenological phase
-        pheno%k_cb_low = info_spat%domain%header%nan
-        pheno%n_crop_in_year = 1
-        pheno%pheno_idx = 1
-
-        ! Allocation of yield variables
-        call init_yearly_yield_output(yield, info_spat%domain%mat, size(info_pheno(1)%ii0,2))
-
         select case(pars%sim%mode)
             case (1)                                                ! USE mode
                 ! Read water sources and dynamic allocation of info_sources%deriv%qt(:,:)
@@ -529,8 +444,6 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         end if
 
         call init_yearly_output_file(yr_map,pars%sim%path,s_years,pars%sim)
-        ! TODO: Verify when output_yield_iniz needs to be activated
-        call init_yield_output_file(yield,pars%sim%path,s_years,pars%sim)
 
         call init_debug_yearly_output_file(yr_deb_map,pars%sim%path,s_years,pars%sim)
 
@@ -608,34 +521,24 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 call init_step_debug_output_file(deb_map, pars%sim%path, s_years, doy, pars%sim%intervals, &
                     &   pars%sim%clock(1)-1, 'step',pars%sim)
             end if
-            ! Phenological parameters spatialization
-            ! Updating of pheno%kcb_old to the last day value - pheno%cult_switch is not updated
-            pheno%k_cb_old = pheno%k_cb
+            ! read weather daily data and calculate ET0 for each weather stations
+            call read_meteo_data(info_meteo,doy,pars%sim%res_canopy(y), pars%sim%forecast_day)
+
+            ! spread weather data to the entire domain
             if (y==pars%sim%start_simulation%year - info_meteo(1)%start%year + 1 &
                 & .and. (pars%sim%start_simulation%day > 1 .or. pars%sim%start_simulation%month > 1)) then
-                call populate_crop_pars_matrices(pheno, info_pheno, info_spat%irandom%mat,                                             &
-                                               & doy + pars%sim%start_simulation%doy - calc_doy(1, 1, pars%sim%start_simulation%year), &
-                                               & dir_phenofases, info_spat%domain, info_spat%soil_use_id, y,                           &
-                                               & pars%sim%year_step(y), crop_map)
+                call create_meteo_matrices(info_meteo,dir_meteo,meteo_weight,meteo,info_spat%domain,&
+                    & doy + pars%sim%start_simulation%doy - calc_doy(1, 1, pars%sim%start_simulation%year),&
+                    & pars%sim%res_canopy(y), pars%sim)
             else
-                call populate_crop_pars_matrices(pheno, info_pheno, info_spat%irandom%mat,                         &
-                                               & doy,                                                              &
-                                               & dir_phenofases, info_spat%domain, info_spat%soil_use_id, y,       &
-                                               & pars%sim%year_step(y), crop_map)
+                call create_meteo_matrices(info_meteo,dir_meteo,meteo_weight,meteo,info_spat%domain,doy,&
+                    & pars%sim%res_canopy(y), pars%sim)
             end if
 
-            ! Output fc in debug %RR%
-            ! if (pars%sim%prt_debug_out .eqv. .true.) then
-            !    pheno_grd%mat = pheno%f_c
-            !    call write_matrices(trim(pars%sim%path)//'fc_'//trim(adjustl(s_years))//'_'//&
-            !                                    trim(adjustl(s_gg))//'.asc', pheno_grd, errorflag)
-            ! end if
-
-
-            ! Creating cell parameters output on first day of simulation
-            if (doy == 1 .and. (pars%sim%f_out_cells .eqv. .true.))then
-                call write_cell_prod(out_tbl_list%prod_info, crop_map, info_spat%irandom%mat)
-            end if
+            crop_date=max(pars%sim%start_simulation%doy,info_meteo(1)%start%doy+sum(pars%sim%year_step(1:y-1)))+doy-1
+            pheno%k_cb_old=pheno%k_cb
+            call advance_crops(pars%sim,crop_date,meteo,info_spat%domain,info_spat%soil_use_id, &
+                info_spat%irandom%mat,dir_meteo,meteo_weight,pars%depth%ze_fix,pheno)
 
             ! Inizialization on first day of simulation
             first_day: if(doy==1 .and. y==pars%sim%start_simulation%year - info_meteo(1)%start%year + 1) then
@@ -747,20 +650,6 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 wat_bal2%h_raw_priv = (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*pheno%p_day*(alpha_unm_map+pheno%r_stress)) + &
                                       (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*pheno%p_day*(alpha_unm_map+pheno%r_stress))
             end where
-
-            ! read weather daily data and calculate ET0 for each weather stations
-            call read_meteo_data(info_meteo,doy,pars%sim%res_canopy(y), pars%sim%forecast_day)
-
-            ! spread weather data to the entire domain
-            if (y==pars%sim%start_simulation%year - info_meteo(1)%start%year + 1 &
-                & .and. (pars%sim%start_simulation%day > 1 .or. pars%sim%start_simulation%month > 1)) then
-                call create_meteo_matrices(info_meteo,dir_meteo,meteo_weight,meteo,info_spat%domain,&
-                    & doy + pars%sim%start_simulation%doy - calc_doy(1, 1, pars%sim%start_simulation%year),&
-                    & pars%sim%res_canopy(y), pars%sim)
-            else
-                call create_meteo_matrices(info_meteo,dir_meteo,meteo_weight,meteo,info_spat%domain,doy,&
-                    & pars%sim%res_canopy(y), pars%sim)
-            end if
 
             ! calculate average latitude %PS%: switched from "forall" to an equivalent "do-do-if" structure to avoid compile-time warnings
             if (doy == 1) then
@@ -1092,83 +981,9 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             wat_bal1%h_pond = min(wat_bal_hour%esten%h_pond,info_spat%h_maxpond%mat)
             !wat_bal1%h_pond = wat_bal_hour%esten%h_pond
 
-            ! Calculate the crop production
-            ! TODO:
-            ! add the crop biomass from the previuos year for winter cereals (need variables to store previous year)
-
-            ! Update the parameters for the calculation of the thermal stress
-            do j=1,size(info_spat%domain%mat,2)
-                do i=1,size(info_spat%domain%mat,1)
-                    if(info_spat%domain%mat(i,j) /= info_spat%domain%header%nan) then
-                        if (doy >= crop_map%TSP_low(i,j,pheno%n_crop_in_year(i,j)) .and. &
-                            & doy < crop_map%TSP_high(i,j,pheno%n_crop_in_year(i,j))) then
-                            if (meteo%T_ave(i,j) < pheno%T_crit(i,j)) then
-                                yield%f_HS_sum%mat(i,j,pheno%n_crop_in_year(i,j)) = &
-                                    & yield%f_HS_sum%mat(i,j,pheno%n_crop_in_year(i,j)) + 1
-                            else if (meteo%T_ave(i,j) >= pheno%T_crit(i,j) .and. meteo%T_ave(i,j) < pheno%T_lim(i,j)) then
-                                yield%f_HS_sum%mat(i,j,pheno%n_crop_in_year(i,j)) = &
-                                    & yield%f_HS_sum%mat (i,j,pheno%n_crop_in_year(i,j)) + 1 - &
-                                    & (meteo%T_ave(i,j) - pheno%T_crit(i,j))/ (pheno%T_lim(i,j) - pheno%T_crit(i,j))
-                            end if
-                        end if
-
-                        ! Calculate the period of growing
-                        if (pheno%k_cb_low(i,j) == 0) then ! annual crop
-                            if (pheno%k_cb(i,j) == pheno%k_cb_low(i,j)) then
-                                pheno%pheno_idx(i,j) = 0
-                            ! initial stage
-                            else if (pheno%k_cb(i,j) <= pheno%k_cb_mid(i,j) .and. &
-                                & (pheno%pheno_idx(i,j)==0 .or. pheno%pheno_idx(i,j)==1)) then
-                                pheno%pheno_idx(i,j) = 1
-                            ! growing stage
-                            else if (pheno%k_cb(i,j) < pheno%k_cb_high(i,j) .and. &
-                                & (pheno%pheno_idx(i,j)==1 .or. pheno%pheno_idx(i,j)==2)) then
-                                pheno%pheno_idx(i,j) = 2
-                            ! maturity stage
-                            else if (pheno%k_cb(i,j) == pheno%k_cb_high(i,j)) then
-                                pheno%pheno_idx(i,j) = 3
-                            ! senescence stage
-                            else
-                                pheno%pheno_idx(i,j) = 4
-                            end if
-                        else  ! permanent, pluriannual cropfn
-                            ! Vernalization or after the harvest
-                            if (pheno%k_cb(i,j) == pheno%k_cb_low(i,j)) then
-                                pheno%pheno_idx(i,j) = 1
-                            ! growing stage
-                            else if (pheno%k_cb(i,j) < pheno%k_cb_high(i,j) .and. &
-                                & (pheno%pheno_idx(i,j)==1 .or. pheno%pheno_idx(i,j)==2)) then
-                                pheno%pheno_idx(i,j) = 2
-                            ! maturity stage
-                            else if (pheno%k_cb(i,j) == pheno%k_cb_high(i,j)) then
-                                pheno%pheno_idx(i,j) = 3
-                            ! senescence stage
-                            else
-                                pheno%pheno_idx(i,j) = 4
-                            end if
-                        end if
-
-                        ! update the parameters for the calculation of the water stress
-                        if (pheno%pheno_idx(i,j) > 0) then
-                            yield%T_act_sum%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) = &
-                                & yield%T_act_sum%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) + &
-                                & wat_bal1%h_transp_act(i,j) + wat_bal2%h_transp_act(i,j)
-                            yield%T_pot_sum%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) = &
-                                & yield%T_pot_sum%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) + &
-                                & wat_bal1%h_transp_pot(i,j) + wat_bal2%h_transp_pot(i,j)
-                            yield%dev_stage%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) = &
-                                & yield%dev_stage%mat(i,j,pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) + 1
-                        end if
-
-                        ! Update transpiration ratio
-                        if ( meteo%et0(i,j)>0) then
-                            yield%transp_ratio_sum%mat(i,j,pheno%n_crop_in_year(i,j)) = &
-                                &  yield%transp_ratio_sum%mat(i,j,pheno%n_crop_in_year(i,j)) + &
-                                & (wat_bal1%h_transp_pot(i,j) + wat_bal2%h_transp_pot(i,j)) / meteo%et0(i,j)
-                        end if
-                    end if
-                end do
-            end do
+            ! Accumulate production for living crop occurrences, then finalize today's harvest/cut.
+            call finish_crop_day(crop_date,info_spat%domain,pheno,meteo, &
+                wat_bal1%h_transp_act+wat_bal2%h_transp_act,wat_bal1%h_transp_pot+wat_bal2%h_transp_pot)
 
             ! calculate transpiration deficit index
             if (trim(pars_TDx%mode)/="none") then
@@ -1231,72 +1046,6 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
         end do day_cycle
 
-        ! Calculate productivity
-        do j=1,size(info_spat%domain%mat,2)
-            do i=1,size(info_spat%domain%mat,1)
-                do z=1, size(crop_map%TSP_high,3)
-                    if(info_spat%domain%mat(i,j) /= info_spat%domain%header%nan) then
-                        !%PS% Skip yield calculations for declared slots absent from the daily crop series (can happen due to cropcoef crop overwriting)
-                        if (crop_map%ii0(i,j,z) == 0 .and. crop_map%iie(i,j,z) == 0) cycle
-
-                        ! TODO: check zero conditions
-                        if ((crop_map%TSP_high(i,j,z) - crop_map%TSP_low(i,j,z))/=0.0D0) then
-                            yield%f_HS%mat(i,j,z) = yield%f_HS_sum%mat(i,j,z) / &
-                                & (crop_map%TSP_high(i,j,z) - crop_map%TSP_low(i,j,z))
-                        else
-                            yield%f_HS%mat(i,j,z) = real(info_spat%domain%header%nan)
-                        end if
-
-                        yield%biomass_pot%mat(i,j,z) = &
-                            & crop_map%wp_adj(i,j,z) * yield%transp_ratio_sum%mat(i,j,z)
-
-                        yield%yield_pot%mat(i,j,z) = &
-                            & yield%biomass_pot%mat(i,j,z) * crop_map%HI(i,j,z)
-
-                        ! Calculate the reduction of the production from the water stress
-                        yield%f_WS%mat(i,j,z) = 1 - crop_map%Ky_tot(i,j,z) * & ! %PS% important bugfix: earlier version was using pheno%Ky_tot(i,j), i.e. whatever value was saved at year end.
-                            & (1- sum(yield%T_act_sum%mat(i,j,:,z)) / &        !                        This potentially gave the same Ky to both crops present in a year (e.g. maize was using wheat's Ky)
-                            & sum(yield%T_pot_sum%mat(i,j,:,z)))
-
-                        if (yield%f_WS%mat(i,j,z) < 0) yield%f_WS%mat(i,j,z) = 0    ! limit to zero
-
-                        yield%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,1) * &
-                            & (1 - (yield%T_act_sum%mat(i,j,1,z) / &
-                            & yield%T_pot_sum%mat(i,j,1,z)))) &
-                            & ** (yield%dev_stage%mat(i,j,1,z) &
-                            & / sum(yield%dev_stage%mat(i,j,:,z)))
-
-                        yield%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,2) * &
-                            & (1 - (yield%T_act_sum%mat(i,j,2,z) / &
-                            & yield%T_pot_sum%mat(i,j,2,z)))) &
-                            & ** (yield%dev_stage%mat(i,j,2,z) &
-                            & / sum(yield%dev_stage%mat(i,j,:,z))) * &
-                            & yield%f_WS_stage%mat(i,j,z)
-
-                        yield%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,3) * &
-                            & (1 - (yield%T_act_sum%mat(i,j,3,z) / &
-                            & yield%T_pot_sum%mat(i,j,3,z)))) &
-                            & ** (yield%dev_stage%mat(i,j,3,z) &
-                            & / sum(yield%dev_stage%mat(i,j,:,z))) * &
-                            & yield%f_WS_stage%mat(i,j,z)
-
-                        yield%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,4) * &
-                            & (1 - (yield%T_act_sum%mat(i,j,4,z) / &
-                            & yield%T_pot_sum%mat(i,j,4,z)))) &
-                            & ** (yield%dev_stage%mat(i,j,4,z) &
-                            & / sum(yield%dev_stage%mat(i,j,:,z))) * &
-                            & yield%f_WS_stage%mat(i,j,z)
-
-                        yield%yield_act%mat(i,j,z) = &
-                            & yield%yield_pot%mat(i,j,z) * &
-                            & min(yield%f_WS%mat(i,j,z), &
-                            & yield%f_WS_stage%mat(i,j,z)) * &
-                            & yield%f_HS%mat(i,j,z)
-                    end if
-                end do
-            end do
-        end do
-
         ! Calculate the annual efficiency for the use of the water inputs (rain and irrigation)
         where ((yr_map%rain_crop_season%mat + yr_map%irr%mat) > 0)
             yr_map%total_eff%mat = (yr_map%eva_act_crop_season%mat + yr_map%transp_act%mat) &
@@ -1317,7 +1066,6 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             call save_annual_irrigation_data(yr_map,info_spat%domain)
         end if
 
-        call save_yield_data(yield,info_spat%domain)
 
         where (yr_map%rain_crop_season%mat > 0)
             yr_deb_map%rain_eff%mat = (yr_map%eva_act_crop_season%mat + yr_map%transp_act%mat) / yr_map%rain_crop_season%mat
@@ -1326,15 +1074,11 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         end where
 
         call save_annual_debug_data(yr_deb_map, info_spat%domain)
-        call save_yield_debug_data(yield, info_spat%domain)
 
         ! close the csv files for cell outputs
         call close_cell_output_by_year(out_tbl_list,pars%sim%mode,pars%sim%f_out_cells, pars%sim,pars%cr%n_withdrawals)
         ! destroy annual variables
-        call destroy_infofeno_tab(info_pheno)
-        call destroy_crop(crop_map)
         if (pars%sim%mode ==1) call destroy_water_sources_duty(info_sources)
-        call destroy_yield_output(yield)
     end do year_cycle
 
     ! Save output for the following year
@@ -1371,6 +1115,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         print*,"TDx index has not been calculated"
     end if
 
+    call end_crop_run()
     call destroy_all(stp_map,yr_map,deb_map,yr_deb_map,wat_bal1,wat_bal1_old,wat_bal2,wat_bal2_old,wat_bal_hour,meteo,wat,pheno, &
         & pars%sim%imax,pars%sim%jmax)
 
@@ -1643,73 +1388,7 @@ subroutine destroy_all(asc,yasc,deb_asc,deb_yasc,bil1,bil1_old,bil2,bil2_old,bil
     call init_pheno_matrices(pheno,imax, jmax, f_allocate)
 end subroutine destroy_all
 
-subroutine allocate_crop_map(crop_mat,domain,mcrop_alt,a)
-    ! init crop matrix
-   type(crop_matrices), intent(inout)::crop_mat
-    integer,dimension(:,:),intent(in)::domain
-    integer,intent(in)::mcrop_alt
-    integer,intent(in)::a
 
-    allocate(crop_mat%ii0(size(domain,1),size(domain,2),mcrop_alt))
-    allocate(crop_mat%iie(size(domain,1),size(domain,2),mcrop_alt))
-    allocate(crop_mat%iid(size(domain,1),size(domain,2),mcrop_alt))
-    allocate(crop_mat%ii0_ref(size(domain,1),size(domain,2),mcrop_alt))
-    allocate(crop_mat%iie_ref(size(domain,1),size(domain,2),mcrop_alt))
-    allocate(crop_mat%iid_ref(size(domain,1),size(domain,2),mcrop_alt))
-    allocate(crop_mat%dij(size(domain,1),size(domain,2),mcrop_alt))
-    allocate(crop_mat%TSP_high(size(domain,1),size(domain,2),mcrop_alt))
-    allocate(crop_mat%TSP_low(size(domain,1),size(domain,2),mcrop_alt))
-    allocate(crop_mat%wp_adj(size(domain,1),size(domain,2),mcrop_alt))
-    allocate(crop_mat%HI(size(domain,1),size(domain,2),mcrop_alt))
-    allocate(crop_mat%Ky_tot(size(domain,1),size(domain,2),mcrop_alt))
-    allocate(crop_mat%Ky_pheno(size(domain,1),size(domain,2),mcrop_alt,4))
-    allocate(crop_mat%T_crit(size(domain,1),size(domain,2),mcrop_alt))
-    allocate(crop_mat%T_lim(size(domain,1),size(domain,2),mcrop_alt))
-    allocate(crop_mat%k_cb_min(size(domain,1),size(domain,2),mcrop_alt))
-    allocate(crop_mat%k_cb_mid(size(domain,1),size(domain,2),mcrop_alt))
-    allocate(crop_mat%k_cb_max(size(domain,1),size(domain,2),mcrop_alt))
-    crop_mat%ii0 = a
-    crop_mat%iie = a
-    crop_mat%iid = 0.d0
-    crop_mat%ii0_ref = a
-    crop_mat%iie_ref = a
-    crop_mat%iid_ref = a
-    crop_mat%dij = a
-    crop_mat%TSP_high = a
-    crop_mat%TSP_low = a
-    crop_mat%wp_adj = a
-    crop_mat%HI = a
-    crop_mat%Ky_tot = a
-    crop_mat%Ky_pheno = a
-    crop_mat%T_crit = a
-    crop_mat%T_lim = a
-    crop_mat%k_cb_min = a
-    crop_mat%k_cb_mid = a
-    crop_mat%k_cb_max = a
-end subroutine allocate_crop_map
-
-subroutine destroy_crop(crop_map)
-   type(crop_matrices),intent(inout)::crop_map
-
-    deallocate(crop_map%ii0)
-    deallocate(crop_map%iie)
-    deallocate(crop_map%iid)
-    deallocate(crop_map%ii0_ref)
-    deallocate(crop_map%iie_ref)
-    deallocate(crop_map%iid_ref)
-    deallocate(crop_map%dij)
-    deallocate(crop_map%TSP_high)
-    deallocate(crop_map%TSP_low)
-    deallocate(crop_map%wp_adj)
-    deallocate(crop_map%HI)
-    deallocate(crop_map%Ky_tot)
-    deallocate(crop_map%Ky_pheno)
-    deallocate(crop_map%T_crit)
-    deallocate(crop_map%T_lim)
-    deallocate(crop_map%k_cb_min)
-    deallocate(crop_map%k_cb_mid)
-    deallocate(crop_map%k_cb_max)
-end subroutine destroy_crop
 
 subroutine init_wat_bal1(bil,a)
     ! overloading of the assignment operator "="

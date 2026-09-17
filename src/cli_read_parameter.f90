@@ -13,6 +13,19 @@ implicit none
 
 contains
 
+subroutine read_crop_path(buffer,path)
+    character(len=*), intent(in) :: buffer
+    character(len=*), intent(out) :: path
+    character(len=len(buffer)) :: value
+    integer :: n
+    value=trim(adjustl(buffer)); n=len_trim(value)
+    if(n>=2) then
+        if((value(1:1)=='"'.and.value(n:n)=='"').or. &
+            (value(1:1)==achar(39).and.value(n:n)==achar(39))) value=value(2:n-1)
+    end if
+    path=trim(value)
+end subroutine
+
 subroutine read_all_parameters(file_xml, xml, xml_dtx, ErrorFlag, debug)
    character(len=*), intent(in) :: file_xml
     logical, intent(in) :: debug
@@ -168,14 +181,19 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
                                             )
                     case ('meteofilename') ! name of the file with the list of weather station
                         read(buffer, *, iostat=ios) xml%sim%ws_list_fn
-                    case ('phenopath') ! path to the phenophase files
-                        read(buffer, *, iostat=ios) xml%sim%pheno_path
-                        xml%sim%pheno_path = replace_str( string = xml%sim%pheno_path &
-                                            , search = "\\" &
-                                            , substitute = delimiter &
-                                            )
-                    case ('phenofileroot') ! the sub string to use as root of phenophase subfolder
-                        read(buffer, *, iostat=ios) xml%sim%pheno_root
+                    case ('croprotationfile')
+                        call read_crop_path(buffer,xml%sim%rotation_file)
+                    case ('cropparameterpath')
+                        call read_crop_path(buffer,xml%sim%crop_path)
+                    case ('croptemperaturewindow')
+                        read(buffer, *, iostat=ios) xml%sim%crop_temperature_window
+                        if(xml%sim%crop_temperature_window<0.or.xml%sim%crop_temperature_window>30) &
+                            error stop 'CropTemperatureWindow must be between 0 and 30'
+                    case ('cropco2')
+                        read(buffer, *, iostat=ios) xml%sim%crop_co2
+                        if(xml%sim%crop_co2<0) error stop 'CropCO2 must be nonnegative'
+                    case ('phenopath','phenofileroot')
+                        print *, 'Obsolete input: ',trim(label),'. Supply CropRotationFile and CropParameterPath.'
                     case ('irrmethpath') ! path to meteo files
                         read(buffer, *, iostat=ios) xml%sim%irr_met_path
                         xml%sim%irr_met_path = replace_str( string = xml%sim%irr_met_path &
@@ -328,8 +346,11 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
                                 print *, "Emergence date is distributed symmetrically"
                                 read *
                         end select
+                    case ('randsowdaysseed')
+                        read(buffer, *, iostat=ios) xml%sim%rand_seed
                     case ('randsowdayswind') ! range of sowinf
                         read(buffer, *, iostat=ios) xml%sim%sowing_range
+                        if(xml%sim%sowing_range<0.or.xml%sim%sowing_range>365) error stop "RandSowDaysWind must be 0..365"
                     case ('repeatable') ! set simulation with random seeding repeatible
                         if ((trim(adjustl(buffer)) == 'true') .or. (trim(adjustl(buffer))== 't') .or. (trim(adjustl(buffer)) == '1'))  then
                             xml%sim%repeatable = .true.

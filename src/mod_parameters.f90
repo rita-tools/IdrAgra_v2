@@ -7,8 +7,10 @@ type simulation
     character(len=200) :: path = '.\\sim_results\\'                     ! path of output
     character(len=200) :: meteo_path = '.\\meteo_data\\'                ! path of meteo tables
     character(len=200) :: ws_list_fn = 'weather_stations.dat'           ! filename (incl. path) of the weather station list
-    character(len=200) :: pheno_path = '.\\crop_series\\'               ! Path to the crop timeseries directory
-    character(len=200) :: pheno_root = 'pheno_'                         ! prefix shared by all folders in pheno_path
+    character(len=255) :: rotation_file = 'landuses/soil_uses.txt'
+    character(len=255) :: crop_path = 'landuses/crop_parameters'
+    integer :: crop_temperature_window = 2 ! centred smoothing half-window [days]
+    real(dp) :: crop_co2 = 0 ! ppm; 0 keeps WP unchanged and canopy resistance at 70 s/m
     character(len=200) :: irr_met_path = '.\\irrmeth_data\\'            ! Path to irrigation methods folder
     character(len=200) :: irr_met_list_fn = 'irrmethods.txt'            ! Filename of the list of irrigation methods
     character(len=200) :: watsour_path = '.\\watsour_data\\'            ! Path to the water sources folder
@@ -88,7 +90,7 @@ type simulation
     integer,dimension(:),pointer :: no_lu_list  ! list of ids if the NOT simulated land uses
     logical :: f_cap_rise = .false.             ! if true, capillary rise is calculated
     logical :: f_shapearea = .false.            ! if true, use shapes area (for vectorialization)
-    logical :: f_irandom                        ! if true, use user defined random values
+    logical :: f_irandom = .false.              ! if true, use user defined random values
     integer :: n_ws = 1                         ! maximum number of weather station
     logical :: interpolate_temp = .true.        ! if false, each cell's temperature is equal to the closest station's (not interpolated)
     logical :: interpolate_rain = .true.        ! if false, each cell's precipitation is equal to the closest station's (not interpolated)
@@ -99,7 +101,7 @@ type simulation
     integer :: end_irr_season = 304             ! end irrigation season [doy]
     integer :: n_irr_meth                       ! number of irrigation methods
     logical :: f_out_cells = .false.            ! if true, print outputs file for control points (aka cells)
-    real(dp),dimension(:),pointer :: res_canopy ! plant resistance
+    real(dp),dimension(:),pointer :: res_canopy => null() ! plant resistance
     real(dp), dimension(2,2) :: quantiles = reshape([0.575118, 0.472116, 8.026400, 7.706101], [2,2])
     real(dp) :: lambda_cn = 0.2                 ! lambda parameters for curve number [-]
     real(dp) :: h_prec_lim = 5.0                ! minimum meaningful precipitation [mm]

@@ -1,723 +1,313 @@
+! Raw CropCoef-compatible inputs for standalone IdrAgra.
+! Physiological definitions/formulas originate in cropcoeff (E. A. Chiaradia), GPL-2.0-or-later.
 module cli_crop_parameters
-use mod_constants, only: sp, dp
-use mod_utility, only: lower_case, string_to_integers, string_to_reals, split_string, count_elements
+use mod_constants, only: dp
+use mod_utility, only: lower_case
 use mod_parameters, only: simulation
-use mod_meteo, only: meteo_info
-use mod_crop_phenology
-use mod_system
+use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
 implicit none
-
-
-logical, dimension(:), allocatable, save :: missing_crop_slot_warned
-
-interface read_crop_pars
-    module procedure read_crop_pars_r, read_crop_pars_i
-end interface
-
-interface init_daily_crop_par_file
-    module procedure init_daily_crop_par_file_r, init_daily_crop_par_file_i
-end interface
-
-interface spread_col
-    module procedure spread_col_i, spread_col_r
-end interface
-
+private
+public :: crop_definition, rotation_definition, rotations, init_crop_database, interpolate_crop, adjusted_wp
+public :: crop_fail, words, clean_line
+integer, parameter :: max_points=512, max_words=64
+real(dp), parameter :: missing=-9999.0_dp
+type crop_definition
+    character(len=255) :: name=''
+    integer :: sow_min=1, sow_delay=0, harvest_max=365, cuts=1, gap=0, photo=0, cn_class=1, irrigated=0
+    logical :: vern=.false., adjust_kcb=.true.
+    real(dp) :: tsow=0, tbase=0, tcut=30, tvmin=0, tvmax=10, vslope=7, vstart=10, vend=50, vfmin=0
+    real(dp) :: dl_if=8, dl_ins=20, wp=0, fsink=0, tcrit=35, tlim=45, hi=0, kyt=1, ky(4)=1
+    real(dp) :: praw=0.5_dp, interception=0.5_dp, rft=1
+    real(dp), allocatable :: gdd(:), values(:,:) ! Kcb, LAI, height, roots, CN, fc, resistance, Ky
+    real(dp) :: stage_gdd(3)=0 ! development start, mid-season start, late-season start
+end type
+type rotation_definition
+    type(crop_definition), allocatable :: crops(:)
+end type
+type(rotation_definition), allocatable, save :: rotations(:)
 contains
-
-subroutine init_daily_crop_par_file_r(file_pars, file_name)
-    ! Store and validate a real-valued daily crop parameter file.
-    character(len=*), intent(in) :: file_name
-    type(file_phenology_r), intent(out) :: file_pars
-
-    call init_daily_crop_par_file_common(file_pars%filename, file_pars%next_pos, file_name)
-end subroutine init_daily_crop_par_file_r
-
-subroutine init_daily_crop_par_file_i(file_pars, file_name)
-    ! Store and validate an integer-valued daily crop parameter file.
-    character(len=*), intent(in) :: file_name
-    type(file_phenology_i), intent(out) :: file_pars
-
-    call init_daily_crop_par_file_common(file_pars%filename, file_pars%next_pos, file_name)
-end subroutine init_daily_crop_par_file_i
-
-subroutine init_daily_crop_par_file_common(stored_name, next_pos, file_name)
-    ! Validate the file, skip its header, remember the first data position, and close it.
-    character(len=*), intent(out) :: stored_name
-    integer, intent(out) :: next_pos
-    character(len=*), intent(in) :: file_name
-    integer :: unit, ios
-    character(len=500) :: io_message
-
-    stored_name = trim(file_name)
-
-    open(newunit=unit, file=trim(stored_name), status='old', action='read', &
-       & access='stream', form='formatted', iostat=ios, iomsg=io_message    )
-    if (ios /= 0) then
-        print *, 'Cannot open phenology file ', trim(stored_name), ': ', trim(io_message)
-        print *, 'Execution will be aborted...'
-        stop
-    end if
-
-    read(unit, '(A)', iostat=ios, iomsg=io_message)
-    if (ios /= 0) then
-        print *, 'Cannot read the header of phenology file ', trim(stored_name), ': ', trim(io_message)
-        print *, 'Execution will be aborted...'
-        stop
-    end if
-
-    ! Save the position in the file as next_pos (read_crop_pars() will start reading data from here)
-    inquire(unit=unit, pos=next_pos)
-    close(unit)
-end subroutine init_daily_crop_par_file_common
-
-subroutine init_crop_par_from_file(file_name, n_crop, n_crop_alt, string_elements, n_crops_by_year, error_flag)
-    ! init static crop parameters from parameter file
-    character(len=*), intent(in) :: file_name
-    integer, intent(in) :: n_crop
-    integer, intent(out) :: n_crop_alt
-    integer, intent(out) :: string_elements
-    integer, dimension(n_crop), intent(out) :: n_crops_by_year
-    integer, intent(out) :: error_flag
-    integer :: free_unit, ios, p
-    integer, dimension(:), allocatable :: crop_counts
-    character(len=n_crop*20) :: buffer, label !EAC: use mcrop_max x 20
-    character(len=10), dimension(:), allocatable :: dummy, dummy_clean
-
-    error_flag = 0
-    open(newunit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios)
-    if (ios /= 0 ) then
-        print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. Execution will be aborted..."
-        stop
-    end if
-
-    do while (ios == 0)
-        read (free_unit, '(A)', iostat=ios) buffer
-        if (ios == 0) then
-            call lower_case(buffer)
-            p = scan(buffer, achar(9))  ! find the first tab ---> tab=achar(9)
-            label = buffer(1:p-1)
-            buffer = buffer(p+1:)
-
-            select case (label)
-                case ('var')
-                    ! read the header line and divide elements
-                    allocate(dummy(n_crop*2))    ! TODO: to add 3 crops, edit 2 to 3
-                    call split_string(buffer, achar(9), dummy, string_elements)
-                    allocate(dummy_clean(string_elements))
-                    dummy_clean = dummy(1:string_elements)
-                    deallocate(dummy)
-                    call count_elements(dummy_clean, crop_counts)
-                    deallocate(dummy_clean)
-                    if (size(crop_counts) > n_crop) then
-                        print *, "Invalid crop parameters in ", trim(file_name), "."
-                        print *, "The header contains ", size(crop_counts), " unique crop IDs, but SoilUsesNum is ", n_crop, "."
-                        print *, "Set SoilUsesNum to at least the number of unique crop IDs in idragra_parameters.txt."
-                        stop
-                    end if
-                    n_crops_by_year = 0
-                    n_crops_by_year(:size(crop_counts)) = crop_counts
-                    deallocate(crop_counts)
-                    n_crop_alt = maxval(n_crops_by_year)
-               case default
-            end select
-        end if
+subroutine crop_fail(message)
+    character(len=*), intent(in) :: message
+    print *, 'Crop input error: ',trim(message)
+    error stop 1
+end subroutine
+function clean_line(raw) result(line)
+    character(len=*), intent(in) :: raw
+    character(len=len(raw)) :: line
+    integer :: k
+    line=raw
+    k=index(line,'#')
+    if(k>0) line=line(:k-1)
+    do k=1,len_trim(line)
+        if(line(k:k)==achar(9)) line(k:k)=' '
     end do
-    close (free_unit)
-end subroutine init_crop_par_from_file
-
-subroutine read_water_prod_file(file_name, string_elements, n_crops_by_year,          &
-                              & unit_param, sim_end_year, weath_start_year, error_flag)
-    ! read water productivity related parameters
-    character(len=*), intent(in) :: file_name
-    integer, intent(in) :: string_elements
-    integer, dimension(:), intent(in) :: n_crops_by_year
-    real(dp), dimension(:,:,:), intent(inout) :: unit_param
-    integer, intent(in) :: sim_end_year, weath_start_year
-    integer, intent(out) :: error_flag
-    integer :: free_unit, ios, line, p, year
-    character(len=string_elements*20) :: buffer, label  !EAC:  use string_elements x 20
-
-    error_flag = 0
-    line = 0
-    open(newunit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios)
-    if (ios /= 0 ) then
-        print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. &
-            & Execution will be aborted..."
-        stop
+    line=adjustl(line)
+end function
+subroutine words(line, token, n)
+    character(len=*), intent(in) :: line
+    character(len=*), intent(out) :: token(:)
+    integer, intent(out) :: n
+    integer :: i,j
+    n=0; i=1; token=''
+    do while(i<=len_trim(line))
+        if(line(i:i)==' ') then
+            i=i+1; cycle
+        end if
+        j=i
+        do while(j<=len_trim(line))
+            if(line(j:j)==' ') exit
+            j=j+1
+        end do
+        n=n+1
+        if(n>size(token)) call crop_fail('too many fields: '//trim(line))
+        if(j-i>len(token)) call crop_fail('field too long: '//trim(line))
+        token(n)=line(i:j-1); i=j
+    end do
+end subroutine
+subroutine init_crop_database(sim)
+    type(simulation), intent(inout) :: sim
+    character(len=4096) :: line, raw
+    character(len=255) :: tok(max_words), path
+    integer :: u,ios,n,id,k,nc
+    if(.not.allocated(rotations)) then
+        allocate(rotations(sim%n_lus))
+        open(newunit=u,file=trim(sim%rotation_file),status='old',action='read',iostat=ios)
+        if(ios/=0) call crop_fail('cannot open '//trim(sim%rotation_file))
+        do
+            read(u,'(a)',iostat=ios) raw
+            if(ios<0) exit
+            if(ios/=0) call crop_fail('reading '//trim(sim%rotation_file))
+            line=clean_line(raw)
+            if(len_trim(line)==0) cycle
+            call words(line,tok,n)
+            call lower_case(tok(1))
+            if(tok(1)=='endtable') exit
+            if(tok(1)=='cr_id') cycle
+            read(tok(1),*,iostat=ios) id
+            if(ios/=0) call crop_fail('expected land-use ID: '//trim(line))
+            if(id<1.or.id>sim%n_lus) call crop_fail('land-use ID outside SoilUsesNum')
+            if(allocated(rotations(id)%crops)) call crop_fail('duplicate land-use ID')
+            nc=count(tok(2:n)/='*')
+            allocate(rotations(id)%crops(nc)); nc=0
+            do k=2,n
+                if(tok(k)=='*') cycle
+                nc=nc+1
+                path=trim(sim%crop_path)//'/'//trim(tok(k))
+                call read_crop(path,rotations(id)%crops(nc))
+            end do
+        end do
+        close(u)
+        do id=1,sim%n_lus
+            if(.not.allocated(rotations(id)%crops)) call crop_fail('rotation database must define every land-use ID')
+        end do
     end if
-
-    do while (ios == 0)
-        read (free_unit, '(A)', iostat=ios) buffer
-        if (ios == 0) then
-            line = line + 1
-            buffer = trim(buffer)
-            call lower_case(buffer)
-            p = scan(buffer, achar(9))  ! find the first tab ---> tab=achar(9)
-            label = buffer(1:p-1)
-            buffer = buffer(p+1:)
-
-            select case (label)
-                case ('year') ! header line
-                case default
-                    read (label, *, iostat=ios) year
-                    if (ios /= 0) then
-                        print *, 'Invalid WPadj.dat entry at line ', line, ': ', trim(label), '. Execution will be aborted...'
-                        stop
-                    end if
-                    ! Store values from the first year of weather data to the last year of simulation (weather data might start earlier than simulation)
-                    if (year >= weath_start_year .and. year <= sim_end_year) then
-                        call spread_col(buffer,achar(9),string_elements,n_crops_by_year,unit_param(:,:,year-weath_start_year+1))
-                    end if
-            end select
-        end if
+    sim%n_crops=1
+    do id=1,size(rotations)
+        sim%n_crops=max(sim%n_crops,size(rotations(id)%crops))
     end do
-    close (free_unit)
-end subroutine read_water_prod_file
-
-subroutine read_canopy_resistance_file(file_name, unit_param, sim_end_year, weath_start_year, error_flag)
-    ! read canopy resistance parameters
-    character(len=*), intent(in) :: file_name
-    real(dp), dimension(:), intent(inout) :: unit_param
-    integer, intent(in) :: sim_end_year, weath_start_year
-    integer, intent(out) :: error_flag
-    integer :: free_unit, ios, line, year
-    real(dp) :: resistance
-    character(len=255) :: full_line
-
-    error_flag = 0
-    open(newunit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios)
-    if (ios /= 0 ) then
-        print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. Execution will be aborted..."
-        stop
-    end if
-
-    read (free_unit, '(A)', iostat=ios) ! skip the first line
-    line = 1
-    do while (ios == 0)
-        read (free_unit, '(A)', iostat=ios) full_line
-        if (ios == 0) then
-            line = line + 1
-            read (full_line, *, iostat=ios) year, resistance
-            if (ios /= 0) then
-                print *, 'Invalid CanopyRes.dat entry at line ', line, ': ', trim(full_line), '. Execution will be aborted...'
-                stop
-            end if
-            ! Store values from the first year of weather data to the last year of simulation (weather data might start earlier than simulation)
-            if (year >= weath_start_year .and. year <= sim_end_year) then
-                unit_param(year - weath_start_year + 1) = resistance
-            end if
-        end if
-    end do
-
-    close (free_unit)
-end subroutine read_canopy_resistance_file
-
-subroutine spread_col_i(string_in, sep, string_el, string_space, string_out)
-    character(len=*), intent(in) :: string_in
-    character(len=*), intent(in) :: sep
-    integer, intent(in) :: string_el
-    integer, dimension(:), intent(in) :: string_space
-    integer, dimension(:,:), intent(inout) :: string_out
-    integer, dimension(:), allocatable :: dummy
-    integer :: i
-
-    allocate(dummy(string_el))
-    dummy = string_to_integers(string_in(1:len_trim(string_in)-1), sep)
-    do i=1, size(string_space)
-       string_out(i,1:string_space(i)) = &
-            & dummy(sum(string_space(1:i-1))+1:sum(string_space(1:i)))
-    end do
-end subroutine spread_col_i
-
-subroutine spread_col_r(string_in, sep, string_el, string_space, string_out)
-    character(len=*), intent(in) :: string_in
-    character(len=*), intent(in) :: sep
-    integer, intent(in) :: string_el
-    integer, dimension(:), intent(in) :: string_space
-    real(dp), dimension(:,:), intent(inout) :: string_out
-    real(dp), dimension(:), allocatable :: dummy
-    integer :: i
-
-    allocate(dummy(string_el))
-    dummy = string_to_reals(string_in(1:len_trim(string_in)-1), sep)
-
-    do i=1, size(string_space)
-       string_out(i,1:string_space(i)) = &
-            & dummy(sum(string_space(1:i-1))+1:sum(string_space(1:i)))
-    end do
-end subroutine spread_col_r
-
-subroutine read_crop_par_file(file_name, string_elements, ze_fix, unit_param, error_flag)
-    ! read static crop parameters file
-    ! TODO: merge with init_crop_par_from_file ?
-    character(len=*), intent(in) :: file_name
-    integer, intent(in) :: string_elements
-    real(dp), intent(in) :: ze_fix
-    type(crop_pheno_info) :: unit_param
-    integer, intent(out) :: error_flag
-    integer :: free_unit
-    integer :: ios
-    integer :: line, p
-    character(len=string_elements*20) :: buffer, label !EAC: use string_elements x 20
-
-    error_flag = 0
-    open(newunit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios)
-    if (ios /= 0 ) then
-        print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. &
-            & The CropCoef version you used to generate inputs might be outdated. Execution will be aborted..."
-        stop
-    end if
-
-    do while (ios == 0)
-        read (free_unit, '(A)', iostat=ios) buffer
-        if (ios == 0) then
-            line = line + 1
-            buffer = trim(buffer)
-            call lower_case(buffer)
-            p = scan(buffer, achar(9))  ! find the first tab ---> tab=achar(9)
-            label = buffer(1:p-1)
-            buffer = buffer(p+1:)
-
-            select case (label)
-                case ('var') ! already initialized
-                case ('irrig')
-                    call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%irrigation_class)
-                case ('cnclass')
-                    call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%cn_class)
-                case('praw')
-                     call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%p_raw_const)
-                case('aint')
-                    call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%a)
-                case('tlim')
-                    call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%T_lim)
-                case('tcrit')
-                    call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%T_crit)
-                case('hi')
-                    call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%HI)
-                case('kyt')
-                    call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%Ky_tot)
-                case('ky1')
-                    call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%Ky_pheno(:,:,1))
-                case('ky2')
-                    call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%Ky_pheno(:,:,2))
-                case('ky3')
-                    call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%Ky_pheno(:,:,3))
-                case('ky4')
-                    call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%Ky_pheno(:,:,4))
-                case('rft')
-                     call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%max_RF_t)
-                case('maxsr')
-                    call spread_col(buffer, achar(9), string_elements, unit_param%n_crops_by_year, unit_param%d_r_max)
-                    unit_param%d_r_max = unit_param%d_r_max - ze_fix
-                case default
-                    print *, 'Skipping invalid or obsolete label <',trim(label),'> at line', line, ' of file: ', file_name
-            end select
-        end if
-    end do
-    close (free_unit)
-end subroutine read_crop_par_file
-
-subroutine read_crop_pars_r(file_pars,n_days,n_crop)
-    ! read crop phenology series from the specified file (real values)
-    integer,intent(in) :: n_days                    ! number of days (i.e. 365 o 366)
-    integer,intent(in)::n_crop                      ! number of crops
-    type(file_phenology_r), intent(inout) :: file_pars
-    integer :: i, unit, ios
-    character(len=500) :: io_message
-
-    allocate(file_pars%tab(n_days,n_crop))
-
-    ! Open the required file
-    open(newunit=unit, file=trim(file_pars%filename), status='old', action='read', &
-       & access='stream', form='formatted', iostat=ios, iomsg=io_message           )
-    if (ios /= 0) then
-        print *, 'Cannot open phenology file ', trim(file_pars%filename), ': ', trim(io_message)
-        print *, 'Execution will be aborted...'
-        stop
-    end if
-
-    ! Read one year of data starting from next_pos, i.e. the place where last year's reading terminated
-    do i=1,size(file_pars%tab,1)
-        if (i == 1) then
-            read(unit, *, pos=file_pars%next_pos, iostat=ios, iomsg=io_message) file_pars%tab(i,:)
-        else
-            read(unit, *, iostat=ios, iomsg=io_message) file_pars%tab(i,:)
-        end if
-        if (ios /= 0) then
-            print *, 'Cannot read day ', i, ' from phenology file ', trim(file_pars%filename), ': ', trim(io_message)
-            print *, 'Execution will be aborted...'
-            stop
-        end if
-    end do
-
-    ! Save the current position of the cursor before closing the file 
-    inquire(unit=unit, pos=file_pars%next_pos)
-    close(unit)
-
-end subroutine read_crop_pars_r
-
-subroutine read_crop_pars_i(file_pars,n_days,n_crop)
-    ! read crop phenology series from the specified file (int values)
-    integer,intent(in) :: n_days                ! number of days (i.e. 365 o 366)
-    integer,intent(in)::n_crop                  ! number of crops
-    type(file_phenology_i), intent(inout) :: file_pars
-    integer :: i, unit, ios
-    character(len=500) :: io_message
-
-    allocate(file_pars%tab(n_days,n_crop))
-
-    ! Open the required file
-    open(newunit=unit, file=trim(file_pars%filename), status='old', action='read', &
-       & access='stream', form='formatted', iostat=ios, iomsg=io_message           )
-    if (ios /= 0) then
-        print *, 'Cannot open phenology file ', trim(file_pars%filename), ': ', trim(io_message)
-        print *, 'Execution will be aborted...'
-        stop
-    end if
-
-    ! Read one year of data starting from next_pos, i.e. the place where last year's reading terminated
-    do i=1,size(file_pars%tab,1)
-        if (i == 1) then
-            read(unit, *, pos=file_pars%next_pos, iostat=ios, iomsg=io_message) file_pars%tab(i,:)
-        else
-            read(unit, *, iostat=ios, iomsg=io_message) file_pars%tab(i,:)
-        end if
-        if (ios /= 0) then
-            print *, 'Cannot read day ', i, ' from phenology file ', trim(file_pars%filename), ': ', trim(io_message)
-            print *, 'Execution will be aborted...'
-            stop
-        end if
-    end do
-
-    ! Save the current position of the cursor before closing the file 
-    inquire(unit=unit, pos=file_pars%next_pos)
-    close(unit)
-
-end subroutine read_crop_pars_i
-
-subroutine init_crop_phenology_pars(sim, info_pheno, info_meteo, ze_fix, verbose)
-    ! init crop parameters and file references for daily parameters
-    type(simulation),intent(inout)::sim
-    type(meteo_info),dimension(:),intent(in)::info_meteo
-    real(dp),intent(in) :: ze_fix
-    logical,intent(in)::verbose
-
-    type(crop_pheno_info),dimension(:),allocatable::info_pheno
-    character(len=255)::dir,froot,dir_name
-    integer::i,errorflag,string_elements
-    integer, dimension(sim%n_lus) :: n_crops_by_year
-    real(dp), parameter :: nan = -9999.0D0
-    integer, parameter :: phases = 4
-
-    dir= trim(sim%pheno_path)
-    froot = sim%pheno_root
-
-    allocate(info_pheno(sim%n_voronoi)) ! init to the number of weather stations
-
+    if(associated(sim%res_canopy)) deallocate(sim%res_canopy)
     allocate(sim%res_canopy(sim%meteo_years))
-    sim%res_canopy=0
-    ! init from crop parameters file (actually produced by cropcoeff)
-    dir_name = info_meteo(1)%filename(1:(index(trim(info_meteo(1)%filename),"."))-1)  ! directory has the same name as the weather station dataset
-    call init_crop_par_from_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropParam.dat", &
-        & sim%n_lus, sim%n_crops, string_elements, n_crops_by_year, ErrorFlag)
-
-    call read_canopy_resistance_file(trim(dir)//delimiter//'CanopyRes.dat', sim%res_canopy, &
-        & sim%end_simulation%year, sim%start_year, ErrorFlag)
-
-    do i=1,size(info_pheno)
-        dir_name = info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)
-        call init_daily_crop_par_file(info_pheno(i)%k_cb,      trim(dir)//trim(froot)//trim(dir_name)//delimiter//"Kcb.dat")
-        call init_daily_crop_par_file(info_pheno(i)%h,         trim(dir)//trim(froot)//trim(dir_name)//delimiter//"H.dat")
-        call init_daily_crop_par_file(info_pheno(i)%z_r,       trim(dir)//trim(froot)//trim(dir_name)//delimiter//"Sr.dat")
-        call init_daily_crop_par_file(info_pheno(i)%lai,       trim(dir)//trim(froot)//trim(dir_name)//delimiter//"LAI.dat")
-        call init_daily_crop_par_file(info_pheno(i)%cn_day,    trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CNvalue.dat")
-        call init_daily_crop_par_file(info_pheno(i)%f_c,       trim(dir)//trim(froot)//trim(dir_name)//delimiter//"fc.dat")
-        ! EDIT: add support for seasonal p_raw
-        call init_daily_crop_par_file(info_pheno(i)%r_stress,  trim(dir)//trim(froot)//trim(dir_name)//delimiter//"r_stress.dat")
-        call init_daily_crop_par_file(info_pheno(i)%crop_slot, trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropId.dat")
-
-        ! TODO - add tabulated ky
-
-        ! init crop parameters
-        allocate(info_pheno(i)%n_crops_by_year    (sim%n_lus))
-        allocate(info_pheno(i)%irrigation_class (sim%n_lus, sim%n_crops))
-        allocate(info_pheno(i)%cn_class             (sim%n_lus, sim%n_crops))
-        allocate(info_pheno(i)%p_raw_const     (sim%n_lus, sim%n_crops))
-        allocate(info_pheno(i)%a              (sim%n_lus, sim%n_crops))
-        allocate(info_pheno(i)%d_r_max          (sim%n_lus, sim%n_crops))
-        allocate(info_pheno(i)%max_RF_t         (sim%n_lus, sim%n_crops))
-        allocate(info_pheno(i)%T_lim           (sim%n_lus, sim%n_crops))
-        allocate(info_pheno(i)%T_crit          (sim%n_lus, sim%n_crops))
-        allocate(info_pheno(i)%HI             (sim%n_lus, sim%n_crops))
-        allocate(info_pheno(i)%Ky_tot            (sim%n_lus, sim%n_crops))
-        allocate(info_pheno(i)%Ky_pheno            (sim%n_lus, sim%n_crops, phases))
-        allocate(info_pheno(i)%wp_adj          (sim%n_lus, sim%n_crops, sim%meteo_years))
-        allocate(info_pheno(i)%kcb_phases%low (sim%n_lus, sim%n_crops))
-        allocate(info_pheno(i)%kcb_phases%high(sim%n_lus, sim%n_crops))
-        allocate(info_pheno(i)%kcb_phases%mid (sim%n_lus, sim%n_crops))
-        allocate(info_pheno(i)%ii0            (sim%n_lus, sim%n_crops))
-        allocate(info_pheno(i)%iie            (sim%n_lus, sim%n_crops))
-        allocate(info_pheno(i)%iid            (sim%n_lus, sim%n_crops))
-        allocate(info_pheno(i)%cycle_crop_slot(sim%n_lus, sim%n_crops))
-        info_pheno(i)%n_crops_by_year     = n_crops_by_year
-        info_pheno(i)%irrigation_class  = int(nan)
-        info_pheno(i)%cn_class              = int(nan)
-        info_pheno(i)%p_raw_const               = nan
-        info_pheno(i)%a               = nan
-        info_pheno(i)%d_r_max           = nan
-        info_pheno(i)%max_RF_t          = nan
-        info_pheno(i)%T_lim            = nan
-        info_pheno(i)%T_crit           = nan
-        info_pheno(i)%HI              = nan
-        info_pheno(i)%Ky_tot             = nan
-        info_pheno(i)%Ky_pheno             = nan
-        info_pheno(i)%wp_adj           = nan
-        info_pheno(i)%kcb_phases%low  = nan
-        info_pheno(i)%kcb_phases%high = nan
-        info_pheno(i)%kcb_phases%mid  = nan
-        info_pheno(i)%ii0             = 0
-        info_pheno(i)%iie             = 0
-        info_pheno(i)%iid             = 0
-        info_pheno(i)%cycle_crop_slot = 0
-        call read_water_prod_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"WPadj.dat",  &
-                                & string_elements, n_crops_by_year, info_pheno(i)%wp_adj,          &
-                                & sim%end_simulation%year, sim%start_year, ErrorFlag)
-        call read_crop_par_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropParam.dat", &
-                              & string_elements, ze_fix, info_pheno(i), ErrorFlag                   )
-
-        ! TODO
-        ! EAC: overwrite p values if exits
-        ! call open_daily_crop_par_file(info_pheno(i)%p%unit,trim(dir)//trim(froot)//trim(fname)//"\praw.dat",errorflag)
-
-    end do
-    if (verbose .eqv. .true.) then
-        print *,'===== DEBUG: crop parameters initialize ====='
-        print *,'path to phenophase: ',  dir
-        print *,'root of subfolder: ',  froot
-        print *,'# of phenophase: ',  size(info_meteo)
-        print *,'===== END DEBUG ====='
+    sim%res_canopy=70.0_dp
+    if(sim%crop_co2>0) then
+        if(sim%crop_co2>=1155) call crop_fail('CropCO2 must be below 1155 ppm for canopy-resistance formula')
+        sim%res_canopy=100.0_dp/(1.4_dp-0.4_dp*sim%crop_co2/330.0_dp)/(0.5_dp*24*0.12_dp)
     end if
-end subroutine init_crop_phenology_pars
-
-subroutine read_all_crop_pars(n_days, n_crop, info_pheno)
-    integer,intent(in)::n_days,n_crop
-    type(crop_pheno_info),dimension(:),intent(inout)::info_pheno
-    integer::i
-
-    do i=1,size(info_pheno) ! i.e. the number of weather stations
-        call read_crop_pars(info_pheno(i)%k_cb,n_days,n_crop)
-        call read_crop_pars(info_pheno(i)%h,n_days,n_crop)
-        call read_crop_pars(info_pheno(i)%z_r,n_days,n_crop)
-        call read_crop_pars(info_pheno(i)%lai,n_days,n_crop)
-        call read_crop_pars(info_pheno(i)%cn_day,n_days,n_crop)
-        call read_crop_pars(info_pheno(i)%f_c,n_days,n_crop)
-        call read_crop_pars(info_pheno(i)%r_stress,n_days,n_crop)
-        call read_crop_pars(info_pheno(i)%crop_slot,n_days,n_crop)
-        call derive_crop_cycles(info_pheno(i), n_days)
+end subroutine
+subroutine read_crop(path,c)
+    character(len=*), intent(in) :: path
+    type(crop_definition), intent(out) :: c
+    character(len=4096) :: raw,line,key
+    character(len=255) :: tok(max_words), headers(max_words)
+    real(dp) :: table(max_points,9),v
+    integer :: u,ios,n,ncol,row,k,p,q,lo,hi,flags(5)
+    logical :: in_table
+    c%name=path; table=missing; row=0; in_table=.false.; ncol=0; flags=0
+    open(newunit=u,file=trim(path),status='old',action='read',iostat=ios)
+    if(ios/=0) call crop_fail('cannot open '//trim(path))
+    do
+        read(u,'(a)',iostat=ios) raw
+        if(ios<0) exit
+        if(ios/=0) call crop_fail('reading '//trim(path))
+        line=clean_line(raw)
+        if(len_trim(line)==0) cycle
+        key=line; call lower_case(key)
+        if(key=='endtable') exit
+        if(in_table) then
+            call words(line,tok,n)
+            if(n/=ncol) call crop_fail('wrong table column count in '//trim(path))
+            row=row+1
+            if(row>max_points) call crop_fail('too many crop curve points')
+            do k=1,n
+                if(tok(k)=='*') cycle
+                read(tok(k),*,iostat=ios) table(row,k)
+                if(ios/=0) call crop_fail('invalid table value in '//trim(path))
+                if(.not.ieee_is_finite(table(row,k))) call crop_fail('non-finite crop value')
+            end do
+            cycle
+        end if
+        p=index(line,'=')
+        if(p==0) then
+            call words(key,headers,ncol)
+            if(ncol<5.or.ncol>9) call crop_fail('expected GDD table in '//trim(path))
+            if(any(headers(1:5)/=[character(len=255)::'gdd','kcb','lai','hc','sr'])) &
+                call crop_fail('expected GDD Kcb LAI Hc Sr columns')
+            if(ncol>=6) then
+                if(headers(6)/='cn') call crop_fail('expected CN column')
+            end if
+            if(ncol>=7) then
+                if(headers(7)/='fc') call crop_fail('expected fc column')
+            end if
+            if(ncol>=8) then
+                if(headers(8)/='r_stress') call crop_fail('expected r_stress column')
+            end if
+            if(ncol>=9) then
+                if(headers(9)/='ky') call crop_fail('expected Ky column')
+            end if
+            in_table=.true.; cycle
+        end if
+        key=trim(line(:p-1)); call lower_case(key)
+        read(line(p+1:),*,iostat=ios) v
+        if(ios/=0) call crop_fail('expected numeric parameter '//trim(key)//' in '//trim(path))
+        if(.not.ieee_is_finite(v)) call crop_fail('non-finite parameter '//trim(key))
+        select case(trim(key))
+        case('sowingdate_min'); c%sow_min=nint(v)
+        case('sowingdelay_max'); c%sow_delay=nint(v)
+        case('harvestdate_max'); c%harvest_max=nint(v)
+        case('harvnum_max'); c%cuts=nint(v)
+        case('cropsoverlap'); c%gap=nint(v)
+        case('ph_r'); c%photo=nint(v)
+        case('cl_cn'); c%cn_class=nint(v)
+        case('irrigation'); c%irrigated=nint(v)
+        case('tsowing'); c%tsow=v
+        case('tdaybase'); c%tbase=v
+        case('tcutoff'); c%tcut=v
+        case('tv_min'); c%tvmin=v
+        case('tv_max'); c%tvmax=v
+        case('vslope'); c%vslope=v
+        case('vstart'); c%vstart=v
+        case('vend'); c%vend=v
+        case('vfmin'); c%vfmin=v
+        case('daylength_if'); c%dl_if=v
+        case('daylength_ins'); c%dl_ins=v
+        case('wp'); c%wp=v
+        case('fsink'); c%fsink=v
+        case('tcrit_hs'); c%tcrit=v
+        case('tlim_hs'); c%tlim=v
+        case('hi'); c%hi=v
+        case('kyt'); c%kyt=v
+        case('ky1'); c%ky(1)=v
+        case('ky2'); c%ky(2)=v
+        case('ky3'); c%ky(3)=v
+        case('ky4'); c%ky(4)=v
+        case('praw'); c%praw=v
+        case('ainterception'); c%interception=v
+        case('rft'); c%rft=v
+        case('vern'); c%vern=v/=0
+        case('adj_flag'); c%adjust_kcb=v/=0
+        case('ke','kt') ! obsolete root-fraction parameters
+        case default
+            call crop_fail('unknown parameter '//trim(key)//' in '//trim(path))
+        end select
+        select case(trim(key))
+        case('sowingdate_min'); flags(1)=1
+        case('harvestdate_max'); flags(2)=1
+        case('tdaybase'); flags(3)=1
+        case('tcutoff'); flags(4)=1
+        case('sowingdelay_max'); flags(5)=1
+        end select
     end do
-end subroutine read_all_crop_pars
-
-subroutine derive_crop_cycles(pheno, n_days)
-    type(crop_pheno_info), intent(inout) :: pheno
-    integer, intent(in) :: n_days
-    integer :: lu, slot, cycle_idx, day, start_day, end_day, crop_slot, first_end, last_start
-    integer :: n_slots, n_present_slots
-    logical, dimension(n_days) :: crop_mask
-    real(dp) :: low_value, high_value, mid_value
-
-    pheno%ii0 = 0
-    pheno%iie = 0
-    pheno%iid = 0
-    pheno%cycle_crop_slot = 0
-
-    if (.not. allocated(missing_crop_slot_warned)) then
-        allocate(missing_crop_slot_warned(size(pheno%crop_slot%tab,2)))
-        missing_crop_slot_warned = .false.
-    end if
-
-    do lu=1,size(pheno%crop_slot%tab,2)
-        n_slots = pheno%n_crops_by_year(lu)
-        if (n_slots < 1) cycle
-
-        ! CropId.dat uses 0 for bare soil and 1:n_slots for the declared rotation slots
-        do day=1,n_days
-            crop_slot = pheno%crop_slot%tab(day,lu)
-            if (crop_slot < 0 .or. crop_slot > n_slots) then
-                print *, 'Invalid crop slot ', crop_slot, ' at day ', day, ', land-use class ', lu
-                print *, 'Expected a value between 0 and ', n_slots
-                print *, 'Execution will be aborted...'
-                stop
-            end if
-        end do
-
-        ! Derive crop-specific daily time-series by rotation slot
-        n_present_slots = 0
-        do slot=1,n_slots
-            crop_mask = pheno%crop_slot%tab(:,lu) == slot
-            if (.not. any(crop_mask)) then
-                if (.not. missing_crop_slot_warned(lu)) then
-                    print *, 'Warning: Crop slot ', slot, ' never occurs in land-use class ', lu, &
-                            &'. CropCoef likely overwrote an entire crop due to overlapping sow/harvest dates.'
-                    missing_crop_slot_warned(lu) = .true.
-                end if
-                cycle
-            end if
-            n_present_slots = n_present_slots + 1
-            low_value = minval(pheno%k_cb%tab(:,lu))
-            high_value = maxval(pheno%k_cb%tab(:,lu), mask=crop_mask)
-            mid_value = high_value
-            do day=2,n_days
-                if (crop_mask(day) .and. crop_mask(day-1)) then
-                    if (pheno%k_cb%tab(day,lu) == pheno%k_cb%tab(day-1,lu) .and. &
-                        & pheno%k_cb%tab(day,lu) > low_value .and. pheno%k_cb%tab(day,lu) < high_value) then
-                        mid_value = pheno%k_cb%tab(day,lu)
-                        exit
-                    end if
-                end if
+    close(u)
+    if(row<1.or.any(flags==0)) call crop_fail('missing required parameters/table in '//trim(path))
+    if(any(table(1:row,1)<0)) call crop_fail('missing/negative GDD')
+    if(any(table(2:row,1)<=table(1:row-1,1))) call crop_fail('GDD must be strictly increasing')
+    if(c%tcut<=c%tbase.or.c%sow_min<1.or.c%sow_min>366.or.c%harvest_max<1.or.c%harvest_max>366 &
+        .or.c%sow_delay<0.or.c%sow_delay>365.or.c%gap<0.or.c%gap>365.or.c%cuts<1) call crop_fail('invalid crop limits in '//trim(path))
+    if(c%vern.and.(c%vend<=c%vstart.or.c%vslope<=0.or.c%tvmax<c%tvmin)) call crop_fail('invalid vernalization limits')
+    if(c%photo<0.or.c%photo>2) call crop_fail('invalid photoperiod class')
+    if(c%photo==1.and.c%dl_ins<=c%dl_if) call crop_fail('invalid long-day thresholds')
+    if(c%photo==2.and.c%dl_if<=c%dl_ins) call crop_fail('invalid short-day thresholds')
+    if(c%cn_class<1.or.c%cn_class>7.or.c%rft<0.or.c%rft>1.or.c%tlim<=c%tcrit) call crop_fail('invalid crop water/yield parameters')
+    allocate(c%gdd(row),c%values(row,8))
+    c%gdd=table(1:row,1); c%values=table(1:row,2:9)
+    ! Interpolate missing knots in thermal time, preserving negative fc as the computed-cover sentinel.
+    do k=1,8
+        if(k==5) cycle ! discrete CN, handled separately
+        if(all(c%values(:,k)==missing)) then
+            select case(k)
+            case(1:4); call crop_fail('missing growth curve in '//trim(path))
+            case(6); c%values(:,k)=-1
+            case(7); c%values(:,k)=0
+            case(8); c%values(:,k)=c%kyt
+            end select
+        end if
+        do p=1,row
+            if(c%values(p,k)/=missing) cycle
+            lo=p-1; hi=p+1
+            do while(lo>=1)
+                if(c%values(lo,k)/=missing) exit
+                lo=lo-1
             end do
-            pheno%kcb_phases%low(lu,slot) = low_value
-            pheno%kcb_phases%high(lu,slot) = high_value
-            pheno%kcb_phases%mid(lu,slot) = mid_value
-        end do
-
-        cycle_idx = 0
-        first_end = 0
-        last_start = n_days + 1
-
-        ! Matching nonzero slots at both year ends are treated as one crop cycle crossing New Year.
-        if (pheno%crop_slot%tab(1,lu) > 0 .and. &
-            & pheno%crop_slot%tab(1,lu) == pheno%crop_slot%tab(n_days,lu)) then
-            crop_slot = pheno%crop_slot%tab(1,lu)
-            first_end = 1
-            do while (first_end < n_days .and. pheno%crop_slot%tab(first_end+1,lu) == crop_slot)
-                first_end = first_end + 1
+            do while(hi<=row)
+                if(c%values(hi,k)/=missing) exit
+                hi=hi+1
             end do
-            cycle_idx = 1
-            if (first_end == n_days) then
-                last_start = n_days + 1
-                pheno%ii0(lu,cycle_idx) = 1
-                pheno%iie(lu,cycle_idx) = n_days
-                pheno%iid(lu,cycle_idx) = n_days
+            if(lo<1) then
+                c%values(p,k)=c%values(hi,k)
+            else if(hi>row) then
+                c%values(p,k)=c%values(lo,k)
             else
-                last_start = n_days
-                do while (last_start > 1 .and. pheno%crop_slot%tab(last_start-1,lu) == crop_slot)
-                    last_start = last_start - 1
-                end do
-                pheno%ii0(lu,cycle_idx) = last_start
-                pheno%iie(lu,cycle_idx) = first_end
-                pheno%iid(lu,cycle_idx) = n_days-last_start+1+first_end
-            end if
-            pheno%cycle_crop_slot(lu,cycle_idx) = crop_slot
-        end if
-
-        ! Store the remaining contiguous crop periods as cycles in calendar order
-        day = first_end + 1
-        do while (day <= min(n_days,last_start-1))
-            if (pheno%crop_slot%tab(day,lu) == 0) then
-                day = day + 1
-                cycle
-            end if
-            crop_slot = pheno%crop_slot%tab(day,lu)
-            start_day = day
-            do while (day <= min(n_days,last_start-1) .and. pheno%crop_slot%tab(day,lu) == crop_slot)
-                day = day + 1
-            end do
-            end_day = day - 1
-            cycle_idx = cycle_idx + 1
-            if (cycle_idx > size(pheno%ii0,2)) then
-                print *, 'Too many crop cycles in land-use class ', lu
-                stop
-            end if
-            pheno%ii0(lu,cycle_idx) = start_day
-            pheno%iie(lu,cycle_idx) = end_day
-            pheno%iid(lu,cycle_idx) = end_day-start_day+1
-            pheno%cycle_crop_slot(lu,cycle_idx) = crop_slot
-        end do
-
-        if (cycle_idx /= n_present_slots) then
-            print *, 'CropId.dat defines ', cycle_idx, ' crop cycles for land-use class ', lu, &
-                & ', but ', n_present_slots, ' declared slots occur in the daily series.'
-            print *, 'Execution will be aborted...'
-            stop
-        end if
-    end do
-end subroutine derive_crop_cycles
-
-subroutine destroy_infofeno_tab(info_pheno)
-! dellaocate all crop phenological time series
-    type(crop_pheno_info),dimension(:),intent(inout)::info_pheno
-    integer::i
-
-    do i=1,size(info_pheno)
-        if(associated(info_pheno(i)%k_cb%tab)) deallocate(info_pheno(i)%k_cb%tab)
-        if(associated(info_pheno(i)%h%tab)) deallocate(info_pheno(i)%h%tab)
-        if(associated(info_pheno(i)%z_r%tab)) deallocate(info_pheno(i)%z_r%tab)
-        if(associated(info_pheno(i)%lai%tab)) deallocate(info_pheno(i)%lai%tab)
-        if(associated(info_pheno(i)%cn_day%tab)) deallocate(info_pheno(i)%cn_day%tab)
-        if(associated(info_pheno(i)%f_c%tab)) deallocate(info_pheno(i)%f_c%tab)
-        if(associated(info_pheno(i)%r_stress%tab)) deallocate(info_pheno(i)%r_stress%tab)
-        if(associated(info_pheno(i)%crop_slot%tab)) deallocate(info_pheno(i)%crop_slot%tab)
-    end do
-
-end subroutine destroy_infofeno_tab
-
-subroutine destroy_info_pheno(info_pheno)
-    ! close all phenological opened files
-    type(crop_pheno_info),dimension(:),allocatable,intent(inout)::info_pheno
-    integer::i
-
-    !%PS%: now pheno files are closed after each year, here we only need to deallocate info_pheno and its components
-    !todo: because some components of info_pheno are pointers, deallocating it does not automatically free all of the memory up.
-    !      Consider using allocatable instead of pointers or extending this subroutine to properly deallocate all pointers.
-
-    do i=1,size(info_pheno)
-        if(associated(info_pheno(i)%cycle_crop_slot)) deallocate(info_pheno(i)%cycle_crop_slot)
-    end do
-    deallocate(info_pheno)
-end subroutine destroy_info_pheno
-
-subroutine check_pheno_parameters(info_pheno,info_meteo)
-! check if phenological parameters match weather station data
-    type(crop_pheno_info),dimension(:),intent(in)::info_pheno
-    type(meteo_info),dimension(:),intent(in)::info_meteo
-    integer::i
-
-    do i=1,size(info_pheno)
-        call check_crop_parameters(info_pheno(i),info_meteo(i)%filename)
-    end do
-end subroutine check_pheno_parameters
-
-subroutine check_crop_parameters(info_pheno,weather_station)
-! check if phenological parameters match weather station data
-! if k_cb is null than all the other parameters must be null
-    type(crop_pheno_info),intent(in)::info_pheno
-    character(len=*),intent(in)::weather_station
-    integer::error_flag
-    integer::d,k
-
-    error_flag = 0
-
-    write(*,*)'INPUT CHECK - SOIL USE PARAMETERS - STATION:',trim(weather_station)
-    do k=1, size(info_pheno%k_cb%tab,2) ! loop over crops
-        do d=1,size(info_pheno%k_cb%tab,1)    ! loop over data
-            if(info_pheno%k_cb%tab(d,k).gt.0)then
-                if(info_pheno%z_r%tab(d,k).eq.0.) then
-                    write(*,*)' Warning: Sr null. Day: ',d,' Soil use class: ', k
-                    error_flag = -1
-                end if
-                if(info_pheno%h%tab(d,k).eq.0.) then
-                    write(*,*)' Warning: H null. Day: ',d,'  Soil use class:', k
-                    error_flag = -1
-                end if
-                if(info_pheno%LAI%tab(d,k).eq.0.) then
-                    write(*,*)' Warning: LAI null. Day: ',d,'  Soil use class:', k
-                    error_flag = -1
-                end if
+                c%values(p,k)=c%values(lo,k)+(c%values(hi,k)-c%values(lo,k))* &
+                    (c%gdd(p)-c%gdd(lo))/(c%gdd(hi)-c%gdd(lo))
             end if
         end do
     end do
-    write(*,*)'END INPUT CHECK - SOIL USE PARAMETERS - STATION:',trim(weather_station)
-
-end subroutine check_crop_parameters
-
-end module cli_crop_parameters
+    do p=1,row
+        if(c%values(p,5)==missing) then
+            c%values(p,5)=1
+            if(c%values(p,1)==0) c%values(p,5)=0
+            if(c%values(p,1)>=0.45_dp) c%values(p,5)=2
+        end if
+    end do
+    if(any(c%values(:,1:4)<0)) call crop_fail('negative growth properties')
+    if(any(c%values(:,5)<0).or.any(c%values(:,5)>2)) call crop_fail('CN stage must be 0, 1 or 2')
+    ! Infer stage boundaries once from the uncorrected Kcb curve (never from today's weather-adjusted Kcb).
+    p=maxloc(c%values(:,1),dim=1); q=p
+    do k=p,row
+        if(c%values(k,1)==c%values(p,1)) q=k
+    end do
+    lo=1
+    do k=2,p
+        if(c%values(k,1)>0.and.c%values(k,1)==c%values(k-1,1)) lo=k
+    end do
+    c%stage_gdd=[c%gdd(lo),c%gdd(p),c%gdd(q)]
+end subroutine
+pure real(dp) function interpolate_crop(c,gdd,column) result(v)
+    type(crop_definition), intent(in) :: c
+    real(dp), intent(in) :: gdd
+    integer, intent(in) :: column
+    integer :: k,n
+    n=size(c%gdd)
+    v=c%values(1,column)
+    if(gdd<=c%gdd(1)) return
+    do k=2,n
+        if(gdd<c%gdd(k)) then
+            v=c%values(k-1,column)
+            if(column/=5) v=v+(c%values(k,column)-v)*(gdd-c%gdd(k-1))/(c%gdd(k)-c%gdd(k-1))
+            return
+        end if
+    end do
+    v=c%values(n,column)
+end function
+pure real(dp) function adjusted_wp(c,co2) result(wp)
+    type(crop_definition), intent(in) :: c
+    real(dp), intent(in) :: co2
+    real(dp) :: ftype,w,fco2
+    wp=c%wp
+    if(co2<=0) return
+    ftype=max(0.0_dp,min(1.0_dp,(40-c%wp*100)/20))
+    w=max(0.0_dp,min(1.0_dp,(co2-369.41_dp)/(550-369.41_dp)))
+    fco2=(co2/369.41_dp)/(1+(co2-369.41_dp)*((1-w)*0.000138_dp+ &
+        w*(c%fsink*0.000138_dp+(1-c%fsink)*0.001165_dp)))
+    wp=(1+ftype*(fco2-1))*c%wp
+end function
+end module

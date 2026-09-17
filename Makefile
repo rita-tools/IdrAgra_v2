@@ -38,6 +38,7 @@ endif
 
 APPNAME = idragra_$(VERSION)_$(TYPE)
 APPALIAS = idragra_latest
+.DEFAULT_GOAL := $(APPNAME)
 EXT = .f90
 SRCDIR = src
 OBJDIR = obj
@@ -49,7 +50,13 @@ RELDIR = release
 
 FILES = mod_constants mod_utility mod_parameters mod_grid mod_common mod_evapotranspiration mod_meteo \
 		mod_crop_phenology mod_crop_soil_water mod_runoff mod_TDx_index mod_irrigation mod_system \
-		cli_watsources cli_crop_parameters cli_save_outputs cli_read_parameter cli_simulation_manager
+		cli_watsources cli_crop_parameters mod_daily_phenology cli_save_outputs cli_read_parameter cli_simulation_manager
+
+# Module interfaces are shared across the source tree. Rebuild all objects on
+# source changes to avoid linking stale layouts after derived-type changes.
+# Keep the declared module order even when make is invoked with -j.
+.NOTPARALLEL:
+$(patsubst %, $(OBJDIR)/%.o, $(FILES)): $(wildcard $(SRCDIR)/*.f90)
 
 #### User, don't touch the following line ####
 

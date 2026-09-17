@@ -38,7 +38,6 @@ type output_table_list
     type(output)::q_un_col                                  ! daily discharge estimated for collective non-monitored sources [m3/s]
     type(cell_output),dimension(:),pointer::cell_info       ! pedo-hydrological parameters of the sampled cell
     type(cell_output),dimension(:),pointer::cell_conv       ! model resolution convergence
-    type(cell_output),dimension(:),pointer::prod_info       ! productivity and crop parameters
     type(cell_output),dimension(:),pointer::cell_eva        ! evaporation process outputs
     type(cell_output),dimension(:),pointer::cell_cn         ! CN & runoff process outputs
 end type output_table_list
@@ -209,7 +208,7 @@ subroutine init_cell_output_by_year(out_tbl_list,path,yr,id_ws_list, mode, f_cel
                     select case (label)
                         case ('ncells')
                             read (buffer, *, iostat = ios) n_cells
-                            allocate(out_tbl_list%sample_cells(n_cells),out_tbl_list%cell_info(n_cells),out_tbl_list%prod_info(n_cells))
+                            allocate(out_tbl_list%sample_cells(n_cells),out_tbl_list%cell_info(n_cells))
                             if (sim%prt_cell_convergence=='y') allocate(out_tbl_list%cell_conv(n_cells))
                             if (sim%prt_cell_evaporation=='y') allocate(out_tbl_list%cell_eva(n_cells))
                             if (sim%prt_cell_runoff=='y') allocate(out_tbl_list%cell_cn(n_cells))
@@ -241,8 +240,6 @@ subroutine init_cell_output_by_year(out_tbl_list,path,yr,id_ws_list, mode, f_cel
 
         out_tbl_list%cell_info%coord%row=out_tbl_list%sample_cells%coord%row
         out_tbl_list%cell_info%coord%col=out_tbl_list%sample_cells%coord%col
-        out_tbl_list%prod_info%coord%row=out_tbl_list%sample_cells%coord%row
-        out_tbl_list%prod_info%coord%col=out_tbl_list%sample_cells%coord%col
 
         ! save file header and connect to the control cell
         do i=1,size(out_tbl_list%sample_cells)
@@ -281,15 +278,6 @@ subroutine init_cell_output_by_year(out_tbl_list,path,yr,id_ws_list, mode, f_cel
             out_tbl_list%cell_info(i)%file%fn =trim(adjustl(yr))//'_cellinfo_'//trim(adjustl(row_str)) &
                 & //'_'//trim(adjustl(col_str))//'.csv'
             call init_cell_output_file(out_tbl_list%cell_info(i)%file%unit,trim(path)//trim(adjustl(out_tbl_list%cell_info(i)%file%fn)), 'input files')
-        end do
-
-        do i=1,size(out_tbl_list%prod_info)
-        ! cell parameter
-            write(row_str,*)out_tbl_list%prod_info(i)%coord%row
-            write(col_str,*)out_tbl_list%prod_info(i)%coord%col
-            out_tbl_list%prod_info(i)%file%fn =trim(adjustl(yr))//'_cellparameters_'//trim(adjustl(row_str)) &
-                & //'_'//trim(adjustl(col_str))//'.csv'
-            call init_cell_output_file(out_tbl_list%prod_info(i)%file%unit,trim(path)//trim(adjustl(out_tbl_list%prod_info(i)%file%fn)), 'input files')
         end do
 
         ! convergence log
@@ -488,13 +476,12 @@ subroutine close_cell_output_by_year(out_tbl_list, mode, f_cell_exists, sim, n_n
         do i=1,size(out_tbl_list%sample_cells)
             close(out_tbl_list%sample_cells(i)%file%unit)
             close(out_tbl_list%cell_info(i)%file%unit)
-            close(out_tbl_list%prod_info(i)%file%unit)
             if (sim%prt_cell_convergence=='y') close(out_tbl_list%cell_conv(i)%file%unit)
             if (sim%prt_cell_evaporation=='y') close(out_tbl_list%cell_eva(i)%file%unit)
             if (sim%prt_cell_runoff=='y') close(out_tbl_list%cell_cn(i)%file%unit)
         end do
 
-        deallocate(out_tbl_list%sample_cells,out_tbl_list%cell_info,out_tbl_list%prod_info)
+        deallocate(out_tbl_list%sample_cells,out_tbl_list%cell_info )
         if (sim%prt_cell_convergence=='y') deallocate(out_tbl_list%cell_conv)   !to re-allocate them the year after
         if (sim%prt_cell_evaporation=='y') deallocate(out_tbl_list%cell_eva)
         if (sim%prt_cell_runoff=='y')deallocate(out_tbl_list%cell_cn)
@@ -619,45 +606,7 @@ subroutine write_cell_info(info_spat, cell_info, mode, f_caprise, ze_fix, zr_fix
     end do
 end subroutine write_cell_info
 
-subroutine write_cell_prod(info_prod, crop, irandom)
-    ! write parameters related to productivity of each cells
-    type(cell_output),dimension(:),intent(in)::info_prod
-    type(crop_matrices), intent(in)::crop
-    integer, dimension(:,:), intent(in)::irandom
-    integer::x,y,z
-    integer::zmax
-    integer::i
-    integer::nan=-9999.
 
-
-    do i=1,size(info_prod)
-        x=info_prod(i)%coord%row
-        y=info_prod(i)%coord%col
-        zmax = 1
-        do z=1,size(crop%wp_adj,3)
-            if (crop%wp_adj(x,y,z) /= nan) then
-                zmax = z
-            end if
-        end do
-        write(info_prod(i)%file%unit,*)'WPadj; ', (crop%wp_adj(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'HI; ', (crop%HI(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'KyT; ', (crop%Ky_tot(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Ky1; ', (crop%Ky_pheno(x,y,z,1), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Ky2; ', (crop%Ky_pheno(x,y,z,2), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Ky3; ', (crop%Ky_pheno(x,y,z,3), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Ky4; ', (crop%Ky_pheno(x,y,z,4), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Tcrit; ', (crop%T_crit(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Tlim; ', (crop%T_lim(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Kcbmin; ', (crop%k_cb_min(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Kcbini; ', (crop%k_cb_mid(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Kcbmax; ', (crop%k_cb_max(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'ii0; ', (crop%ii0(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'iie; ', (crop%iie(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'iid; ', (crop%iid(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'dij; ', (crop%dij(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'irandom; ', irandom(x,y)
-    end do
-end subroutine write_cell_prod
 
 subroutine init_step_output(a_step_map,domain)
     type(step_map)::a_step_map

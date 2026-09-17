@@ -8,6 +8,7 @@ configuration reference material, practical guidance, and worked examples.
 :caption: Configuration reference
 
 pages/overview
+pages/standalone_phenology
 pages/parameters
 pages/project_structure
 pages/irrigation

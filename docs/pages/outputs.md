@@ -1,3 +1,11 @@
+:::{important}
+On the standalone phenology branch, crop production is reported per harvest in
+`crop_harvests.csv`, with transitions in `crop_events.csv`. The old annual
+crop-slot yield maps and `cellparameters` files are no longer produced.
+Hydrological outputs described below remain available. See
+[standalone phenology](standalone_phenology.md).
+:::
+
 # Simulation outputs
 
 :::{container} llm-review-note

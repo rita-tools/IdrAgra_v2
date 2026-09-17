@@ -1,3 +1,11 @@
+:::{important}
+This page describes the existing plugin export workflow. The standalone
+phenology branch changes the executable's input contract: export/copy raw crop
+parameters and rotations, set `CropRotationFile` and `CropParameterPath`, and
+omit **Run CropCoef**. The plugin itself has not been updated in this branch.
+See [standalone phenology](standalone_phenology.md).
+:::
+
 # Preparing a project with IdrAgraTools
 
 :::{container} llm-review-note

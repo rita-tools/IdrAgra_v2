@@ -6,7 +6,7 @@ use mod_meteo!, only: meteo_series_length, read_meteo_parameters,
     ! close_meteo_file, read_meteo_data
 use mod_TDx_index                                     ! variables and methods to handle meteorological data
 
-use cli_crop_parameters, only: init_crop_phenology_pars, destroy_info_pheno, crop_pheno_info ! variables and methods to handle crop parameters
+use cli_crop_parameters, only: init_crop_database
 use cli_watsources                                                          ! variables and methods to handle irrigation units water supply
 use cli_simulation_manager                                                  ! simulation manager: control IO and daily cycle
 use cli_read_parameter
@@ -23,7 +23,6 @@ type(water_sources_table),dimension(:),allocatable::watsour ! stores parameters 
 real(dp), dimension(10,3,4):: tab_CN2, tab_CN3               ! CN implementation
 type(source_info)::info_sources                             ! stores water sources series
 type(meteo_info),dimension(:),allocatable::info_meteo       ! stores meteorological series data
-type(crop_pheno_info),dimension(:),allocatable::info_pheno  ! stores phenological parameters series
 type(soil2_rice)::theta2_rice                               ! stores soil parameters data for paddy rice fields
 
 integer,dimension(8)::t_start,t_stop
@@ -111,9 +110,9 @@ if(xml%sim%f_init_wc .eqv. .false.)then ! Generates soil initial condition
     call read_meteo_parameters(xml%sim,info_meteo,verbose)
     print*, 'Variable "info_meteo" has been initialized'
 
-    ! Initializes info_pheno matrices (by associating file units to files)
-    call init_crop_phenology_pars(xml%sim, info_pheno, info_meteo, xml%depth%ze_fix, verbose)
-    print*, 'Variable "info_pheno" has been initialized'
+    ! Read raw crop definitions and initialize canopy resistance.
+    call init_crop_database(xml%sim)
+    print*, 'Crop database has been initialized'
 
     ! Initializes watsources and info_sources matrices
     if (xml%sim%mode == 1) then                 ! USE mode
@@ -123,7 +122,7 @@ if(xml%sim%f_init_wc .eqv. .false.)then ! Generates soil initial condition
 
     ! Soil-crop water balance algorithm
     call simulation_manager(xml, xml_TDx, info_spat, watsour, info_sources, info_meteo, &
-        & info_pheno, tab_CN2, tab_CN3, theta2_rice, 1, boundaries, verbose, summary)
+        & tab_CN2, tab_CN3, theta2_rice, 1, boundaries, verbose, summary, .true.)
 
     ! Prints initial condition values
     if (xml%sim%prt_init_cond == 'y') then
@@ -134,7 +133,6 @@ if(xml%sim%f_init_wc .eqv. .false.)then ! Generates soil initial condition
     ! Closes input files
     if (xml%sim%mode == 1) call close_water_sources_dudy(info_sources,xml)        ! USE mode
     call close_meteo_file(info_meteo)
-    call destroy_info_pheno(info_pheno)
     print *, '=== INITIAL CONDITION SET ==='
 end if
 
@@ -157,9 +155,9 @@ end where
 call read_meteo_parameters(xml%sim,info_meteo,verbose)
 print*, 'Variable "info_meteo" has been initialized'
 
-! Initializes info_pheno matrices (by associating file units to files)
-call init_crop_phenology_pars(xml%sim, info_pheno, info_meteo, xml%depth%ze_fix, verbose)
-print*, 'Variable "info_pheno" has been initialized'
+! Read raw crop definitions and initialize canopy resistance.
+call init_crop_database(xml%sim)
+print*, 'Crop database has been initialized'
 
 ! Initializes watsources and info_sources matrices
 if (xml%sim%mode == 1) then         ! %AB% USE mode
@@ -169,13 +167,12 @@ end if
 
 ! Soil-crop water balance algorithm
 print*,"=== SIMULATION ==="
-call simulation_manager(xml,xml_TDx,info_spat,watsour,info_sources,info_meteo,info_pheno, tab_CN2, tab_CN3, &
-    & theta2_rice,xml%sim%sim_years,boundaries,verbose, summary)
+call simulation_manager(xml,xml_TDx,info_spat,watsour,info_sources,info_meteo, tab_CN2, tab_CN3, &
+    & theta2_rice,xml%sim%sim_years,boundaries,verbose, summary, .false.)
 
 ! Closes input files
 if (xml%sim%mode == 1) call close_water_sources_dudy(info_sources,xml)        ! USE mode
 call close_meteo_file(info_meteo)
-call destroy_info_pheno(info_pheno)
 
 ! Memorization of time in which simulation ends
 call date_and_time(values=t_stop)
@@ -218,8 +215,6 @@ type(TDx_index), intent(in) :: xml_dtx
 print *,'OutputPath = ',  xml%sim%path
 print *,'MeteoPath = ', xml%sim%meteo_path
 print *,'MeteoFileName = ', xml%sim%ws_list_fn
-print *,'PhenoPath = ', xml%sim%pheno_path
-print *,'PhenoFileRoot = ', xml%sim%pheno_root
 print *,'IrrMethPath = ', xml%sim%irr_met_path
 print *,'IrrMethFileName = ', xml%sim%irr_met_list_fn
 print *,'WatSourpath = ', xml%sim%watsour_path
