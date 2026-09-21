@@ -62,11 +62,11 @@ WatSourPath = wsources\\
 
 # Mode: irrigation simulation mode [0...4].
 #   0 = no irrigation
-#   1 = irrigation consumptions
-#   2 = satisfy field-capacity requirements
-#   3 = fixed irrigation volumes
-#   4 = fixed irrigation dates and volumes read from file
-Mode = 1
+#   1 = USE mode
+#   2 = NEED mode; field-capacity target
+#   3 = NEED mode; fixed irrigation amount
+#   4 = Scheduled irrigation: dates and volumes read from file
+Mode = 3
 
 # InitialThetaFlag: read the initial soil-moisture state from an external
 # file [T/F]. When F, IdrAgra generates the initial condition internally.
