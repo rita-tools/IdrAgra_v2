@@ -293,9 +293,7 @@ type irr_units_table
     ! store all the data referred to th irrigation units
     integer::id                             ! irrigation unit id
     integer::n_cells                        ! number of cells belonging to the irrigation units
-!        integer::n_irr                         ! number of irrigable cells, depending on phenology
-    !integer::conta                         ! NOT USED cell counter with specific id
-    integer::last_cell_id                   ! id of the latest irrigated cell
+    integer :: last_cell_id = 0             ! id of the latest irrigated cell
     real(dp)::int_distr_eff                 ! internal water distribution efficiency
     real(dp)::h_irr_mean                    ! average irrigation height in the irrigation unit
     real(dp),dimension(4)::q_act_fld        ! discharge available at cell

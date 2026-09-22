@@ -390,11 +390,10 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
     integer,dimension(:),allocatable::s_cn_class
     integer,dimension(:),allocatable::vcells ! sign the cells already processed
     ! shifted copies of the already defined variable (see above)
-    real(dp),dimension(:),allocatable::s_h_old, s_h_raw_coll, s_h_raw, s_h_raw_half, &
-                                        & s_h_raw_priv, s_h_transp_pot, s_transp_ratio, &
-                                        & s_def_day, s_v_irr_cell, s_h_met
+    real(dp), dimension(:), allocatable :: s_h_old, s_h_raw_coll, s_h_raw, s_h_raw_half, s_h_raw_priv, s_h_transp_pot
+    real(dp), dimension(:), allocatable :: s_transp_ratio, s_def_day, s_v_irr_cell, s_h_met
     real(dp)::n_day_to_deficit ! expected number of days to deficit
-    integer::dist
+    integer :: n_cells_reached, n_cells_skip
     real(dp)::Q_tot_act,Q_tot_pot,q_cell,q_mean,q_act_avail,q_pot_avail,q_deliv,h_deliv
     logical::rice_req,cell_req
 
@@ -473,7 +472,7 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
             n_cells_req_irr = count(s_h_old <= s_h_raw_coll .or. (s_cn_class==7 .and. s_h_met>0.0D0))
 
             ! find the index of the latest irrigated cell (the day before)
-            ! get_value_index returns shift=0 by default
+            shift = 0
             if (any(vid == irr_units(k)%last_cell_id)) then
                 shift = get_value_index(vid,irr_units(k)%last_cell_id)
             end if
@@ -518,6 +517,7 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
 
                 if(q_cell<=0.0D0) then
                     irr_units(k)%last_cell_id = vid(p)
+                    vcells(p) = vid(p)
                     cycle cell_loop
                 end if
 
@@ -582,63 +582,36 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
             !%AB% store the water actually used
             irr_units(k)%q_day = Q_tot_act
 
-            ! UNMONITORED PRIVATE ONLY
-            ! %AB% recalculate n
-            ! n_cells_tobe_irr = count(irr_mask)! %EAC% no more required
-
+            ! Unmonitored private sources (i.e. private wells)
             if (irr_units(k)%f_un_priv==1) then
-                allocate(s_transp_ratio(n_cells_tobe_irr)); s_transp_ratio = s_h_transp_pot/sum(s_h_transp_pot)
-                allocate(s_def_day(n_cells_tobe_irr)); s_def_day = 0.
-                where(s_h_transp_pot/=0.) s_def_day=(s_h_old-s_h_raw)/s_h_transp_pot
-                ! %AB% skip at least one cell that could be irrigated by monitored sources
-                ! dist = int(sum(vtmm-vRaw)/sum(vTrasp_pot))*IU(k)%n_irrigable_cells ! OLD version
-                dist = 1 + nint((sum(s_transp_ratio*s_def_day)/sum(s_transp_ratio))*irr_units(k)%n_irrigable_cells)
 
+                allocate(s_transp_ratio(n_cells_tobe_irr)); s_transp_ratio = 0.0_dp
+                allocate(s_def_day(n_cells_tobe_irr)); s_def_day = 0.0_dp
 
-                if(dist>n_cells_tobe_irr) dist=n_cells_tobe_irr
-                ! TODO: check shift is the same as before
-                ! vector shift
-                vi=cshift(vi,shift)
-                vj=cshift(vj,shift)
-                vid=cshift(vid,shift)
-                s_h_old=cshift(s_h_old,shift)
-                s_h_raw_coll=cshift(s_h_raw_coll,shift)
-                s_h_raw=cshift(s_h_raw,shift)
-                s_h_raw_half=cshift(s_h_raw_half,shift)
-                s_h_raw_priv=cshift(s_h_raw_priv,shift)
-                s_h_transp_pot=cshift(s_h_transp_pot,shift)
-                s_v_irr_cell=cshift(s_v_irr_cell,shift)
-                s_h_met=cshift(s_h_met,shift)
-                s_cn_class=cshift(s_cn_class,shift)
+                n_cells_reached = count(vcells /= 0) ! Cells already reached by collective sources
 
-                do p=1,n_cells_tobe_irr
-                    if((p>=dist).and.(.not.(any(vcells==vid(p)))))then
-                        if(s_h_old(p) <= s_h_raw_priv(p) .or. (s_cn_class(p)==7 .and. s_h_met(p)>0.0D0)) then
-                            ! %AB% irrigation volume is equal to the irrigation depth of the method
-                            priv_irr(vi(p),vj(p)) = s_h_met(p)
-                            irr_units(k)%q_un_priv = irr_units(k)%q_un_priv + s_v_irr_cell(p)/sec_to_day
-                        end if
+                ! Estimate the number of cells that will receive collective irrigation soon enough to avoid deficit
+                n_cells_skip = 0
+                if (sum(s_h_transp_pot) > 0.0_dp) then
+                    s_transp_ratio = s_h_transp_pot / sum(s_h_transp_pot)
+                    where(s_h_transp_pot /= 0.0_dp) s_def_day = (s_h_old - s_h_raw) / s_h_transp_pot ! Days until deficit
+                    n_cells_skip =max(0,nint((sum(s_transp_ratio*s_def_day)/sum(s_transp_ratio))*irr_units(k)%n_irrigable_cells))
+                end if
+
+                ! Activate wells for cells that 1. are in need and 2. won't be reached by collective irrigation soon
+                do p = 1, n_cells_tobe_irr
+                    if ((s_h_old(p) <= s_h_raw_priv(p)) .and. (p > n_cells_reached + n_cells_skip)) then
+                        ! %AB% irrigation volume is equal to the irrigation depth of the method
+                        priv_irr(vi(p),vj(p)) = s_h_met(p)
+                        irr_units(k)%q_un_priv = irr_units(k)%q_un_priv + s_v_irr_cell(p)/sec_to_day
                     end if
                 end do
 
-                deallocate(s_transp_ratio)
-                deallocate(s_def_day)
+                deallocate(s_transp_ratio, s_def_day)
             end if
 
-            ! free memory
-            deallocate(vi)
-            deallocate(vj)
-            deallocate(vid)
-            deallocate(s_h_old)
-            deallocate(s_h_raw_coll)
-            deallocate(s_h_raw)
-            deallocate(s_h_raw_half)
-            deallocate(s_h_raw_priv)
-            deallocate(s_h_transp_pot)
-            deallocate(vcells)
-            deallocate(s_v_irr_cell)
-            deallocate(s_h_met)
-            deallocate(s_cn_class)
+            deallocate(vi, vj, vid, s_cn_class, vcells, s_h_old, s_h_raw_coll, s_h_raw, &
+                     & s_h_raw_half, s_h_raw_priv, s_h_transp_pot, s_v_irr_cell, s_h_met)
         end if
     end do irr_units_loop ! end irrigation units loop
 
@@ -655,28 +628,6 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
             end if
         end do
     end do
-
-
-    ! ! TODO: replace with update_perco_parameters subroutine
-    ! ! calculate the exponential param from the number of days from the latest irrigation event day
-    ! where(priv_irr+coll_irr==0)
-    !     where(day_from_irr==-9999)
-    !         day_from_irr=-9999
-    !     else where
-    !         day_from_irr=day_from_irr+1
-    !     end where
-    ! else where
-    !     day_from_irr=0
-    ! end where
-
-    ! ! %EAC%: limit day_from_irr whene day_from_irr= 20 to prevent calculation error, TODO: to be fixed with a better solution
-    ! ! 20 should be safe for all OS and CPU
-    ! where(day_from_irr>20)
-    !     day_from_irr=20
-    ! end where
-
-    ! esp_perc(:,:,1)=merge(1.0D0,1+am_perc(1)%mat*exp(-1.0*day_from_irr*bm_perc(1)%mat),day_from_irr==-9999)
-    ! esp_perc(:,:,2)=merge(1.0D0,1+am_perc(2)%mat*exp(-1.0*day_from_irr*bm_perc(2)%mat),day_from_irr==-9999)
 
 end subroutine irrigation_use
 
