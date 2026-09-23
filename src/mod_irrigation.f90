@@ -388,7 +388,7 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
     integer,dimension(size(irr_units))::ind
     integer,dimension(:),allocatable::vi,vj,vid
     integer,dimension(:),allocatable::s_cn_class
-    integer,dimension(:),allocatable::vcells ! sign the cells already processed
+    logical, dimension(:), allocatable :: reached_by_collective ! Marks the cells processed by collective sources (will be skipped by private sources)
     ! shifted copies of the already defined variable (see above)
     real(dp), dimension(:), allocatable :: s_h_old, s_h_raw_coll, s_h_raw, s_h_raw_half, s_h_raw_priv, s_h_transp_pot
     real(dp), dimension(:), allocatable :: s_transp_ratio, s_def_day, s_v_irr_cell, s_h_met
@@ -465,7 +465,7 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
             allocate(s_h_raw_half(n_cells_tobe_irr)); s_h_raw_half=pack(h_raw_half,irr_mask)
             allocate(s_h_raw_priv(n_cells_tobe_irr)); s_h_raw_priv=pack(h_raw_priv,irr_mask)
             allocate(s_h_transp_pot(n_cells_tobe_irr)); s_h_transp_pot=pack(transp_pot,irr_mask)
-            allocate(vcells(n_cells_tobe_irr)); vcells=0
+            allocate(reached_by_collective(n_cells_tobe_irr)); reached_by_collective = .false.
             allocate(s_v_irr_cell(n_cells_tobe_irr)); s_v_irr_cell=pack(v_irr_cell,irr_mask)
             allocate(s_h_met(n_cells_tobe_irr)); s_h_met=pack(h_met,irr_mask)
             allocate(s_cn_class(n_cells_tobe_irr)); s_cn_class=pack(cn_class,irr_mask)
@@ -517,7 +517,7 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
 
                 if(q_cell<=0.0D0) then
                     irr_units(k)%last_cell_id = vid(p)
-                    vcells(p) = vid(p)
+                    reached_by_collective(p) = .true.
                     cycle cell_loop
                 end if
 
@@ -542,7 +542,7 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
                 if(q_deliv>=q_cell) then
                     irr_units(k)%last_cell_id = vid(p)
                 end if
-                vcells(p) = vid(p)
+                reached_by_collective(p) = .true.
 
                 ! check if the cell is irrigable according to the soil water content less than the RAW big threshold
                 ! %AB% alternative consider the number of days to have deficit
@@ -588,7 +588,7 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
                 allocate(s_transp_ratio(n_cells_tobe_irr)); s_transp_ratio = 0.0_dp
                 allocate(s_def_day(n_cells_tobe_irr)); s_def_day = 0.0_dp
 
-                n_cells_reached = count(vcells /= 0) ! Cells already reached by collective sources
+                n_cells_reached = count(reached_by_collective) ! Cells already reached by collective sources
 
                 ! Estimate the number of cells that will receive collective irrigation soon enough to avoid deficit
                 n_cells_skip = 0
@@ -610,8 +610,8 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
                 deallocate(s_transp_ratio, s_def_day)
             end if
 
-            deallocate(vi, vj, vid, s_cn_class, vcells, s_h_old, s_h_raw_coll, s_h_raw, &
-                     & s_h_raw_half, s_h_raw_priv, s_h_transp_pot, s_v_irr_cell, s_h_met)
+            deallocate(vi, vj, vid, s_cn_class, reached_by_collective, s_h_old, s_h_raw_coll, s_h_raw, &
+                     & s_h_raw_half, s_h_raw_priv, s_h_transp_pot, s_v_irr_cell, s_h_met               )
         end if
     end do irr_units_loop ! end irrigation units loop
 
