@@ -30,7 +30,7 @@ module cli_simulation_manager
 ! calc_interception              <- interception calculation
 ! Pioggia_Efficace          <- effective rainfall calculation
 
-use mod_utility, only: sp, dp, get_value_index, get_uniform_sample, days_x_month, calc_date, day_of_week
+use mod_utility, only: dp, get_value_index, get_uniform_sample, days_x_month, calc_date, day_of_week
 use mod_parameters
 use mod_grid, only: read_grid, write_grid, print_mat_as_grid, overlay_domain, bound, id_to_par, set_default_par
 use mod_evapotranspiration, only: ET_reference, calculateDLH

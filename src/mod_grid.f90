@@ -1,5 +1,5 @@
 module mod_grid
-use mod_constants, only: sp, dp, tabCN
+use mod_constants, only: dp, tabCN
 use mod_utility, only: lower_case
 use mod_parameters, only: simulation, par_method
 implicit none

@@ -1,6 +1,6 @@
 module mod_TDx_index
 ! TODO: split UI functions from model
-use mod_constants, only: sp, dp, nan_r
+use mod_constants, only: dp, nan_r
 use mod_grid, only: grid_i, grid_r, print_mat_as_grid
 implicit none
 

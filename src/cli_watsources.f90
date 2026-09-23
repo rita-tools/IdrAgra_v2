@@ -1,5 +1,5 @@
 module cli_watsources
-use mod_constants, only: sp, dp, seconds_per_day
+use mod_constants, only: dp, seconds_per_day
 use mod_utility, only: get_value_index, lower_case, calc_doy, split_date
 use mod_parameters
 use mod_grid, only: grid_i, grid_r

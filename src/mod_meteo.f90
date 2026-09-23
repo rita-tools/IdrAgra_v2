@@ -1,5 +1,5 @@
 module mod_meteo
-use mod_constants, only: sp, dp
+use mod_constants, only: dp
 use mod_utility, only: date, lower_case, days_x_month, calc_doy, split_date
 use mod_parameters, only: simulation, par_method
 use mod_evapotranspiration, only: ET_reference

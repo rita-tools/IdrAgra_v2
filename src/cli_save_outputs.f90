@@ -1,6 +1,6 @@
 ! TODO: some fixes
 module cli_save_outputs
-use mod_constants, only: sp, dp
+use mod_constants, only: dp
 use mod_utility, only: lower_case
 use mod_grid, only: grid_i, grid_r, print_mat_as_grid
 use mod_common, only: spatial_info

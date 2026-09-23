@@ -1,5 +1,5 @@
 module mod_runoff
-use mod_constants, only: sp, dp
+use mod_constants, only: dp
 use mod_grid, only: grid_i, grid_r
 ! use mod_parameters, only: pond ! NOT USED
 use mod_crop_phenology, only: crop_pars_matrices

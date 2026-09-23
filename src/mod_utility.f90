@@ -1,6 +1,6 @@
 module mod_utility
 
-use mod_constants, only: sp, dp, pi
+use mod_constants, only: dp, pi
 implicit none
 
 ! type that stores date

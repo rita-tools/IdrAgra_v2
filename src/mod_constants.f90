@@ -2,7 +2,7 @@ module mod_constants
 implicit none
 
 ! Symbolic names for kind types of single- and double-precision reals
-integer, parameter :: sp = kind(1.0)
+!integer, parameter :: sp = kind(1.0)
 integer, parameter :: dp = kind(1.0D0)
 
 ! set default NAN values

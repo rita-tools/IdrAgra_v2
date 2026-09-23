@@ -1,5 +1,5 @@
 module cli_crop_parameters
-use mod_constants, only: sp, dp
+use mod_constants, only: dp
 use mod_utility, only: lower_case, string_to_integers, string_to_reals, split_string, count_elements
 use mod_parameters, only: simulation
 use mod_meteo, only: meteo_info

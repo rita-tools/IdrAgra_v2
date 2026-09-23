@@ -1,5 +1,5 @@
 module mod_crop_soil_water
-use mod_constants, only: sp, dp
+use mod_constants, only: dp
 use mod_evapotranspiration
 implicit none
 
