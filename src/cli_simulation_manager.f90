@@ -1,35 +1,4 @@
 module cli_simulation_manager
-! Contains subroutines:
-! soilcropwater_balance
-! write_daily_output        <- writes daily output for selected cells (files *.csv)
-! write_monthly_output      <- writes monthly/periodic files (files *.asc)
-! deallocate_all            <- deallocates balance matrices
-! iniz_bil1                 <- initializes evaporative layer matrices
-! iniz_bil2                 <- initializes transpirative layer matrices
-! eq_bil1                   <- updates evaporative layer matrices (operator "=")
-! eq_bil2                   <- updates transpirative layer matrices (operator "=")
-! iniz_pheno                <- initializes phenological matrices
-! iniz_meteo                <- initializes meteorological matrices
-! matrici_meteo_pesate      <- spatializes meteorological data and calculates ET0
-! eq_extensive              <- initializes hourly variables' matrices
-! interventi_fabbisogni_fix <- calculates irrigation - NEED mode, fixed water supply to each cell
-! interventi_fabbisogni_fc  <- calculates irrigation - NEED mode, water supply to reach field capacity
-! scheduled_irrigation_duty <- calculates irrigation - scheduled irrigation
-! b1_no_iter_eva            <- calculates of variables used in evaporation estimation
-! inizializza_aggregati     <- initialization of crop-soil water balance variables
-! x_wat                     <- calculates soil content thresholds as a function of root zone depth
-! irr_xRiso                 <- calculates irrigation for paddy fieleds
-! dim_bil1                  <- allocates and deallocates bil1 variable
-! dim_bil2                  <- allocates and deallocates bil2 variable
-! dim_bil_hour              <- allocates and deallocates bil_hour variable
-! dim_meteo                 <- allocates and deallocates meteo variable
-! dim_pheno                 <- allocates and deallocates pheno variable
-! dim_wat                   <- allocates and deallocates wat variable
-! interventi_consumi        <- calculates irrigation in USE simulation (mode==1)
-! Contains functions:
-! calc_interception              <- interception calculation
-! Pioggia_Efficace          <- effective rainfall calculation
-
 use mod_utility, only: dp, get_value_index, get_uniform_sample, days_x_month, calc_date, day_of_week
 use mod_parameters
 use mod_grid, only: read_grid, write_grid, print_mat_as_grid, overlay_domain, bound, id_to_par, set_default_par
@@ -42,13 +11,11 @@ use mod_TDx_index
 use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva
 use mod_common, only: wat_matrix, soil2_rice, hourly, unit_file_scratch
 use mod_irrigation
-
 use cli_watsources
 use cli_crop_parameters, only: read_all_crop_pars, destroy_infofeno_tab, check_pheno_parameters, k_cb_matrices
 use cli_save_outputs
 use cli_read_parameter
 implicit none
-
 
 ! Assignment statement overloading interface
 ! Help to initialize and update derived types
