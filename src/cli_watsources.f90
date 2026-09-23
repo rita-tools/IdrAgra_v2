@@ -1,5 +1,5 @@
 module cli_watsources
-use mod_constants, only: sp, dp
+use mod_constants, only: sp, dp, seconds_per_day
 use mod_utility, only: get_value_index, lower_case, calc_doy, split_date
 use mod_parameters
 use mod_grid, only: grid_i, grid_r
@@ -513,7 +513,6 @@ subroutine nom_water_supply(watsources_fn, irr_units, src_info, wat_src_tbl, f_s
     real(dp),dimension(:,:),intent(in)::shape_area
     integer,dimension(:,:),intent(in)::irr_unit_map
     logical,intent(in)::verbose
-    integer,parameter::sec_to_day=24*60*60  ![s/d]
     integer::i,j,k
 
     irr_units%q_nom = 0
@@ -542,10 +541,10 @@ subroutine nom_water_supply(watsources_fn, irr_units, src_info, wat_src_tbl, f_s
     irr_units%q_nom = irr_units%q_pot_fld(1) + irr_units%q_pot_fld(2) + irr_units%q_pot_fld(3) + irr_units%q_pot_fld(4)
     ! TODO: shapearea
     if (f_shapearea .eqv. .false.) then
-        !irr_units%n_irrigable_cells = irr_units%q_nom*sec_to_day / (1.e-3*irr_units%h_irr_mean*cell_size**2)
+        !irr_units%n_irrigable_cells = irr_units%q_nom*seconds_per_day / (1.e-3*irr_units%h_irr_mean*cell_size**2)
         do i=1, size(irr_units)
             if ((1.e-3* irr_units(i)%h_irr_mean *cell_size**2)>0.)then
-                irr_units(i)%n_irrigable_cells = irr_units(i)%q_nom * sec_to_day / &
+                irr_units(i)%n_irrigable_cells = irr_units(i)%q_nom * seconds_per_day / &
                                                 & (1.e-3* irr_units(i)%h_irr_mean *cell_size**2)
             else
                 print *,"No irrigation required in irrigation unit: ", irr_units(i)%id, " h_irr_mean: ",irr_units(i)%h_irr_mean
@@ -554,7 +553,7 @@ subroutine nom_water_supply(watsources_fn, irr_units, src_info, wat_src_tbl, f_s
         end do
     else
         do i=1, size(irr_units)
-            irr_units(i)%n_irrigable_cells = irr_units(i)%q_nom * sec_to_day / &
+            irr_units(i)%n_irrigable_cells = irr_units(i)%q_nom * seconds_per_day / &
                                            & (1.e-3* irr_units(i)%h_irr_mean * sum(shape_area, irr_unit_map == irr_units(j)%id))
         end do
     end if

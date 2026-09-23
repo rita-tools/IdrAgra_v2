@@ -1,5 +1,5 @@
 module mod_irrigation
-use mod_constants, only: dp
+use mod_constants, only: dp, seconds_per_day
 use mod_utility, only: get_value_index
 use mod_grid
 use mod_common, only: balance1_matrices,balance2_matrices, spatial_info
@@ -380,7 +380,6 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
     integer :: i, j, k, shift, p
     integer :: n_cells_tobe_irr ! number of cells that might receive irrigation today (in-season & with an irrigable crop growing)
     integer :: n_cells_req_irr  ! number of cells that require irrigation from monitored sources today (irrigable + soil dry enough)
-    integer,parameter::sec_to_day=24*60*60
     real(dp),dimension(domain%header%imax,domain%header%jmax)::v_irr_cell   ! irrigation volumes [m^3]
     logical,dimension(domain%header%imax,domain%header%jmax)::irr_mask      ! a mask to get all the irrigable cells
     integer,dimension(:,:),allocatable::i_mat,j_mat,id_cell                 ! for movement inside the matrix
@@ -492,7 +491,7 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
             cell_loop: do p=1, n_cells_tobe_irr !%AB% loop in irrigable cells where mask = 1
 
                 ! discharge assigned to p-cell (not considering the field efficiency)
-                q_cell = s_v_irr_cell(p)/sec_to_day
+                q_cell = s_v_irr_cell(p) / seconds_per_day
                 rice_req = (s_cn_class(p)==7 .and. s_h_met(p)>0.0D0)
                 cell_req = (s_h_old(p)<=s_h_raw_coll(p) .or. rice_req)
                 q_act_avail = irr_units(k)%q_day - Q_tot_act
@@ -586,7 +585,7 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
                     if ((s_h_old(p) <= s_h_raw_priv(p)) .and. (p > n_cells_reached + n_cells_skip)) then
                         ! %AB% irrigation volume is equal to the irrigation depth of the method
                         priv_irr(vi(p),vj(p)) = s_h_met(p)
-                        irr_units(k)%q_un_priv = irr_units(k)%q_un_priv + s_v_irr_cell(p)/sec_to_day
+                        irr_units(k)%q_un_priv = irr_units(k)%q_un_priv + s_v_irr_cell(p)/seconds_per_day
                     end if
                 end do
 

@@ -96,4 +96,7 @@ integer, dimension(12), parameter:: tmin_time = &
 real(dp), parameter :: pi= acos(-1.)
 
 real(dp), parameter :: res_canopy_std = 70.                 ! Standard canopy resistance (alfalfa) for ET0 calculation
+
+integer, parameter :: seconds_per_day = 24 * 60 * 60
+
 end module mod_constants
