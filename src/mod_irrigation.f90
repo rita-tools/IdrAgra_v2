@@ -374,8 +374,7 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
     real(dp),dimension(:,:),intent(inout)::priv_irr,coll_irr
     real(dp),dimension(:,:),intent(in)::cell_area
     real(dp),dimension(:,:),intent(in)::h_met
-    integer,dimension(:,:),intent(in)::irr_starts
-    integer,dimension(:,:),intent(in)::irr_ends
+    integer, dimension(:,:), intent(in) :: irr_starts, irr_ends
     logical,intent(in)::f_shape_area
 
     integer :: i, j, k, shift, p
@@ -386,20 +385,17 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
     logical,dimension(domain%header%imax,domain%header%jmax)::irr_mask      ! a mask to get all the irrigable cells
     integer,dimension(:,:),allocatable::i_mat,j_mat,id_cell                 ! for movement inside the matrix
     integer,dimension(size(irr_units))::ind
-    integer,dimension(:),allocatable::vi,vj,vid
-    integer,dimension(:),allocatable::s_cn_class
+    integer, dimension(:), allocatable :: vi, vj, vid, s_cn_class
     logical, dimension(:), allocatable :: reached_by_collective ! Marks the cells processed by collective sources (will be skipped by private sources)
     ! shifted copies of the already defined variable (see above)
     real(dp), dimension(:), allocatable :: s_h_old, s_h_raw_coll, s_h_raw, s_h_raw_half, s_h_raw_priv, s_h_transp_pot
     real(dp), dimension(:), allocatable :: s_transp_ratio, s_def_day, s_v_irr_cell, s_h_met
-    real(dp)::n_day_to_deficit ! expected number of days to deficit
+    real(dp) :: Q_tot_act, Q_tot_pot, q_cell, q_act_avail, q_pot_avail, q_deliv, h_deliv
     integer :: n_cells_reached, n_cells_skip
-    real(dp)::Q_tot_act,Q_tot_pot,q_cell,q_mean,q_act_avail,q_pot_avail,q_deliv,h_deliv
     logical::rice_req,cell_req
 
     ! Flooded rice uses a ponding/saturation demand depth, but remains limited by source availability.
 
-    ! TODO: move the initialization of the cell_area outside in order to overcome control
     if (f_shape_area .eqv. .false.) then
         v_irr_cell=1.e-3*h_met*(domain%header%cellsize**2) ! TODO: also NAN are calculated
     else
@@ -409,7 +405,6 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
     h_irr = 0.
 
     ! init the matrix for coordinates and id of the calculation cells
-    ! TODO: move the initialization of the cell_area outside in order to overcome control
     ind=0
     if(.not.(allocated(i_mat))) allocate(i_mat(domain%header%imax,domain%header%jmax))
     if(.not.(allocated(j_mat))) allocate(j_mat(domain%header%imax,domain%header%jmax))
@@ -491,22 +486,10 @@ subroutine irrigation_use(domain, irr_units_map, irr_class, method, irr_units, t
             s_h_met = cshift(s_h_met,shift)
             s_cn_class = cshift(s_cn_class,shift)
 
-            ! TODO: discharge at cell not in irrigation unit
-            ! average net discharge required by the irrigation unit
-            ! it doesn't consider the field efficiency
-            ! it is estimated from the water depth from the irrigation method
-            ! TODO: not used q_mean
-            q_mean = sum(s_v_irr_cell)/(n_cells_tobe_irr*sec_to_day)
-
-            ! TODOs:
-            ! %AB% check irrigation when k_cb > 0
             ! %AB% check condition when the number of irrigable cells is very
             ! low respect the total number of cell in the irrigation unit
 
             cell_loop: do p=1, n_cells_tobe_irr !%AB% loop in irrigable cells where mask = 1
-                n_day_to_deficit = 9999. !default (>0) x transp_pot=0
-
-                if(s_h_transp_pot(p)/=0.) n_day_to_deficit = (s_h_old(p)-s_h_raw_half(p))/s_h_transp_pot(p)
 
                 ! discharge assigned to p-cell (not considering the field efficiency)
                 q_cell = s_v_irr_cell(p)/sec_to_day
