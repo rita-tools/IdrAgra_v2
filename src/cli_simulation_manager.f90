@@ -161,7 +161,6 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     if (pars%sim%mode>0) then
         info_spat%irr_ends%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_ends)
         info_spat%irr_starts%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%irr_starts)
-        !info_spat%h_maxpond%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_maxpond)
     end if
 
     ! init to zero irrigation related outputs
@@ -374,6 +373,9 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
                 info_spat%h_meth=info_spat%domain
                 info_spat%h_meth%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_irr)
+
+                info_spat%irr_starts%mat = id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%irr_starts)
+                info_spat%irr_ends%mat   = id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%irr_ends)
 
                 call calc_perc_booster_pars(info_spat, pars%irr%met, pars%sim%quantiles)
 
