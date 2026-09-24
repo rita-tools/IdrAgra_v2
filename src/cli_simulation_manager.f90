@@ -1307,9 +1307,9 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     end do year_cycle
 
     ! Save output for the following year
+    info_spat%theta(1)%old%mat = wat_bal1%h_soil/(1000.*wat_bal1%d_e)
+    info_spat%theta(2)%old%mat = wat_bal2%h_soil/(1000.*wat_bal2%d_t)
     if (pars%sim%f_theta_out .eqv. .true.) then
-        info_spat%theta(1)%old%mat = wat_bal1%h_soil/(1000.*wat_bal1%d_e)
-        info_spat%theta(2)%old%mat = wat_bal2%h_soil/(1000.*wat_bal2%d_t)
         call write_grid(trim(pars%sim%final_condition)//trim(pars%sim%thetaI_end_fn)//'.asc',info_spat%theta(1)%old,error_flag)
         call write_grid(trim(pars%sim%final_condition)//trim(pars%sim%thetaII_end_fn)//'.asc',info_spat%theta(2)%old,error_flag)
     end if

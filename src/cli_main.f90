@@ -25,6 +25,7 @@ type(source_info)::info_sources                             ! stores water sourc
 type(meteo_info),dimension(:),allocatable::info_meteo       ! stores meteorological series data
 type(crop_pheno_info),dimension(:),allocatable::info_pheno  ! stores phenological parameters series
 type(soil2_rice)::theta2_rice                               ! stores soil parameters data for paddy rice fields
+real(dp), allocatable :: warmup_theta(:, :, :)              ! passes soil theta from warmup to the actual simulation
 
 integer,dimension(8)::t_start,t_stop
 integer :: errorflag
@@ -125,6 +126,11 @@ if(xml%sim%f_init_wc .eqv. .false.)then ! Generates soil initial condition
     call simulation_manager(xml, xml_TDx, info_spat, watsour, info_sources, info_meteo, &
         & info_pheno, tab_CN2, tab_CN3, theta2_rice, 1, boundaries, verbose, summary)
 
+    !%PS%: save soil moisture at the end of warmup explicitly (info_spat gets overwritten by read_spatial_info)
+    allocate(warmup_theta(size(info_spat%theta(1)%old%mat, 1), size(info_spat%theta(1)%old%mat, 2), 2))
+    warmup_theta(:, :, 1) = info_spat%theta(1)%old%mat
+    warmup_theta(:, :, 2) = info_spat%theta(2)%old%mat
+
     ! Prints initial condition values
     if (xml%sim%prt_init_cond == 'y') then
         call write_grid(trim(xml%sim%path)//'IC_thetaI.asc',info_spat%theta(1)%old,errorflag)
@@ -140,6 +146,14 @@ end if
 
 ! Initializes info_spat and reads spatial files (*.asc); initializes tab_CN*
 call read_spatial_info(info_spat,boundaries,xml%sim,tab_CN2,tab_CN3,theta2_rice,xml%irr%met)
+
+!%PS%: immediately overwrite starting theta set in read_spatial_info with warmup_theta if warmup was performed
+if (allocated(warmup_theta)) then
+    info_spat%theta(1)%old%mat = warmup_theta(:, :, 1)
+    info_spat%theta(2)%old%mat = warmup_theta(:, :, 2)
+    deallocate(warmup_theta)
+end if
+
 print*,"Variable info_spat has been initialized"
 if (xml%sim%prt_debug_out=='y') then
     ! Print spatial data matrices in files out_*.asc
