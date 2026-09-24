@@ -168,9 +168,17 @@ subroutine irrigation_need_fc(info_spat, h_irr, bil2, bil2_old, bil1_old, pheno,
     logical, dimension(:,:), intent(in) :: is_rice_paddy
     real(dp),dimension(size(info_spat%domain%mat,1),size(info_spat%domain%mat,2))::h_irr_temp
     real(dp),intent(in)::fc_ratio ! fraction of FC to use as target
+    logical, save :: rice_fc_warning_shown = .false.
     ! init
     h_irr = 0.
     h_irr_temp = 0.
+
+    if (any(is_rice_paddy) .and. .not. rice_fc_warning_shown) then
+        print *, 'Warning: Mode 2 rice irrigation behaviour is inconsistent with other modes and requires checking:'
+        print *, 'it replaces et and percolation, but does not have a moisture or ponding target'
+        rice_fc_warning_shown = .true.
+    end if
+
     !!! %RR% %CG% %EAC% %AB% (feb-23) network efficiency no more considered in need mode [info_spat%eff_rete%mat]
     where (pheno%irrigation_class == 1 .and. info_spat%irr_meth_id%mat>0)
         where (is_rice_paddy)
