@@ -609,14 +609,14 @@ potential evapotranspiration
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_cell_all`
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_stp_rain`
@@ -672,42 +672,42 @@ potential evapotranspiration
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_dbg_eff_rain`
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_dbg_perc1`
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_dbg_perc2`
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_dbg_h_soil1`
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_dbg_h_soil2`
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_yr_rain`
@@ -868,70 +868,70 @@ potential evapotranspiration
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_yr_dbg_rain_eff`
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_yr_dbg_iter1`
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_yr_dbg_iter2`
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_cell_convergence`
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_cell_evaporation`
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_cell_runoff`
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_cell_et0`
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_debug_out`
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 ### `prt_init_cond`
 
 :::{container} parameter-summary
 **Type:** String
-**Default:** `y`
+**Default:** `n`
 :::
 
 {.parameter-list-group .parameter-list-last}

@@ -192,11 +192,6 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
                                             )
                     case ('mode') ! running mode: 0 - no irrigation; 1 - consumption; 2 - water needs to field capacity; 3 - water needs with fixed volume
                         read(buffer, *, iostat=ios) xml%sim%mode
-                        ! if no irrigation set startIrrSeason and endIrrSeason to -1
-                        if (xml%sim%mode == 0) then
-                            xml%sim%start_irr_season = -1
-                            xml%sim%end_irr_season = -1
-                        end if
                     case ('initialthetaflag') ! T: read init moisture from external file
                         read(buffer, *, iostat=ios) xml%sim%f_init_wc
                     case ('finalthetaflag') ! T: if final soil moisture condition is written on files, F if not
@@ -349,10 +344,8 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
                         read(buffer, *, iostat=ios)xml%sim%quantiles(2,2)
                     case ('startirrseason') ! start doy of irrigation season
                         read(buffer, *, iostat=ios)xml%sim%start_irr_season
-                        if (xml%sim%mode == 0) xml%sim%start_irr_season = -1
                     case ('endirrseason') ! end doy of irrigation season
                         read(buffer, *, iostat=ios)xml%sim%end_irr_season
-                        if (xml%sim%mode == 0) xml%sim%end_irr_season = -1
                     case ('lim_prec') ! Minimum meaningfull precipitation
                         read(buffer, *, IOSTAT=ios)xml%sim%h_prec_lim
                     case ('zevap') ! Ze_fix: thickness of the first layer

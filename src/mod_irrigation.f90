@@ -107,7 +107,7 @@ subroutine update_adj_perco_parameters(info_spat, matrice_irr, day_from_irr, adj
 
 end subroutine
 
-subroutine irrigation_need_fixed(info_spat, h_irr, bil2, bil2_old, bil1_old, pheno, eff_rain, xrice_ksat, h_sat2)
+subroutine irrigation_need_fixed(info_spat, h_irr, bil2, bil2_old, bil1_old, pheno, eff_rain, xrice_ksat, is_rice_paddy, h_sat2)
     ! calculate irrigation needs at field capacity and fixed volume (defined by irrigation methods)
    real(dp),dimension(:,:,:),intent(out)::h_irr
     type(spatial_info),intent(in)::info_spat
@@ -116,6 +116,7 @@ subroutine irrigation_need_fixed(info_spat, h_irr, bil2, bil2_old, bil1_old, phe
     type(crop_pars_matrices),intent(in)::pheno
     real(dp),dimension(:,:),intent(in)::eff_rain
     real(dp),intent(in)::xrice_ksat     ! ksat of the transpirative layer for rice
+    logical, dimension(:,:), intent(in) :: is_rice_paddy
     real(dp),dimension(:,:),intent(in)::h_sat2
     real(dp),dimension(size(info_spat%domain%mat,1),size(info_spat%domain%mat,2))::h_irr_temp
     integer::i,j
@@ -126,8 +127,7 @@ subroutine irrigation_need_fixed(info_spat, h_irr, bil2, bil2_old, bil1_old, phe
 
     where(pheno%irrigation_class == 1 .and. info_spat%irr_meth_id%mat>0)
         !!! %RR% %CG% %EAC% %AB% (feb-23) network efficiency no more considered in need mode [info_spat%eff_rete%mat]
-        where(pheno%cn_class==7)                   ! irrigation matrix for rice
-            !h_irr_temp = (bil1_old%h_eva + bil2_old%h_transp_pot)
+        where(is_rice_paddy)
             ! %CG% add water to fill soil, ponding and ET
             h_irr_temp = ((info_spat%h_meth%mat-  bil1_old%h_pond)+ & ! fill the ponding layer
                             (info_spat%theta(1)%sat%mat*bil1_old%d_e*1000-bil1_old%h_soil)+ &
@@ -145,7 +145,7 @@ subroutine irrigation_need_fixed(info_spat, h_irr, bil2, bil2_old, bil1_old, phe
         end where
     end where
 
-    call irrigate_rice(h_irr_temp,pheno,eff_rain,xrice_ksat)
+    call irrigate_rice(h_irr_temp, pheno, eff_rain, xrice_ksat, is_rice_paddy)
 
     ! split the irrigation matrix for each irrigation method
     ! n is the number of irrigation methods
@@ -155,7 +155,7 @@ subroutine irrigation_need_fixed(info_spat, h_irr, bil2, bil2_old, bil1_old, phe
 
 end subroutine irrigation_need_fixed
 
-subroutine irrigation_need_fc(info_spat, h_irr, bil2, bil2_old, bil1_old, pheno, eff_rain, xrice_ksat, fc_ratio)
+subroutine irrigation_need_fc(info_spat, h_irr, bil2, bil2_old, bil1_old, pheno, eff_rain, xrice_ksat, is_rice_paddy, fc_ratio)
     ! calculate irrigation needs at field capacity
    real(dp),dimension(:,:,:),intent(out)::h_irr
     type(spatial_info),intent(in)::info_spat
@@ -165,14 +165,23 @@ subroutine irrigation_need_fc(info_spat, h_irr, bil2, bil2_old, bil1_old, pheno,
     real(dp),dimension(:,:),intent(in)::eff_rain
     integer::i,j
     real(dp),intent(in)::xrice_ksat     ! ksat of the transpirative layer for rice
+    logical, dimension(:,:), intent(in) :: is_rice_paddy
     real(dp),dimension(size(info_spat%domain%mat,1),size(info_spat%domain%mat,2))::h_irr_temp
     real(dp),intent(in)::fc_ratio ! fraction of FC to use as target
+    logical, save :: rice_fc_warning_shown = .false.
     ! init
     h_irr = 0.
     h_irr_temp = 0.
+
+    if (any(is_rice_paddy) .and. .not. rice_fc_warning_shown) then
+        print *, 'Warning: Mode 2 rice irrigation behaviour is inconsistent with other modes and requires checking:'
+        print *, 'it replaces et and percolation, but does not have a moisture or ponding target'
+        rice_fc_warning_shown = .true.
+    end if
+
     !!! %RR% %CG% %EAC% %AB% (feb-23) network efficiency no more considered in need mode [info_spat%eff_rete%mat]
     where (pheno%irrigation_class == 1 .and. info_spat%irr_meth_id%mat>0)
-        where (pheno%cn_class==7)                      ! %AB% irrigation matrix for rice
+        where (is_rice_paddy)
             h_irr_temp = (bil1_old%h_eva + bil2_old%h_transp_pot)/(info_spat%eff_met%mat)
 
             ! TODO: info_spat%h_meth%mat is not initialized in FC mode
@@ -199,7 +208,7 @@ subroutine irrigation_need_fc(info_spat, h_irr, bil2, bil2_old, bil1_old, pheno,
         h_irr_temp = 0.0D0
     end where
 
-    call irrigate_rice(h_irr_temp,pheno,eff_rain,xrice_ksat)
+    call irrigate_rice(h_irr_temp, pheno, eff_rain, xrice_ksat, is_rice_paddy)
 
     ! split the irrigation matrix for each irrigation method
     ! n is the number of irrigation methods
@@ -211,7 +220,7 @@ end subroutine irrigation_need_fc
 
 subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_irr, &
     & verbose, bil1_old, bil2, bil2_old, &
-    & a_loss, b_loss, c_loss, wind_vel, temp_ave,losses,eff_rain,xrice_ksat,h_sat2)
+    & a_loss, b_loss, c_loss, wind_vel, temp_ave,losses,eff_rain,xrice_ksat, is_rice_paddy, h_sat2)
     ! spread irrigation height when scheduled
     ! TODO: need for testing
     ! TODO: include losses calculation inside
@@ -232,6 +241,7 @@ subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_
     real(dp),dimension(:,:),intent(inout)::losses
     real(dp),dimension(:,:),intent(in)::eff_rain
     real(dp),intent(in)::xrice_ksat     ! ksat of the transpirative layer for rice
+    logical, dimension(:,:), intent(in) :: is_rice_paddy
     real(dp),dimension(:,:),intent(in)::h_sat2
 
     logical, dimension(size(info_spat%domain%mat,1),size(info_spat%domain%mat,2)) :: is_irrigable
@@ -274,8 +284,7 @@ subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_
             else if (sch_irr(i)%h_irr == -1) then
                 ! add water with fixed volume
                 where (info_spat%irr_unit_id%mat == sch_irr(i)%irr_unit_id .and. is_irrigable)
-                    where(pheno%cn_class==7)                   ! irrigation matrix for rice
-                        !h_irr_temp = (bil1_old%h_eva+bil2_old%h_transp_pot)
+                    where(is_rice_paddy)
                         h_irr_temp = ((info_spat%h_meth%mat-bil1_old%h_pond)+ & ! fill the ponding layer
                                     (info_spat%theta(1)%sat%mat*bil1_old%d_e*1000-bil1_old%h_soil)+ &
                                     (h_sat2-bil2_old%h_soil) + & ! fill the soil layer to saturation
@@ -293,8 +302,7 @@ subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_
             else if (sch_irr(i)%h_irr == -10) then
                 ! add water to field capacity
                 where (info_spat%irr_unit_id%mat == sch_irr(i)%irr_unit_id .and. is_irrigable)
-                    where (pheno%cn_class==7)                      ! %AB% irrigation matrix for rice
-                        !h_irr_temp = (bil1_old%h_eva+bil2_old%h_transp_pot)/(info_spat%eff_met%mat)
+                    where (is_rice_paddy)
                         h_irr_temp = ((info_spat%h_meth%mat-bil1_old%h_pond)+ & ! fill the ponding layer
                                     (info_spat%theta(1)%sat%mat*bil1_old%d_e*1000-bil1_old%h_soil)+ &
                                     (h_sat2-bil2_old%h_soil) + & ! fill the soil layer to saturation
@@ -327,7 +335,7 @@ subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_
         end if
     end do
 
-    call irrigate_rice(h_irr_temp,pheno,eff_rain,xrice_ksat)
+    call irrigate_rice(h_irr_temp, pheno, eff_rain, xrice_ksat, is_rice_paddy)
 
     ! split the irrigation matrix for each irrigation method
     ! n is the number of irrigation methods
@@ -337,18 +345,19 @@ subroutine irrigation_scheduled(info_spat, doy_cur, year_cur, sch_irr, pheno, h_
 
 end subroutine irrigation_scheduled
 
-subroutine irrigate_rice(h_irr,pheno,eff_rain,k_sat)
+subroutine irrigate_rice(h_irr, pheno, eff_rain, k_sat, is_rice_paddy)
     ! calculate irrigation event for paddy fields
     real(dp),dimension(:,:),intent(inout)::h_irr    ! TODO: externally set to equal the potential crop ET,
                                                     !       the soil water content to saturation and the ponding height
     type(crop_pars_matrices),intent(in)::pheno
     real(dp),dimension(:,:),intent(in)::eff_rain    ! effective rain
     real(dp),intent(in)::k_sat
+    logical, dimension(:,:), intent(in) :: is_rice_paddy
     real(dp)::h_irr_min
 
     ! init the minimum irrigation height (equal to infiltration)
     h_irr_min = 10.*24.*k_sat ! k_sat is in mm
-    where(pheno%irrigation_class == 1 .and. pheno%cn_class == 7)
+    where(is_rice_paddy)
         h_irr = max(0.0D0,h_irr_min + h_irr - eff_rain)  ! %CG%: irrigation compensate ET and Percolation, minus effective rain
         !where(h_irr<=h_irr_min) h_irr = h_irr_min       ! irrigation height at least equal to the minimum irrigation height
         !where(eff_rain>=h_irr) h_irr = 0.               ! if effective precipitation > irrigation height -> zero irrigation height

@@ -110,7 +110,7 @@ type simulation
     real(dp) :: h_maxpond = 0.0D0               ! overall maximum pond (mm). It will replaced by irrigation method
     real(dp) :: fc_ratio = 1.0D0                ! fraction of FC to fill with irrigation
 
-    ! set print to file options (default is 'y' = yes)
+    ! Standard simulation outputs are enabled by default; diagnostic outputs are opt-in.
     character :: prt_stp_rain='y'
     character :: prt_stp_transp_act='y'
     character :: prt_stp_transp_pot='y'
@@ -123,12 +123,12 @@ type simulation
     character :: prt_stp_runoff='y'
     character :: prt_stp_et_pot='y'
     character :: prt_stp_et_act='y'
-    character :: prt_dbg_eva_act='y'
-    character :: prt_dbg_eff_rain='y'
-    character :: prt_dbg_perc1='y'
-    character :: prt_dbg_perc2='y'
-    character :: prt_dbg_h_soil1='y'
-    character :: prt_dbg_h_soil2='y'
+    character :: prt_dbg_eva_act='n'
+    character :: prt_dbg_eff_rain='n'
+    character :: prt_dbg_perc1='n'
+    character :: prt_dbg_perc2='n'
+    character :: prt_dbg_h_soil1='n'
+    character :: prt_dbg_h_soil2='n'
     character :: prt_yr_rain='y'
     character :: prt_yr_rain_crop_season='y'
     character :: prt_yr_irr='y'
@@ -151,28 +151,28 @@ type simulation
     character :: prt_yr_f_WS='y'
     character :: prt_yr_f_HS='y'
     character :: prt_yr_f_HS_sum='y'
-    character :: prt_yr_dbg_eva_act_tot='y'
-    character :: prt_yr_dbg_rain_eff='y'
-    character :: prt_yr_dbg_iter1='y'
-    character :: prt_yr_dbg_iter2='y'
+    character :: prt_yr_dbg_eva_act_tot='n'
+    character :: prt_yr_dbg_rain_eff='n'
+    character :: prt_yr_dbg_iter1='n'
+    character :: prt_yr_dbg_iter2='n'
 
     character :: prt_all = 'y'
     character :: prt_step = 'y'
     character :: prt_annual = 'y'
     character :: prt_yield = 'y'
-    character :: prt_debug = 'y'
-    character :: prt_cell_all = 'y'
+    character :: prt_debug = 'n'
+    character :: prt_cell_all = 'n'
 
     ! set options for cell outputs
-    character :: prt_cell_convergence = 'y'
-    character :: prt_cell_evaporation = 'y'
-    character :: prt_cell_runoff = 'y'
-    character :: prt_cell_et0 = 'y'
+    character :: prt_cell_convergence = 'n'
+    character :: prt_cell_evaporation = 'n'
+    character :: prt_cell_runoff = 'n'
+    character :: prt_cell_et0 = 'n'
 
     ! set other print options
-    character :: prt_debug_out = 'y'
+    character :: prt_debug_out = 'n'
 
-    character :: prt_init_cond = 'y'
+    character :: prt_init_cond = 'n'
 
 
 end type simulation

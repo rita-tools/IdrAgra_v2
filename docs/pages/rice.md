@@ -30,7 +30,8 @@ ThetaII_sat = <real>
 ThetaII_WP = <real>
 ```
 
-These values replace the ordinary Layer II properties while rice is active. If the file is absent, IdrAgra uses the Layer II soil-property maps instead.
+These values replace the ordinary Layer II properties for irrigated rice cells during the configured irrigation period. Modes 1--4 use the period of the cell's irrigation method; mode 0 uses the global `StartIrrSeason` and `EndIrrSeason` values.
+If the file is absent, IdrAgra uses the Layer II soil-property maps instead.
 
 ## Flooding and ponding
 
@@ -53,4 +54,3 @@ Before running an irrigated rice scenario, check that:
 5. `rice_soilparam.txt` contains reviewed Layer II values when paddy-specific soil properties are required.
 
 See [Irrigation modes and inputs](irrigation.md) for mode selection and common method settings.
-

@@ -85,6 +85,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::a_loss, b_loss, c_loss, f_interception ! application losses model
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::h_irr_sum, h_bypass, h_met_use
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::k_sat2_use, fact_n2_use
+    logical, dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax) :: is_rice_paddy
 
     !! TDx
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,pars_TDx%temp%n_ind)::tot_deficit      ! TDx sum
@@ -119,6 +120,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     ! init irrigation time limits
     info_spat%irr_starts = info_spat%domain
     info_spat%irr_ends = info_spat%domain
+    info_spat%irr_starts%mat = pars%sim%start_irr_season
+    info_spat%irr_ends%mat = pars%sim%end_irr_season
 
     ! init maximum pond
     info_spat%h_maxpond=info_spat%slope
@@ -593,13 +596,11 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                                                & pars%sim%year_step(y), crop_map)
             end if
 
-            ! Output fc in debug %RR%
-            ! if (pars%sim%prt_debug_out .eqv. .true.) then
-            !    pheno_grd%mat = pheno%f_c
-            !    call write_matrices(trim(pars%sim%path)//'fc_'//trim(adjustl(s_years))//'_'//&
-            !                                    trim(adjustl(s_gg))//'.asc', pheno_grd, errorflag)
-            ! end if
-
+            !%PS%: unified switch for flooded rice special behaviour (soil switch, irrigation)
+            is_rice_paddy = info_spat%domain%mat /= info_spat%domain%header%nan .and.         &! Is in the domain
+                            pheno%irrigation_class == 1 .and.                                 &! Is an irrigable crop
+                            pheno%cn_class == 7 .and.                                         &! Is a CN=7 crop (rice)
+                            doy >= info_spat%irr_starts%mat .and. doy <= info_spat%irr_ends%mat! We are in irrigation season
 
             ! Creating cell parameters output on first day of simulation
             if (doy == 1 .and. (pars%sim%f_out_cells .eqv. .true.))then
@@ -662,8 +663,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 where(wat_bal2%d_t == wat_bal2_old%d_t)
                     wat_bal2_old%h_soil = wat_bal2_old%t_soil*1000*wat_bal2_old%d_t
                 else where(wat_bal2%d_t > wat_bal2_old%d_t)
-                    ! Paddy field correction (only during growth season)
-                    where(pheno%cn_class==7 .and. pheno%k_cb>0)
+                    ! Paddy field correction
+                    where(is_rice_paddy)
                         wat_bal2_old%h_soil = wat_bal2_old%t_soil*1000*wat_bal2_old%d_t + &
                                                 theta2_rice%theta2_FC*1000*(wat_bal2%d_t-wat_bal2_old%d_t)
                     else where
@@ -685,7 +686,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             call calculate_RF_t(wat_bal2%d_t, pheno, info_spat%domain)
 
             ! Soil water thresholds update (wat variable)
-            call update_soil_pars(info_spat%domain, info_spat%theta, wat_bal1%d_e, wat_bal2%d_t, wat, theta2_rice, pheno%cn_class, pheno%k_cb)
+            call update_soil_pars(info_spat%domain, info_spat%theta, wat_bal1%d_e, wat_bal2%d_t, wat, theta2_rice, is_rice_paddy)
 
             ! Irrigation application thresholds update
             where(info_spat%domain%mat /= info_spat%domain%header%nan)
@@ -804,13 +805,13 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                     !%PS%: precompute tentative irrigation depth for rice so that USE mode can treat it as a fixed height
                     !      (whether irrigation can actually be supplied is decided in irrigation_use).
                     h_met_use = info_spat%h_meth%mat
-                    where(pheno%irrigation_class == 1 .and. pheno%cn_class == 7)
+                    where(is_rice_paddy)
                         h_met_use = ((info_spat%h_meth%mat - wat_bal1_old%h_pond) +                                 &!<-- reach a pond level of h_meth
                                      (info_spat%theta(1)%sat%mat*wat_bal1_old%d_e*1000.0D0 - wat_bal1_old%h_soil) + &!<-- replenish 1st layer up to saturation
                                      (wat%layer(2)%h_sat - wat_bal2_old%h_soil) +                                   &!<-- replenish 2nd layer up to saturation
                                      (wat_bal1_old%h_eva + wat_bal2_old%h_transp_pot)                               )!<-- add yesterday's evapotranspiration
                     end where
-                    call irrigate_rice(h_met_use, pheno, wat_bal1%h_eff_rain, theta2_rice%k_sat_2)                   !<-- add expected percolation and subtract rain
+                    call irrigate_rice(h_met_use, pheno, wat_bal1%h_eff_rain, theta2_rice%k_sat_2, is_rice_paddy)    !<-- add expected percolation and subtract rain
 
                     call irrigation_use(info_spat%domain, info_spat%irr_unit_id, pheno%irrigation_class, info_spat%irr_meth_id, &
                                       & irr_units, (wat_bal1_old%h_transp_pot+wat_bal2_old%h_transp_pot),                       &
@@ -834,8 +835,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                     !if (doy==pars%sim%end_irr_season) irr_units(:)%q_surplus = 0
 
                 case (2) ! NEED mode with field capacity target
-                    call irrigation_need_fc(info_spat, h_irr, wat_bal2, wat_bal2_old, wat_bal1_old, pheno, &
-                                          & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, pars%sim%fc_ratio    )
+                    call irrigation_need_fc(info_spat, h_irr, wat_bal2, wat_bal2_old, wat_bal1_old, pheno,            &
+                                          & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, is_rice_paddy, pars%sim%fc_ratio)
                     ! if outside the irrigation period, set irrigation height to zero
                     do z=1, pars%sim%n_irr_meth
                         where(doy<info_spat%irr_starts%mat .or. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
@@ -843,8 +844,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                     irr_loss = 0. ! not consider irrigation losses
 
                 case (3) ! NEED mode with fixed volume
-                    call irrigation_need_fixed(info_spat, h_irr, wat_bal2, wat_bal2_old, wat_bal1_old, pheno, &
-                                             & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, wat%layer(2)%h_sat   )
+                    call irrigation_need_fixed(info_spat, h_irr, wat_bal2, wat_bal2_old, wat_bal1_old, pheno,             &
+                                             & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, is_rice_paddy, wat%layer(2)%h_sat)
                     ! update irrigation losses
                     call calc_irrigation_losses(a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min),irr_loss)
                     ! if outside the irrigation period, set irrigation height to zero
@@ -858,7 +859,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                     call irrigation_scheduled(info_spat, doy, current_year, irr_sch, pheno, &
                         & h_irr, debug, wat_bal1_old, wat_bal2, wat_bal2_old, &
                         & a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min),irr_loss,&
-                        wat_bal1%h_eff_rain, theta2_rice%k_sat_2, wat%layer(2)%h_sat)
+                        wat_bal1%h_eff_rain, theta2_rice%k_sat_2, is_rice_paddy, wat%layer(2)%h_sat)
                     ! if outside the irrigation period, set irrigation height to zero
                     ! and calculate net irrigation
                     do z=1, pars%sim%n_irr_meth
@@ -911,13 +912,13 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
             ! calculate the runoff with the CN model
             call CN_runoff(wat_bal1%h_gross_av_water, wat_bal1%h_net_av_water, &
-                & h_irr_sum*(1-f_interception), info_spat%domain, pheno, &
+                & h_irr_sum*(1-f_interception), info_spat%domain, is_rice_paddy, &
                 & wat_bal1%h_runoff, out_cn_day, pars%sim%lambda_cn)
 
             ! HOURLY LOOP OF THE SIMULATION
             k_sat2_use = info_spat%k_sat(2)%mat
             fact_n2_use = info_spat%fact_n(2)%mat
-            where(pheno%cn_class==7 .and. pheno%k_cb>0.0D0)
+            where(is_rice_paddy)
                 k_sat2_use = theta2_rice%k_sat_2
                 fact_n2_use = theta2_rice%n_2
             end where
@@ -976,7 +977,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                                 & wat_bal_hour%esten%h_eva_pot(i,j), wat_bal_hour%esten%h_caprise(i,j), &
                                 & wat_bal_hour%esten%h_rise(i,j), &
                                 & pheno%d_r(i,j), wat_bal2%d_t(i,j), pheno%RF_t(i,j), &
-                                & pheno%k_cb(i,j), pheno%p_day(i,j), pheno%cn_class(i,j), &
+                                & pheno%k_cb(i,j), pheno%p_day(i,j), &
                                 & meteo%et0(i,j)*pars%fet0(hour), wat%layer(2)%h_sat(i,j), &
                                 & wat%layer(2)%h_fc(i,j), wat%layer(2)%h_wp(i,j), wat%layer(2)%h_r(i,j), &
                                 & k_sat2_use(i,j), fact_n2_use(i,j), &
@@ -1930,15 +1931,14 @@ subroutine init_water_balance_variables(wat_bal1,wat_bal2)
 
 end subroutine init_water_balance_variables
 
-subroutine update_soil_pars(domain,theta,d_e,d_t,wat,theta2_rice,cn_class,k_cb)
+subroutine update_soil_pars(domain, theta, d_e, d_t, wat, theta2_rice, is_rice_paddy)
     ! update water matrix that change with only the thikness of the soil layer
    type(grid_i),intent(in)::domain
     type(moisture),dimension(:),intent(in)::theta
     real(dp),dimension(:,:),intent(in)::d_e,d_t
     type(wat_matrix),intent(out)::wat
     type(soil2_rice),intent(in)::theta2_rice
-    integer,dimension(:,:),intent(in)::cn_class
-    real(dp),dimension(:,:),intent(in)::k_cb
+    logical, dimension(:,:), intent(in) :: is_rice_paddy
 
     where(domain%mat/=domain%header%nan)
         wat%layer(1)%h_wp  = 1000*theta(1)%wp%mat*d_e             ! water soil content at WP [mm]
@@ -1946,7 +1946,7 @@ subroutine update_soil_pars(domain,theta,d_e,d_t,wat,theta2_rice,cn_class,k_cb)
         wat%layer(1)%h_sat = 1000*theta(1)%sat%mat*d_e            ! water soil content at saturation [mm] %AB%
         wat%layer(1)%h_r   = 1000*theta(1)%r%mat*d_e              ! water soil content at residual humidity [mm]
         wat%layer(1)%rew = ((theta(1)%fc%mat - 0.5*theta(1)%wp%mat)*0.4)*1000*d_e
-        where (cn_class ==7 .and. k_cb>0) ! %AB% rice in crop season
+        where (is_rice_paddy)
             wat%layer(2)%h_wp=1000*theta2_rice%theta2_WP*d_t     ! water soil content at WP [mm]
             wat%layer(2)%h_fc=1000*theta2_rice%theta2_FC*d_t     ! water soil content at FC [mm]
             wat%layer(2)%h_sat=1000*theta2_rice%theta2_SAT*d_t   ! water soil content at saturation [mm] %AB%
