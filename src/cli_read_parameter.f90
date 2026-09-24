@@ -875,7 +875,7 @@ subroutine read_grid_files(info_spat, extent, sim)
     if(sim%f_init_wc .eqv. .true.)then  ! from external files
         call read_grid(trim(dir_ic)//trim(sim%thetaI_0_fn)//'.asc',info_spat%theta(1)%old,sim,extent)
         call read_grid(trim(dir_ic)//trim(sim%thetaII_0_fn)//'.asc',info_spat%theta(2)%old,sim,extent)
-    else                            ! from the first year of simulation warm-up
+    else ! Warmup starts at FC moisture; first actual year overwrites this using warmup_theta later 
         call read_grid(trim(dir)//trim(sim%thetaI_FC_fn)//'.asc',info_spat%theta(1)%old,sim,extent)
         call read_grid(trim(dir)//trim(sim%thetaII_FC_fn)//'.asc',info_spat%theta(2)%old,sim,extent)
     end if
