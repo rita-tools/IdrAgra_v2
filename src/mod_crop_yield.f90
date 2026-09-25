@@ -4,10 +4,71 @@ use mod_grid, only: grid_i
 use mod_common, only: balance1_matrices, balance2_matrices
 use mod_meteo, only: meteo_mat
 use mod_crop_phenology, only: crop_pars_matrices, crop_matrices
-use cli_save_outputs, only: yield_t
 implicit none
 
+type yield_3d_t
+    character(len=255) :: fn = ''
+    real(dp), dimension(:,:,:), allocatable :: mat
+end type yield_3d_t
+
+type yield_4d_t
+    character(len=255) :: fn = ''
+    real(dp), dimension(:,:,:,:), allocatable :: mat
+end type yield_4d_t
+
+type yield_t
+    type(yield_3d_t) :: biomass_pot
+    type(yield_3d_t) :: yield_pot
+    type(yield_3d_t) :: yield_act
+    type(yield_3d_t) :: f_WS
+    type(yield_3d_t) :: f_WS_stage
+    type(yield_3d_t) :: f_HS
+    type(yield_3d_t) :: f_HS_sum
+    type(yield_3d_t) :: transp_ratio_sum
+    type(yield_4d_t) :: T_act_sum
+    type(yield_4d_t) :: T_pot_sum
+    type(yield_4d_t) :: days_in_stage
+end type yield_t
+
 contains
+
+subroutine initialize_yield(yld, domain, n_crops)
+    type(yield_t), intent(inout) :: yld
+    integer, dimension(:,:), intent(in) :: domain
+    integer, intent(in) :: n_crops
+    integer, parameter :: n_stages = 4
+    integer :: nrows, ncols
+
+    nrows = size(domain, 1)
+    ncols = size(domain, 2)
+    allocate(yld%biomass_pot%mat    (nrows,ncols,n_crops), source=0.0_dp)
+    allocate(yld%yield_pot%mat      (nrows,ncols,n_crops), source=0.0_dp)
+    allocate(yld%yield_act%mat      (nrows,ncols,n_crops), source=0.0_dp)
+    allocate(yld%f_WS%mat           (nrows,ncols,n_crops), source=0.0_dp)
+    allocate(yld%f_WS_stage%mat     (nrows,ncols,n_crops), source=0.0_dp)
+    allocate(yld%f_HS%mat           (nrows,ncols,n_crops), source=0.0_dp)
+    allocate(yld%f_HS_sum%mat       (nrows,ncols,n_crops), source=0.0_dp)
+    allocate(yld%transp_ratio_sum%mat(nrows,ncols,n_crops),source=0.0_dp)
+    allocate(yld%T_act_sum%mat      (nrows,ncols,n_stages,n_crops), source=0.0_dp)
+    allocate(yld%T_pot_sum%mat      (nrows,ncols,n_stages,n_crops), source=0.0_dp)
+    allocate(yld%days_in_stage%mat  (nrows,ncols,n_stages,n_crops), source=0.0_dp)
+end subroutine initialize_yield
+
+subroutine destroy_yield(yld)
+    type(yield_t), intent(inout) :: yld
+
+    if (allocated(yld%biomass_pot%mat)) deallocate(yld%biomass_pot%mat)
+    if (allocated(yld%yield_pot%mat)) deallocate(yld%yield_pot%mat)
+    if (allocated(yld%yield_act%mat)) deallocate(yld%yield_act%mat)
+    if (allocated(yld%f_WS%mat)) deallocate(yld%f_WS%mat)
+    if (allocated(yld%f_WS_stage%mat)) deallocate(yld%f_WS_stage%mat)
+    if (allocated(yld%f_HS%mat)) deallocate(yld%f_HS%mat)
+    if (allocated(yld%f_HS_sum%mat)) deallocate(yld%f_HS_sum%mat)
+    if (allocated(yld%transp_ratio_sum%mat)) deallocate(yld%transp_ratio_sum%mat)
+    if (allocated(yld%T_act_sum%mat)) deallocate(yld%T_act_sum%mat)
+    if (allocated(yld%T_pot_sum%mat)) deallocate(yld%T_pot_sum%mat)
+    if (allocated(yld%days_in_stage%mat)) deallocate(yld%days_in_stage%mat)
+end subroutine destroy_yield
 
 subroutine accumulate_daily_yield(yld, pheno, crop_map, meteo, wat_bal1, wat_bal2, domain, doy)
     type(yield_t), intent(inout) :: yld
@@ -19,6 +80,7 @@ subroutine accumulate_daily_yield(yld, pheno, crop_map, meteo, wat_bal1, wat_bal
     type(grid_i), intent(in) :: domain
     integer, intent(in) :: doy
     integer :: i, j, n, stage
+    real(dp) :: h_transp_act, h_transp_pot
 
     ! TODO: add crop biomass from the previous year for winter cereals.
 

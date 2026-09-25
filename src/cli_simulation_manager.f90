@@ -6,7 +6,8 @@ use mod_evapotranspiration, only: ET_reference, calculateDLH
 use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data, create_meteo_matrices
 use mod_runoff
 use mod_crop_soil_water
-use mod_crop_phenology, only: crop_pheno_info, crop_matrices, populate_crop_pars_matrices
+use mod_crop_phenology, only: crop_pheno_info, crop_matrices, populate_crop_pars_matrices, &
+    & populate_crop_yield_matrices
 use mod_TDx_index
 use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva
 use mod_common, only: wat_matrix, soil2_rice, hourly, unit_file_scratch
@@ -14,7 +15,7 @@ use mod_irrigation
 use cli_watsources
 use cli_crop_parameters, only: read_all_crop_pars, destroy_infofeno_tab, check_pheno_parameters, k_cb_matrices
 use cli_save_outputs
-use mod_crop_yield, only: accumulate_daily_yield, calculate_annual_yield
+use mod_crop_yield, only: yield_t, initialize_yield, destroy_yield, accumulate_daily_yield, calculate_annual_yield
 use cli_read_parameter
 implicit none
 
@@ -440,16 +441,14 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                     & error_flag)
             end do
         end if
-        ! Writing crop parameters in cult matrix
-        call populate_crop_yield_matrices(info_pheno,dir_phenofases,info_spat%domain,info_spat%soil_use_id%mat,crop_map,y)
+
+        call populate_crop_yield_matrices(info_pheno, dir_phenofases, info_spat%domain, info_spat%soil_use_id%mat, crop_map, y)
+        call initialize_yield(yield, info_spat%domain%mat, size(info_pheno(1)%ii0,2))
 
         ! Inizialization of kcb_low and phenological phase
         pheno%k_cb_low = info_spat%domain%header%nan
         pheno%n_crop_in_year = 1
         pheno%pheno_idx = 1
-
-        ! Allocation of yield variables
-        call init_yearly_yield_output(yield, info_spat%domain%mat, size(info_pheno(1)%ii0,2))
 
         select case(pars%sim%mode)
             case (1)                                                ! USE mode
@@ -1165,7 +1164,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         call destroy_infofeno_tab(info_pheno)
         call destroy_crop(crop_map)
         if (pars%sim%mode ==1) call destroy_water_sources_duty(info_sources)
-        call destroy_yield_output(yield)
+        call destroy_yield(yield)
     end do year_cycle
 
     ! Save output for the following year
