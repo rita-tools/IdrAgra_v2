@@ -8,27 +8,29 @@ implicit none
 
 type yield_3d_t
     character(len=255) :: fn = ''
-    real(dp), dimension(:,:,:), allocatable :: mat
+    real(dp), dimension(:,:,:), allocatable :: mat !(nrows,ncols,n_crops_in_year)
 end type yield_3d_t
 
 type yield_4d_t
     character(len=255) :: fn = ''
-    real(dp), dimension(:,:,:,:), allocatable :: mat
+    real(dp), dimension(:,:,:,:), allocatable :: mat !(nrows,ncols,n_stages,n_crops_in_year)
 end type yield_4d_t
 
 type yield_t
-    type(yield_3d_t) :: biomass_pot
-    type(yield_3d_t) :: yield_pot
-    type(yield_3d_t) :: yield_act
-    type(yield_3d_t) :: f_WS
-    type(yield_3d_t) :: f_WS_stage
-    type(yield_3d_t) :: f_HS
-    type(yield_3d_t) :: f_HS_sum
-    type(yield_3d_t) :: transp_ratio_sum
-    type(yield_4d_t) :: T_act_sum
-    type(yield_4d_t) :: T_pot_sum
-    type(yield_4d_t) :: days_in_stage
+    type(yield_3d_t) :: biomass_pot     ! Potential biomass [t/ha]
+    type(yield_3d_t) :: yield_pot       ! Potential yield [t/ha]
+    type(yield_3d_t) :: yield_act       ! Actual yield [t/ha]
+    type(yield_3d_t) :: T_pot_ratio_sum ! Daily transpiration ratio (t_pot/et0) accumulator; used to estimate biomass_pot from water productivity.
+    type(yield_3d_t) :: HS_sum          ! Daily Heat stress accumulator. Cool days add 1, stress days add <1. [-]
+    type(yield_3d_t) :: f_HS            ! Mean heat-stress yield factor over the sensitive window, calculated as HS_sum/window_days [-]
+    type(yield_3d_t) :: f_WS_tot        ! Water stress yield factor calculated from the whole crop cycle [-]
+    type(yield_3d_t) :: f_WS_stage      ! Water stress yield factor calculated stage-by-stage [-]
+    type(yield_4d_t) :: T_act_sum       ! Cumulative transpiration in each stage [mm]
+    type(yield_4d_t) :: T_pot_sum       ! Cumulative potential transpiration in each stage [mm]
+    type(yield_4d_t) :: days_in_stage   ! Number of days spent in each stage !TODO: should be an integer
 end type yield_t
+
+integer, parameter :: n_stages = 4
 
 contains
 
@@ -36,7 +38,6 @@ subroutine initialize_yield(yld, domain, n_crops)
     type(yield_t), intent(inout) :: yld
     integer, dimension(:,:), intent(in) :: domain
     integer, intent(in) :: n_crops
-    integer, parameter :: n_stages = 4
     integer :: nrows, ncols
 
     nrows = size(domain, 1)
@@ -44,11 +45,11 @@ subroutine initialize_yield(yld, domain, n_crops)
     allocate(yld%biomass_pot%mat    (nrows,ncols,n_crops), source=0.0_dp)
     allocate(yld%yield_pot%mat      (nrows,ncols,n_crops), source=0.0_dp)
     allocate(yld%yield_act%mat      (nrows,ncols,n_crops), source=0.0_dp)
-    allocate(yld%f_WS%mat           (nrows,ncols,n_crops), source=0.0_dp)
+    allocate(yld%f_WS_tot%mat       (nrows,ncols,n_crops), source=0.0_dp)
     allocate(yld%f_WS_stage%mat     (nrows,ncols,n_crops), source=0.0_dp)
     allocate(yld%f_HS%mat           (nrows,ncols,n_crops), source=0.0_dp)
-    allocate(yld%f_HS_sum%mat       (nrows,ncols,n_crops), source=0.0_dp)
-    allocate(yld%transp_ratio_sum%mat(nrows,ncols,n_crops),source=0.0_dp)
+    allocate(yld%HS_sum%mat         (nrows,ncols,n_crops), source=0.0_dp)
+    allocate(yld%T_pot_ratio_sum%mat(nrows,ncols,n_crops), source=0.0_dp)
     allocate(yld%T_act_sum%mat      (nrows,ncols,n_stages,n_crops), source=0.0_dp)
     allocate(yld%T_pot_sum%mat      (nrows,ncols,n_stages,n_crops), source=0.0_dp)
     allocate(yld%days_in_stage%mat  (nrows,ncols,n_stages,n_crops), source=0.0_dp)
@@ -57,17 +58,17 @@ end subroutine initialize_yield
 subroutine destroy_yield(yld)
     type(yield_t), intent(inout) :: yld
 
-    if (allocated(yld%biomass_pot%mat)) deallocate(yld%biomass_pot%mat)
-    if (allocated(yld%yield_pot%mat)) deallocate(yld%yield_pot%mat)
-    if (allocated(yld%yield_act%mat)) deallocate(yld%yield_act%mat)
-    if (allocated(yld%f_WS%mat)) deallocate(yld%f_WS%mat)
-    if (allocated(yld%f_WS_stage%mat)) deallocate(yld%f_WS_stage%mat)
-    if (allocated(yld%f_HS%mat)) deallocate(yld%f_HS%mat)
-    if (allocated(yld%f_HS_sum%mat)) deallocate(yld%f_HS_sum%mat)
-    if (allocated(yld%transp_ratio_sum%mat)) deallocate(yld%transp_ratio_sum%mat)
-    if (allocated(yld%T_act_sum%mat)) deallocate(yld%T_act_sum%mat)
-    if (allocated(yld%T_pot_sum%mat)) deallocate(yld%T_pot_sum%mat)
-    if (allocated(yld%days_in_stage%mat)) deallocate(yld%days_in_stage%mat)
+    if (allocated(yld%biomass_pot%mat))     deallocate(yld%biomass_pot%mat)
+    if (allocated(yld%yield_pot%mat))       deallocate(yld%yield_pot%mat)
+    if (allocated(yld%yield_act%mat))       deallocate(yld%yield_act%mat)
+    if (allocated(yld%f_WS_tot%mat))        deallocate(yld%f_WS_tot%mat)
+    if (allocated(yld%f_WS_stage%mat))      deallocate(yld%f_WS_stage%mat)
+    if (allocated(yld%f_HS%mat))            deallocate(yld%f_HS%mat)
+    if (allocated(yld%HS_sum%mat))          deallocate(yld%HS_sum%mat)
+    if (allocated(yld%T_pot_ratio_sum%mat)) deallocate(yld%T_pot_ratio_sum%mat)
+    if (allocated(yld%T_act_sum%mat))       deallocate(yld%T_act_sum%mat)
+    if (allocated(yld%T_pot_sum%mat))       deallocate(yld%T_pot_sum%mat)
+    if (allocated(yld%days_in_stage%mat))   deallocate(yld%days_in_stage%mat)
 end subroutine destroy_yield
 
 subroutine accumulate_daily_yield(yld, pheno, crop_map, meteo, wat_bal1, wat_bal2, domain, doy)
@@ -96,10 +97,10 @@ subroutine accumulate_daily_yield(yld, pheno, crop_map, meteo, wat_bal1, wat_bal
                 ! Accumulate thermal stress
                 if (doy >= crop_map%TSP_low(i,j,n) .and. doy < crop_map%TSP_high(i,j,n)) then
                     if (meteo%T_ave(i,j) < pheno%T_crit(i,j)) then
-                        yld%f_HS_sum%mat(i,j,n) = yld%f_HS_sum%mat(i,j,n) + 1
+                        yld%HS_sum%mat(i,j,n) = yld%HS_sum%mat(i,j,n) + 1
                     else if (meteo%T_ave(i,j) >= pheno%T_crit(i,j) .and. meteo%T_ave(i,j) < pheno%T_lim(i,j)) then
-                        yld%f_HS_sum%mat(i,j,n) = yld%f_HS_sum%mat(i,j,n) + 1 -                                                 &
-                                                & (meteo%T_ave(i,j) - pheno%T_crit(i,j)) / (pheno%T_lim(i,j) - pheno%T_crit(i,j))
+                        yld%HS_sum%mat(i,j,n) = yld%HS_sum%mat(i,j,n) + 1 -                                                   &
+                                              & (meteo%T_ave(i,j) - pheno%T_crit(i,j)) / (pheno%T_lim(i,j) - pheno%T_crit(i,j))
                     end if
                 end if
 
@@ -139,7 +140,7 @@ subroutine accumulate_daily_yield(yld, pheno, crop_map, meteo, wat_bal1, wat_bal
 
                 ! Update transpiration ratio
                 if (meteo%et0(i,j) > 0) then
-                    yld%transp_ratio_sum%mat(i,j,n) = yld%transp_ratio_sum%mat(i,j,n) + (h_transp_pot) / meteo%et0(i,j)
+                    yld%T_pot_ratio_sum%mat(i,j,n) = yld%T_pot_ratio_sum%mat(i,j,n) + (h_transp_pot) / meteo%et0(i,j)
                 end if
             end if
         end do
@@ -150,56 +151,47 @@ subroutine calculate_annual_yield(yld, crop_map, domain)
     type(yield_t), intent(inout) :: yld
     type(crop_matrices), intent(in) :: crop_map
     type(grid_i), intent(in) :: domain
-    integer :: i, j, z
+    integer :: i, j, z, heat_sensitive_window, stage
+    real(dp) :: t_deficit, stage_duration_frac, ky, total_days
 
     do j = 1, size(domain%mat, 2)
         do i = 1, size(domain%mat, 1)
             do z = 1, size(crop_map%TSP_high, 3)
                 if (domain%mat(i,j) /= domain%header%nan) then
 
-                    ! A declared slot can be absent from the daily crop series when one crop overwrites another
+                    ! A declared slot can be absent from the daily crop series when one crop overwrites another; skip it
                     if (crop_map%ii0(i,j,z) == 0 .and. crop_map%iie(i,j,z) == 0) cycle
 
-                    if ((crop_map%TSP_high(i,j,z) - crop_map%TSP_low(i,j,z)) /= 0.0_dp) then
-                        yld%f_HS%mat(i,j,z) = yld%f_HS_sum%mat(i,j,z) / &
-                          & (crop_map%TSP_high(i,j,z) - crop_map%TSP_low(i,j,z))
-                    else
-                        yld%f_HS%mat(i,j,z) = real(domain%header%nan)
-                    end if
-
                     ! Calculate potential yield
-                    yld%biomass_pot%mat(i,j,z) = crop_map%wp_adj(i,j,z) * yld%transp_ratio_sum%mat(i,j,z)
+                    yld%biomass_pot%mat(i,j,z) = crop_map%wp_adj(i,j,z) * yld%T_pot_ratio_sum%mat(i,j,z)
                     yld%yield_pot%mat(i,j,z) = yld%biomass_pot%mat(i,j,z) * crop_map%HI(i,j,z)
 
-                    ! Calculate production reduction due to water stress
-                    yld%f_WS%mat(i,j,z) = 1 - crop_map%Ky_tot(i,j,z) * &
-                      & (1 - sum(yld%T_act_sum%mat(i,j,:,z)) / &
-                      & sum(yld%T_pot_sum%mat(i,j,:,z)))
+                    ! Heat stress !%PS%, todo: due to how TSP_high and _low are calculated, this is not correct for crops crossing the year boundary
+                    heat_sensitive_window = crop_map%TSP_high(i,j,z) - crop_map%TSP_low(i,j,z)
+                    if ((heat_sensitive_window) /= 0._dp) then
+                        yld%f_HS%mat(i,j,z) = yld%HS_sum%mat(i,j,z) / (heat_sensitive_window)
+                    else
+                        yld%f_HS%mat(i,j,z) = 1._dp !%PS%: no stess window; crop doesn't enter heat stress --> f_HS = 1
+                    end if
 
-                    if (yld%f_WS%mat(i,j,z) < 0) yld%f_WS%mat(i,j,z) = 0
+                    ! "Total" water stress
+                    yld%f_WS_tot%mat(i,j,z) = 1 - crop_map%Ky_tot(i,j,z)                                          * &
+                                            & (1 - sum(yld%T_act_sum%mat(i,j,:,z)) / sum(yld%T_pot_sum%mat(i,j,:,z)))
+                    yld%f_WS_tot%mat(i,j,z) = max(0._dp, yld%f_WS_tot%mat(i,j,z))
 
-                    yld%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,1) * &
-                      & (1 - yld%T_act_sum%mat(i,j,1,z) / yld%T_pot_sum%mat(i,j,1,z))) &
-                      & ** (yld%days_in_stage%mat(i,j,1,z) / sum(yld%days_in_stage%mat(i,j,:,z)))
+                    ! Stage-specific water stress
+                    total_days = sum(yld%days_in_stage%mat(i,j,:,z)) !%PS%: note that total_days does not include days in stage 0
+                    yld%f_WS_stage%mat(i,j,z) = 1._dp
+                    do stage = 1, n_stages
+                        ky = crop_map%Ky_pheno(i,j,z,stage)
+                        t_deficit = 1 - yld%T_act_sum%mat(i,j,stage,z) / yld%T_pot_sum%mat(i,j,stage,z)
+                        stage_duration_frac = (yld%days_in_stage%mat(i,j,stage,z) / total_days)
+                        yld%f_WS_stage%mat(i,j,z) = yld%f_WS_stage%mat(i,j,z) * (1 - ky * t_deficit)**stage_duration_frac
+                    end do
 
-                    yld%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,2) * &
-                      & (1 - yld%T_act_sum%mat(i,j,2,z) / yld%T_pot_sum%mat(i,j,2,z))) &
-                      & ** (yld%days_in_stage%mat(i,j,2,z) / sum(yld%days_in_stage%mat(i,j,:,z))) * &
-                      & yld%f_WS_stage%mat(i,j,z)
-
-                    yld%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,3) * &
-                      & (1 - yld%T_act_sum%mat(i,j,3,z) / yld%T_pot_sum%mat(i,j,3,z))) &
-                      & ** (yld%days_in_stage%mat(i,j,3,z) / sum(yld%days_in_stage%mat(i,j,:,z))) * &
-                      & yld%f_WS_stage%mat(i,j,z)
-
-                    yld%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,4) * &
-                      & (1 - yld%T_act_sum%mat(i,j,4,z) / yld%T_pot_sum%mat(i,j,4,z))) &
-                      & ** (yld%days_in_stage%mat(i,j,4,z) / sum(yld%days_in_stage%mat(i,j,:,z))) * &
-                      & yld%f_WS_stage%mat(i,j,z)
-
+                    ! Actual yield depends on both heat and water stress
                     yld%yield_act%mat(i,j,z) = yld%yield_pot%mat(i,j,z) * &
-                      & min(yld%f_WS%mat(i,j,z), yld%f_WS_stage%mat(i,j,z)) * &
-                      & yld%f_HS%mat(i,j,z)
+                                             & min(yld%f_WS_tot%mat(i,j,z), yld%f_WS_stage%mat(i,j,z)) * yld%f_HS%mat(i,j,z)
                 end if
             end do
         end do

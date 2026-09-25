@@ -866,9 +866,9 @@ subroutine init_yield_output_file(yield,path,year,sim)
     if (sim%prt_yr_T_act_sum=='y') yield%T_act_sum%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'T_act_sum'))
     if (sim%prt_yr_T_pot_sum=='y') yield%T_pot_sum%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'T_pot_sum'))
     if (sim%prt_yr_f_WS_stage=='y') yield%f_WS_stage%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fcCS'))
-    if (sim%prt_yr_f_WS=='y') yield%f_WS%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fcT'))
+    if (sim%prt_yr_f_WS=='y') yield%f_WS_tot%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fcT'))
     if (sim%prt_yr_f_HS=='y') yield%f_HS%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fHS'))
-    if (sim%prt_yr_f_HS_sum=='y') yield%f_HS_sum%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fHS_sum'))
+    if (sim%prt_yr_f_HS_sum=='y') yield%HS_sum%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fHS_sum'))
 end subroutine init_yield_output_file
 
 subroutine init_debug_yearly_output_file(a_yr_dbg_map,path,year,sim)
@@ -1133,11 +1133,11 @@ subroutine save_yield_debug_data(yield,domain)
             end if
         end do
     end do
-    do i=1, size(yield%f_WS%mat,3)
+    do i=1, size(yield%f_WS_tot%mat,3)
         write(stri,*)i
-        if (yield%f_WS%fn/='') then
-            call print_mat_as_grid(trim(trim(yield%f_WS%fn)//"_"//trim(adjustl(stri))//".asc"), &
-                & domain%header,yield%f_WS%mat(:,:,i),errorflag)
+        if (yield%f_WS_tot%fn/='') then
+            call print_mat_as_grid(trim(trim(yield%f_WS_tot%fn)//"_"//trim(adjustl(stri))//".asc"), &
+                & domain%header,yield%f_WS_tot%mat(:,:,i),errorflag)
         end if
         if (yield%f_WS_stage%fn/='') then
             call print_mat_as_grid(trim(trim(yield%f_WS_stage%fn)//"_"//trim(adjustl(stri))//".asc"), &
