@@ -64,7 +64,6 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     type(scheduled_irrigation),dimension(:),allocatable::irr_sch ! Allocated in 'open_scheduled_irrigation' function
     type(crop_matrices)::crop_map
 
-    integer:: unit_crop
     integer :: i, j, k, y, period_start_year, day_idx, hour, z ! for cycles
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::dir_phenofases
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::dir_meteo
@@ -76,8 +75,6 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     integer::error_flag
     integer::xx,yy ! Test cells coordinates
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::iter1,iter2
-    character(len=33)::str
-
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::irr_loss ! Irrigation application losses
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::alpha_ms_map, alpha_unm_map
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::fw_irr
@@ -279,75 +276,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         call update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, period_label,         &
                                       & alpha_ms_map, alpha_unm_map, fw_irr, a_loss, b_loss, c_loss, f_interception)
 
-        ! Read all phenological tables and allocation of info_pheno%prm%tab(:,:)
-        call read_all_crop_pars(pars%sim%days_in_year(y), pars%sim%n_lus, info_pheno)
-        if (pars%sim%prt_debug_out == 'y') then
-            call check_pheno_parameters(info_pheno,info_meteo)
-            call init_cell_output_file(unit_crop,trim(pars%sim%path)//'Kcb_levels.csv',&
-                &'MeteoStat; SoilUse; nCrop; low; mid; high')
-            do i=1, size(info_pheno)
-                do j = 1, size(info_pheno(i)%k_cb%tab, 2)
-                    do z = 1, info_pheno(i)%n_crops_by_year(j)
-                        write(unit_crop,*) trim(info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)), &
-                            & '; ', j, '; ', z, '; ', &
-                            & info_pheno(i)%kcb_phases%low(j,z), '; ', &
-                            & info_pheno(i)%kcb_phases%mid(j,z), '; ', info_pheno(i)%kcb_phases%high(j,z)
-                    end do
-                end do
-            end do
-            close(unit_crop)
-            call init_cell_output_file(unit_crop,trim(pars%sim%path)//period_label//'_PhenoLengths.csv',&
-                &'MeteoStat; SoilUse; nCrop; ii0; iie; iid')
-            do i=1,size(info_pheno)
-                do j=1,size(info_pheno(i)%ii0,1)
-                    do z=1,size(info_pheno(i)%ii0,2)
-                        if (info_pheno(i)%ii0(j,z)>0) then
-                            write(unit_crop,*)trim(info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)), &
-                                & '; ',j,'; ', z, '; ',info_pheno(i)%ii0(j,z),'; ',&
-                                & info_pheno(i)%iie(j,z),'; ',info_pheno(i)%iid(j,z)
-                        end if
-                    end do
-                end do
-            end do
-            close(unit_crop)
-        end if
-
-        ! Randomization and spatial distribution of crop emergence
-        if (pars%sim%f_irandom .eqv. .false.) then
-            call get_uniform_sample(info_spat%irandom%mat,pars%sim%sowing_range,pars%sim%rand_symmetry,pars%sim%repeatable)
-        end if
-
-        call allocate_crop_map (crop_map,info_spat%domain%mat,pars%sim%n_crops,info_spat%domain%header%nan)
-        ! make_random_emergence calculates reference data to estimate crop emergence date
-        ! which will be calculated in populate_crop_pars_matrices
-        call make_random_emergence(info_pheno,meteo_weight,dir_meteo,info_spat%domain,info_spat%soil_use_id%mat, &
-            & crop_map, info_spat%irandom%mat, pars%sim%days_in_year(y))
-
-        if (pars%sim%prt_debug_out == 'y') then
-            ! write debug files of reference data for crop randomization
-            call print_mat_as_grid(trim(pars%sim%path)//period_label//"_irandom.asc", &
-                & info_spat%irandom%header,info_spat%irandom%mat,error_flag)
-            do i=1,size(crop_map%ii0,3)
-                write(str,*)i
-                call print_mat_as_grid(trim(pars%sim%path)//period_label//"_ii0_" &
-                    & //trim(adjustl(str))//".asc",info_spat%domain%header,crop_map%ii0(:,:,i), &
-                    & error_flag)
-                call print_mat_as_grid(trim(pars%sim%path)//period_label//"_iie_" &
-                    & //trim(adjustl(str))//".asc",info_spat%domain%header,crop_map%iie(:,:,i), &
-                    & error_flag)
-                call print_mat_as_grid(trim(pars%sim%path)//period_label//"_dij_" &
-                    & //trim(adjustl(str))//".asc",info_spat%domain%header,crop_map%dij(:,:,i), &
-                    & error_flag)
-            end do
-        end if
-
-        call populate_crop_yield_matrices(info_pheno, dir_phenofases, info_spat%domain, info_spat%soil_use_id%mat, crop_map, y)
-        call initialize_yield(yield, info_spat%domain%mat, size(info_pheno(1)%ii0,2))
-
-        ! Inizialization of kcb_low and phenological phase
-        pheno%k_cb_low = info_spat%domain%header%nan
-        pheno%n_crop_in_year = 1
-        pheno%pheno_idx = 1
+        call initialize_yearly_crop_state(pars, y, period_label, info_pheno, info_meteo, info_spat, &
+            & meteo_weight, dir_meteo, dir_phenofases, crop_map, yield, pheno)
 
         select case(pars%sim%mode)
             case (1)                                                ! USE mode
@@ -1210,6 +1140,95 @@ subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, b
     end if
 
 end subroutine update_yearly_spatial_data
+
+subroutine initialize_yearly_crop_state(pars, year_idx, period_label, info_pheno, info_meteo, info_spat, &
+    & meteo_weight, dir_meteo, dir_phenofases, crop_map, yield, pheno)
+
+    type(parameters), intent(in) :: pars
+    integer, intent(in) :: year_idx
+    character(len=*), intent(in) :: period_label
+    type(crop_pheno_info), dimension(:), intent(inout) :: info_pheno
+    type(meteo_info), dimension(:), intent(in) :: info_meteo
+    type(spatial_info), intent(inout) :: info_spat
+    real(dp), dimension(:,:,:), intent(in) :: meteo_weight
+    integer, dimension(:,:,:), intent(in) :: dir_meteo
+    integer, dimension(:,:), intent(in) :: dir_phenofases
+    type(crop_matrices), intent(inout) :: crop_map
+    type(yield_t), intent(inout) :: yield
+    type(crop_pars_matrices), intent(inout) :: pheno
+
+    integer :: unit_crop, error_flag
+    integer :: i, j, z
+
+    ! Read all phenological tables and allocation of info_pheno%prm%tab(:,:)
+    call read_all_crop_pars(pars%sim%days_in_year(year_idx), pars%sim%n_lus, info_pheno)
+    if (pars%sim%prt_debug_out == 'y') then
+        call check_pheno_parameters(info_pheno,info_meteo)
+        call init_cell_output_file(unit_crop,trim(pars%sim%path)//'Kcb_levels.csv', 'MeteoStat; SoilUse; nCrop; low; mid; high')
+        do i=1, size(info_pheno)
+            do j = 1, size(info_pheno(i)%k_cb%tab, 2)
+                do z = 1, info_pheno(i)%n_crops_by_year(j)
+                    write(unit_crop,*) trim(info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)), &
+                        & '; ', j, '; ', z, '; ', &
+                        & info_pheno(i)%kcb_phases%low(j,z), '; ', &
+                        & info_pheno(i)%kcb_phases%mid(j,z), '; ', info_pheno(i)%kcb_phases%high(j,z)
+                end do
+            end do
+        end do
+        close(unit_crop)
+        call init_cell_output_file(unit_crop,trim(pars%sim%path)//period_label//'_PhenoLengths.csv',&
+            &'MeteoStat; SoilUse; nCrop; ii0; iie; iid')
+        do i=1,size(info_pheno)
+            do j=1,size(info_pheno(i)%ii0,1)
+                do z=1,size(info_pheno(i)%ii0,2)
+                    if (info_pheno(i)%ii0(j,z)>0) then
+                        write(unit_crop,*)trim(info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)), &
+                            & '; ',j,'; ', z, '; ',info_pheno(i)%ii0(j,z),'; ',&
+                            & info_pheno(i)%iie(j,z),'; ',info_pheno(i)%iid(j,z)
+                    end if
+                end do
+            end do
+        end do
+        close(unit_crop)
+    end if
+
+    ! Randomization and spatial distribution of crop emergence
+    if (pars%sim%f_irandom .eqv. .false.) then
+        call get_uniform_sample(info_spat%irandom%mat,pars%sim%sowing_range,pars%sim%rand_symmetry,pars%sim%repeatable)
+    end if
+
+    call allocate_crop_map (crop_map,info_spat%domain%mat,pars%sim%n_crops,info_spat%domain%header%nan)
+    ! make_random_emergence calculates reference data to estimate crop emergence date
+    ! which will be calculated in populate_crop_pars_matrices
+    call make_random_emergence(info_pheno,meteo_weight,dir_meteo,info_spat%domain,info_spat%soil_use_id%mat, &
+        & crop_map, info_spat%irandom%mat, pars%sim%days_in_year(year_idx))
+
+    if (pars%sim%prt_debug_out == 'y') then
+        ! write debug files of reference data for crop randomization
+        call print_mat_as_grid(trim(pars%sim%path)//period_label//"_irandom.asc", &
+            & info_spat%irandom%header,info_spat%irandom%mat,error_flag)
+        do i=1,size(crop_map%ii0,3)
+            call print_mat_as_grid(trim(pars%sim%path)//period_label//"_ii0_" &
+                & //itoa(i)//".asc",info_spat%domain%header,crop_map%ii0(:,:,i), &
+                & error_flag)
+            call print_mat_as_grid(trim(pars%sim%path)//period_label//"_iie_" &
+                & //itoa(i)//".asc",info_spat%domain%header,crop_map%iie(:,:,i), &
+                & error_flag)
+            call print_mat_as_grid(trim(pars%sim%path)//period_label//"_dij_" &
+                & //itoa(i)//".asc",info_spat%domain%header,crop_map%dij(:,:,i), &
+                & error_flag)
+        end do
+    end if
+
+    call populate_crop_yield_matrices(info_pheno, dir_phenofases, info_spat%domain, info_spat%soil_use_id%mat, crop_map, year_idx)
+    call initialize_yield(yield, info_spat%domain%mat, size(info_pheno(1)%ii0, 2))
+
+    ! Inizialization of kcb_low and phenological phase
+    pheno%k_cb_low = info_spat%domain%header%nan
+    pheno%n_crop_in_year = 1
+    pheno%pheno_idx = 1
+
+end subroutine initialize_yearly_crop_state
 
 subroutine write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal1, wat_bal2, wat_bal2_old, &
     & info_spat, pars, wat, wat_bal_hour, fw, fw_old, esp_perc, out_cn, out_cn_day, h_bypass, coll_irr, &
