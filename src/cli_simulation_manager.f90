@@ -6,7 +6,7 @@ use mod_evapotranspiration, only: ET_reference, calculateDLH
 use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data, create_meteo_matrices
 use mod_runoff
 use mod_crop_soil_water
-use mod_crop_phenology, only: crop_pheno_info, crop_matrices, populate_crop_pars_matrices
+use mod_crop_phenology, only: crop_pheno_info, crop_matrices, populate_crop_pars_matrices, populate_crop_yield_matrices
 use mod_TDx_index
 use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva
 use mod_common, only: wat_matrix, soil2_rice, hourly, unit_file_scratch
@@ -14,6 +14,7 @@ use mod_irrigation
 use cli_watsources
 use cli_crop_parameters, only: read_all_crop_pars, destroy_infofeno_tab, check_pheno_parameters, k_cb_matrices
 use cli_save_outputs
+use mod_crop_yield, only: yield_t, initialize_yield, destroy_yield, accumulate_daily_yield, calculate_annual_yield
 use cli_read_parameter
 implicit none
 
@@ -439,16 +440,14 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                     & error_flag)
             end do
         end if
-        ! Writing crop parameters in cult matrix
-        call populate_crop_yield_matrices(info_pheno,dir_phenofases,info_spat%domain,info_spat%soil_use_id%mat,crop_map,y)
+
+        call populate_crop_yield_matrices(info_pheno, dir_phenofases, info_spat%domain, info_spat%soil_use_id%mat, crop_map, y)
+        call initialize_yield(yield, info_spat%domain%mat, size(info_pheno(1)%ii0,2))
 
         ! Inizialization of kcb_low and phenological phase
         pheno%k_cb_low = info_spat%domain%header%nan
         pheno%n_crop_in_year = 1
         pheno%pheno_idx = 1
-
-        ! Allocation of yield variables
-        call init_yearly_yield_output(yield, info_spat%domain%mat, size(info_pheno(1)%ii0,2))
 
         select case(pars%sim%mode)
             case (1)                                                ! USE mode
@@ -1062,83 +1061,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             wat_bal1%h_pond = min(wat_bal_hour%esten%h_pond,info_spat%h_maxpond%mat)
             !wat_bal1%h_pond = wat_bal_hour%esten%h_pond
 
-            ! Calculate the crop production
-            ! TODO:
-            ! add the crop biomass from the previuos year for winter cereals (need variables to store previous year)
-
-            ! Update the parameters for the calculation of the thermal stress
-            do j=1,size(info_spat%domain%mat,2)
-                do i=1,size(info_spat%domain%mat,1)
-                    if(info_spat%domain%mat(i,j) /= info_spat%domain%header%nan) then
-                        if (doy >= crop_map%TSP_low(i,j,pheno%n_crop_in_year(i,j)) .and. &
-                            & doy < crop_map%TSP_high(i,j,pheno%n_crop_in_year(i,j))) then
-                            if (meteo%T_ave(i,j) < pheno%T_crit(i,j)) then
-                                yield%f_HS_sum%mat(i,j,pheno%n_crop_in_year(i,j)) = &
-                                    & yield%f_HS_sum%mat(i,j,pheno%n_crop_in_year(i,j)) + 1
-                            else if (meteo%T_ave(i,j) >= pheno%T_crit(i,j) .and. meteo%T_ave(i,j) < pheno%T_lim(i,j)) then
-                                yield%f_HS_sum%mat(i,j,pheno%n_crop_in_year(i,j)) = &
-                                    & yield%f_HS_sum%mat (i,j,pheno%n_crop_in_year(i,j)) + 1 - &
-                                    & (meteo%T_ave(i,j) - pheno%T_crit(i,j))/ (pheno%T_lim(i,j) - pheno%T_crit(i,j))
-                            end if
-                        end if
-
-                        ! Calculate the period of growing
-                        if (pheno%k_cb_low(i,j) == 0) then ! annual crop
-                            if (pheno%k_cb(i,j) == pheno%k_cb_low(i,j)) then
-                                pheno%pheno_idx(i,j) = 0
-                            ! initial stage
-                            else if (pheno%k_cb(i,j) <= pheno%k_cb_mid(i,j) .and. &
-                                & (pheno%pheno_idx(i,j)==0 .or. pheno%pheno_idx(i,j)==1)) then
-                                pheno%pheno_idx(i,j) = 1
-                            ! growing stage
-                            else if (pheno%k_cb(i,j) < pheno%k_cb_high(i,j) .and. &
-                                & (pheno%pheno_idx(i,j)==1 .or. pheno%pheno_idx(i,j)==2)) then
-                                pheno%pheno_idx(i,j) = 2
-                            ! maturity stage
-                            else if (pheno%k_cb(i,j) == pheno%k_cb_high(i,j)) then
-                                pheno%pheno_idx(i,j) = 3
-                            ! senescence stage
-                            else
-                                pheno%pheno_idx(i,j) = 4
-                            end if
-                        else  ! permanent, pluriannual cropfn
-                            ! Vernalization or after the harvest
-                            if (pheno%k_cb(i,j) == pheno%k_cb_low(i,j)) then
-                                pheno%pheno_idx(i,j) = 1
-                            ! growing stage
-                            else if (pheno%k_cb(i,j) < pheno%k_cb_high(i,j) .and. &
-                                & (pheno%pheno_idx(i,j)==1 .or. pheno%pheno_idx(i,j)==2)) then
-                                pheno%pheno_idx(i,j) = 2
-                            ! maturity stage
-                            else if (pheno%k_cb(i,j) == pheno%k_cb_high(i,j)) then
-                                pheno%pheno_idx(i,j) = 3
-                            ! senescence stage
-                            else
-                                pheno%pheno_idx(i,j) = 4
-                            end if
-                        end if
-
-                        ! update the parameters for the calculation of the water stress
-                        if (pheno%pheno_idx(i,j) > 0) then
-                            yield%T_act_sum%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) = &
-                                & yield%T_act_sum%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) + &
-                                & wat_bal1%h_transp_act(i,j) + wat_bal2%h_transp_act(i,j)
-                            yield%T_pot_sum%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) = &
-                                & yield%T_pot_sum%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) + &
-                                & wat_bal1%h_transp_pot(i,j) + wat_bal2%h_transp_pot(i,j)
-                            yield%dev_stage%mat(i,j, pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) = &
-                                & yield%dev_stage%mat(i,j,pheno%pheno_idx(i,j), pheno%n_crop_in_year(i,j)) + 1
-                        end if
-
-                        ! Update transpiration ratio
-                        if ( meteo%et0(i,j)>0) then
-                            yield%transp_ratio_sum%mat(i,j,pheno%n_crop_in_year(i,j)) = &
-                                &  yield%transp_ratio_sum%mat(i,j,pheno%n_crop_in_year(i,j)) + &
-                                & (wat_bal1%h_transp_pot(i,j) + wat_bal2%h_transp_pot(i,j)) / meteo%et0(i,j)
-                        end if
-                    end if
-                end do
-            end do
+            call accumulate_daily_yield(yield, pheno, crop_map, meteo, wat_bal1, wat_bal2, info_spat%domain, doy)
 
             ! calculate transpiration deficit index
             if (trim(pars_TDx%mode)/="none") then
@@ -1201,71 +1124,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
         end do day_cycle
 
-        ! Calculate productivity
-        do j=1,size(info_spat%domain%mat,2)
-            do i=1,size(info_spat%domain%mat,1)
-                do z=1, size(crop_map%TSP_high,3)
-                    if(info_spat%domain%mat(i,j) /= info_spat%domain%header%nan) then
-                        !%PS% Skip yield calculations for declared slots absent from the daily crop series (can happen due to cropcoef crop overwriting)
-                        if (crop_map%ii0(i,j,z) == 0 .and. crop_map%iie(i,j,z) == 0) cycle
-
-                        ! TODO: check zero conditions
-                        if ((crop_map%TSP_high(i,j,z) - crop_map%TSP_low(i,j,z))/=0.0D0) then
-                            yield%f_HS%mat(i,j,z) = yield%f_HS_sum%mat(i,j,z) / &
-                                & (crop_map%TSP_high(i,j,z) - crop_map%TSP_low(i,j,z))
-                        else
-                            yield%f_HS%mat(i,j,z) = real(info_spat%domain%header%nan)
-                        end if
-
-                        yield%biomass_pot%mat(i,j,z) = &
-                            & crop_map%wp_adj(i,j,z) * yield%transp_ratio_sum%mat(i,j,z)
-
-                        yield%yield_pot%mat(i,j,z) = &
-                            & yield%biomass_pot%mat(i,j,z) * crop_map%HI(i,j,z)
-
-                        ! Calculate the reduction of the production from the water stress
-                        yield%f_WS%mat(i,j,z) = 1 - crop_map%Ky_tot(i,j,z) * & ! %PS% important bugfix: earlier version was using pheno%Ky_tot(i,j), i.e. whatever value was saved at year end.
-                            & (1- sum(yield%T_act_sum%mat(i,j,:,z)) / &        !                        This potentially gave the same Ky to both crops present in a year (e.g. maize was using wheat's Ky)
-                            & sum(yield%T_pot_sum%mat(i,j,:,z)))
-
-                        if (yield%f_WS%mat(i,j,z) < 0) yield%f_WS%mat(i,j,z) = 0    ! limit to zero
-
-                        yield%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,1) * &
-                            & (1 - (yield%T_act_sum%mat(i,j,1,z) / &
-                            & yield%T_pot_sum%mat(i,j,1,z)))) &
-                            & ** (yield%dev_stage%mat(i,j,1,z) &
-                            & / sum(yield%dev_stage%mat(i,j,:,z)))
-
-                        yield%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,2) * &
-                            & (1 - (yield%T_act_sum%mat(i,j,2,z) / &
-                            & yield%T_pot_sum%mat(i,j,2,z)))) &
-                            & ** (yield%dev_stage%mat(i,j,2,z) &
-                            & / sum(yield%dev_stage%mat(i,j,:,z))) * &
-                            & yield%f_WS_stage%mat(i,j,z)
-
-                        yield%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,3) * &
-                            & (1 - (yield%T_act_sum%mat(i,j,3,z) / &
-                            & yield%T_pot_sum%mat(i,j,3,z)))) &
-                            & ** (yield%dev_stage%mat(i,j,3,z) &
-                            & / sum(yield%dev_stage%mat(i,j,:,z))) * &
-                            & yield%f_WS_stage%mat(i,j,z)
-
-                        yield%f_WS_stage%mat(i,j,z) = (1 - crop_map%Ky_pheno(i,j,z,4) * &
-                            & (1 - (yield%T_act_sum%mat(i,j,4,z) / &
-                            & yield%T_pot_sum%mat(i,j,4,z)))) &
-                            & ** (yield%dev_stage%mat(i,j,4,z) &
-                            & / sum(yield%dev_stage%mat(i,j,:,z))) * &
-                            & yield%f_WS_stage%mat(i,j,z)
-
-                        yield%yield_act%mat(i,j,z) = &
-                            & yield%yield_pot%mat(i,j,z) * &
-                            & min(yield%f_WS%mat(i,j,z), &
-                            & yield%f_WS_stage%mat(i,j,z)) * &
-                            & yield%f_HS%mat(i,j,z)
-                    end if
-                end do
-            end do
-        end do
+        call calculate_annual_yield(yield, crop_map, info_spat%domain)
 
         ! Calculate the annual efficiency for the use of the water inputs (rain and irrigation)
         where ((yr_map%rain_crop_season%mat + yr_map%irr%mat) > 0)
@@ -1304,7 +1163,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         call destroy_infofeno_tab(info_pheno)
         call destroy_crop(crop_map)
         if (pars%sim%mode ==1) call destroy_water_sources_duty(info_sources)
-        call destroy_yield_output(yield)
+        call destroy_yield(yield)
     end do year_cycle
 
     ! Save output for the following year

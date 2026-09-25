@@ -7,6 +7,7 @@ use mod_common, only: spatial_info
 use mod_parameters
 use cli_watsources
 use mod_crop_phenology
+use mod_crop_yield, only: yield_t
 implicit none
 
 type output
@@ -47,31 +48,6 @@ type out_2d_mat
     character(len=255)::fn  = ''                            ! name of the file, set to empty by default
     real(dp),dimension(:,:),pointer::mat                    ! single data matrix
 end type out_2d_mat
-
-type out_3d_mat
-    character(len=255)::fn = ''                             ! name of the file, set to empty by default
-    real(dp),dimension(:,:,:),pointer::mat                  ! data matrix per layer
-end type out_3d_mat
-
-type out_4d_mat
-    character(len=255)::fn = ''                             ! name of the file, set to empty by default
-    real(dp),dimension(:,:,:,:),pointer::mat                ! data matrix per layer and condiction
-end type out_4d_mat
-
-! TODO: check meaning
-type yield_t
-    type(out_3d_mat):: biomass_pot                   ! potential biomass
-    type(out_3d_mat):: yield_pot                     ! potential yield [t/ha]
-    type(out_3d_mat):: yield_act                     ! actual yield [t/ha]
-    type(out_3d_mat):: f_WS                          ! water-stress yield reduction factor - overall [-]
-    type(out_3d_mat):: f_WS_stage                    ! water-stress yield reduction factor - stages [-]
-    type(out_3d_mat):: f_HS                          ! heat-stress yield reduction factor [-]
-    type(out_3d_mat):: f_HS_sum                      ! somma dei valori per il calcolo del fattore di riduzione correlato allo stress
-    type(out_3d_mat):: transp_ratio_sum              ! somma del rapporto tra traspirazione potenziale ed evapotraspirazione di riferimento
-    type(out_4d_mat):: T_act_sum                     ! somma della traspirazione effettiva per ciascuna fase del kcb
-    type(out_4d_mat):: T_pot_sum                     ! somma della traspirazione potenziale per ciascuna fase del kcb
-    type(out_4d_mat):: dev_stage                     ! durata delle fasi del kcb
-end type yield_t
 
 type step_map
     ! store the spatial distribution of several parameters aggregated by month
@@ -130,7 +106,6 @@ interface assignment(=)
     module procedure assign_step_debug_map
     module procedure assign_annual_map
     module procedure assign_annual_debug_map
-    module procedure assign_yield_map
 end interface
 
 contains
@@ -709,25 +684,6 @@ subroutine init_yearly_output(yr_map,domain)
     allocate(yr_map%h_irr_mean%mat(size(domain,1),size(domain,2)))
 end subroutine init_yearly_output
 
-subroutine init_yearly_yield_output(yield_map,domain,cs)
-    type(yield_t),intent(inout)::yield_map
-    integer,dimension(:,:),intent(in)::domain
-    integer,intent(in)::cs
-    integer,parameter::fasi_kcb=4
-
-    allocate(yield_map%biomass_pot%mat(size(domain,1),size(domain,2),cs))
-    allocate(yield_map%yield_pot%mat(size(domain,1),size(domain,2),cs))
-    allocate(yield_map%yield_act%mat(size(domain,1),size(domain,2),cs))
-    allocate(yield_map%f_WS%mat(size(domain,1),size(domain,2),cs))
-    allocate(yield_map%f_WS_stage%mat(size(domain,1),size(domain,2),cs))
-    allocate(yield_map%f_HS%mat(size(domain,1),size(domain,2),cs))
-    allocate(yield_map%f_HS_sum%mat(size(domain,1),size(domain,2),cs))
-    allocate(yield_map%transp_ratio_sum%mat(size(domain,1),size(domain,2),cs))
-    allocate(yield_map%T_act_sum%mat(size(domain,1),size(domain,2),fasi_kcb, cs))
-    allocate(yield_map%T_pot_sum%mat(size(domain,1),size(domain,2),fasi_kcb, cs))
-    allocate(yield_map%dev_stage%mat(size(domain,1),size(domain,2),fasi_kcb, cs))
-end subroutine init_yearly_yield_output
-
 subroutine init_yearly_debug_output(dbg_yr_map,domain)
     type(annual_debug_map)::dbg_yr_map
     integer,dimension(:,:),intent(in)::domain
@@ -782,22 +738,6 @@ subroutine destroy_annual_output(yr_map)
     deallocate(yr_map%n_irr_events%mat)
     deallocate(yr_map%h_irr_mean%mat)
 end subroutine destroy_annual_output
-
-subroutine destroy_yield_output(yld_map)
-    type(yield_t)::yld_map
-
-    deallocate(yld_map%biomass_pot%mat)
-    deallocate(yld_map%yield_pot%mat)
-    deallocate(yld_map%yield_act%mat)
-    deallocate(yld_map%f_WS%mat)
-    deallocate(yld_map%f_WS_stage%mat)
-    deallocate(yld_map%f_HS%mat)
-    deallocate(yld_map%f_HS_sum%mat)
-    deallocate(yld_map%transp_ratio_sum%mat)
-    deallocate(yld_map%T_act_sum%mat)
-    deallocate(yld_map%T_pot_sum%mat)
-    deallocate(yld_map%dev_stage%mat)
-end subroutine destroy_yield_output
 
 subroutine destroy_annual_debug_output(dbg_yr_map)
     type(annual_debug_map)::dbg_yr_map
@@ -926,10 +866,9 @@ subroutine init_yield_output_file(yield,path,year,sim)
     if (sim%prt_yr_T_act_sum=='y') yield%T_act_sum%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'T_act_sum'))
     if (sim%prt_yr_T_pot_sum=='y') yield%T_pot_sum%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'T_pot_sum'))
     if (sim%prt_yr_f_WS_stage=='y') yield%f_WS_stage%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fcCS'))
-    if (sim%prt_yr_f_WS=='y') yield%f_WS%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fcT'))
+    if (sim%prt_yr_f_WS=='y') yield%f_WS_tot%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fcT'))
     if (sim%prt_yr_f_HS=='y') yield%f_HS%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fHS'))
-    if (sim%prt_yr_f_HS_sum=='y') yield%f_HS_sum%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fHS_sum'))
-    yield = 0.0D0    ! set to zero after
+    if (sim%prt_yr_f_HS_sum=='y') yield%HS_sum%fn=trim(adjustl(trim(path)//trim(adjustl(year_str))//'fHS_sum'))
 end subroutine init_yield_output_file
 
 subroutine init_debug_yearly_output_file(a_yr_dbg_map,path,year,sim)
@@ -1100,7 +1039,7 @@ subroutine save_yearly_data(yr_map,domain)
 end subroutine save_yearly_data
 
 subroutine save_yield_data(yield,domain)
-    type(yield_t),intent(in)::yield
+    type(yield_t),intent(inout)::yield
     type(grid_i),intent(in)::domain
     integer::j
     integer::errorflag
@@ -1194,11 +1133,11 @@ subroutine save_yield_debug_data(yield,domain)
             end if
         end do
     end do
-    do i=1, size(yield%f_WS%mat,3)
+    do i=1, size(yield%f_WS_tot%mat,3)
         write(stri,*)i
-        if (yield%f_WS%fn/='') then
-            call print_mat_as_grid(trim(trim(yield%f_WS%fn)//"_"//trim(adjustl(stri))//".asc"), &
-                & domain%header,yield%f_WS%mat(:,:,i),errorflag)
+        if (yield%f_WS_tot%fn/='') then
+            call print_mat_as_grid(trim(trim(yield%f_WS_tot%fn)//"_"//trim(adjustl(stri))//".asc"), &
+                & domain%header,yield%f_WS_tot%mat(:,:,i),errorflag)
         end if
         if (yield%f_WS_stage%fn/='') then
             call print_mat_as_grid(trim(trim(yield%f_WS_stage%fn)//"_"//trim(adjustl(stri))//".asc"), &
@@ -1260,23 +1199,6 @@ subroutine assign_annual_map(yr_map,a)
     yr_map%n_irr_events%mat = a
     yr_map%h_irr_mean%mat = a
 end subroutine assign_annual_map
-
-subroutine assign_yield_map(yield_map,a)
-    type(yield_t),intent(inout)::yield_map
-    real(dp),intent(in)::a
-
-    yield_map%biomass_pot%mat = a
-    yield_map%yield_pot%mat = a
-    yield_map%yield_act%mat = a
-    yield_map%f_WS%mat = a
-    yield_map%f_WS_stage%mat = a
-    yield_map%f_HS%mat = a
-    yield_map%f_HS_sum%mat = a
-    yield_map%transp_ratio_sum%mat = a
-    yield_map%T_act_sum%mat = a
-    yield_map%T_pot_sum%mat = a
-    yield_map%dev_stage%mat = a
-end subroutine assign_yield_map
 
 subroutine assign_annual_debug_map(yr_debug_map,a)
     type(annual_debug_map),intent(inout)::yr_debug_map
