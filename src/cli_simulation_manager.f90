@@ -586,16 +586,16 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 & .and. (pars%sim%start_simulation%day > 1 .or. pars%sim%start_simulation%month > 1)) then
                 call populate_crop_pars_matrices(pheno, info_pheno, info_spat%irandom%mat,                                             &
                                                & doy + pars%sim%start_simulation%doy - calc_doy(1, 1, pars%sim%start_simulation%year), &
-                                               & dir_phenofases, info_spat%domain, info_spat%soil_use_id, y,                           &
+                                               & dir_phenofases, info_spat%domain, info_spat%soil_use_id,                              &
                                                & pars%sim%year_step(y), crop_map)
             else
                 call populate_crop_pars_matrices(pheno, info_pheno, info_spat%irandom%mat,                         &
                                                & doy,                                                              &
-                                               & dir_phenofases, info_spat%domain, info_spat%soil_use_id, y,       &
+                                               & dir_phenofases, info_spat%domain, info_spat%soil_use_id,          &
                                                & pars%sim%year_step(y), crop_map)
             end if
 
-            !%PS%: unified switch for flooded rice special behaviour (soil switch, irrigation)
+            !%PS%: unified flag for flooded rice special behaviour (soil params swap, irrigation)
             is_rice_paddy = info_spat%domain%mat /= info_spat%domain%header%nan .and.         &! Is in the domain
                             pheno%irrigation_class == 1 .and.                                 &! Is an irrigable crop
                             pheno%cn_class == 7 .and.                                         &! Is a CN=7 crop (rice)
@@ -2029,7 +2029,6 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
     integer,intent(in)::imax
     integer,intent(in)::jmax
     logical,intent(in)::f_allocate
-    integer,parameter::phases=4
     integer::checkstat
     character (len=*),parameter:: errormessage = "pheno has been wrongly allocated"
 
@@ -2051,16 +2050,12 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
         allocate(pheno%RF_t            (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
         allocate(pheno%T_lim           (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
         allocate(pheno%T_crit          (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%HI             (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%Ky_tot            (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
         allocate(pheno%k_cb_low        (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
         allocate(pheno%k_cb_mid        (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
         allocate(pheno%k_cb_high       (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%wp_adj          (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
         allocate(pheno%p_day           (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
         allocate(pheno%n_crop_in_year    (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
         allocate(pheno%pheno_idx   (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%Ky_pheno            (imax,jmax,phases),stat=checkstat) ; if(checkstat/=0) print*,errormessage! 3d matrix
         allocate(pheno%r_stress           (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
 
     else
@@ -2081,13 +2076,9 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
         deallocate(pheno%RF_t            )
         deallocate(pheno%T_lim           )
         deallocate(pheno%T_crit          )
-        deallocate(pheno%HI             )
-        deallocate(pheno%Ky_tot            )
-        deallocate(pheno%Ky_pheno            )
         deallocate(pheno%k_cb_low        )
         deallocate(pheno%k_cb_mid        )
         deallocate(pheno%k_cb_high       )
-        deallocate(pheno%wp_adj          )
         deallocate(pheno%p_day           )
         deallocate(pheno%n_crop_in_year    )
         deallocate(pheno%pheno_idx   )
