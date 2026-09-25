@@ -209,15 +209,15 @@ subroutine get_uniform_sample(irandom, amplitude, rand_symmetry,repeatable)
 
 end subroutine get_uniform_sample
 
-function calc_doy(idd,imm,iyyy)
+function get_julian_day(idd,imm,iyyy)
     ! Calculate the day of the year from day, month, year
     ! source: Numerical recipes in FORTRAN 90
     integer, intent(in) :: imm, idd, iyyy
-    integer :: calc_doy
+    integer :: get_julian_day
     integer, parameter :: igreg=15+31*(10+12*1582) ! Gregorian Calendar adopted Oct. 15, 1582.
     integer :: ja,jm,jy
     jy=iyyy
-    if (jy == 0) stop 'calc_doy: there is no year zero'
+    if (jy == 0) stop 'get_julian_day: there is no year zero'
     if (jy < 0) jy = jy+1
     if (imm > 2) then
         jm = imm+1
@@ -225,12 +225,12 @@ function calc_doy(idd,imm,iyyy)
         jy = jy-1
         jm = imm+13
     end if
-    calc_doy = floor(365.25 * jy) + floor(30.6001 * jm) + idd + 1720995
+    get_julian_day = floor(365.25 * jy) + floor(30.6001 * jm) + idd + 1720995
     if (idd + 31 * (imm+12*iyyy) >= igreg) then !Test whether to change to Gregorian Calendar.
         ja=floor(0.01 * jy)
-        calc_doy = calc_doy + 2 - ja + floor(0.25 * ja)
+        get_julian_day = get_julian_day + 2 - ja + floor(0.25 * ja)
     end if
-end function calc_doy
+end function get_julian_day
 
 subroutine calc_date(julian_day,idd, imm,iyyy)
     ! Calculate the date from the julian date

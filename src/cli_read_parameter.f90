@@ -199,12 +199,12 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
                     case ('startsimulation')    ! date of start simulation
                         read (buffer, *, iostat=ios)
                         call split_date(buffer, xml%sim%start_simulation)
-                        xml%sim%start_simulation%doy = calc_doy(xml%sim%start_simulation%day, xml%sim%start_simulation%month, &
+                        xml%sim%start_simulation%doy = get_julian_day(xml%sim%start_simulation%day, xml%sim%start_simulation%month, &
                             & xml%sim%start_simulation%year)
                     case ('endsimulation')    ! date of end simulation
                         read (buffer, *, iostat=ios)
                         call split_date(buffer, xml%sim%end_simulation)
-                        xml%sim%end_simulation%doy = calc_doy(xml%sim%end_simulation%day, xml%sim%end_simulation%month, &
+                        xml%sim%end_simulation%doy = get_julian_day(xml%sim%end_simulation%day, xml%sim%end_simulation%month, &
                             & xml%sim%end_simulation%year)
                     case ('initialconditionpath') ! path to initial condition input files
                         read(buffer, *, iostat=ios) xml%sim%initial_condition

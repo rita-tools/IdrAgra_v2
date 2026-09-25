@@ -1,5 +1,5 @@
 module mod_parameters
-use mod_utility, only: date, lower_case, string_to_integers, calc_doy, split_date
+use mod_utility, only: date, lower_case, string_to_integers, get_julian_day, split_date
 use mod_constants
 implicit none
 
@@ -69,7 +69,7 @@ type simulation
     integer :: start_year                       ! first year of simulation
     integer :: sim_years                        ! number of years for the simulation
     integer :: meteo_years                      ! number of available weather time series
-    integer,dimension(:),pointer :: year_step   ! number of days for each simulation years
+    integer, dimension(:), allocatable :: days_in_year ! number of days in each simulation year
     logical :: f_init_wc = .false.              ! if true, use user provided values otherwise calculate from first year run
     logical :: f_theta_out                      ! id true, write final soil moisture condition
     integer :: rand_seed = -999                 ! seed to initialize the random number generator

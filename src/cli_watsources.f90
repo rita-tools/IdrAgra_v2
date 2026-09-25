@@ -1,6 +1,6 @@
 module cli_watsources
 use mod_constants, only: dp, seconds_per_day
-use mod_utility, only: get_value_index, lower_case, calc_doy, split_date
+use mod_utility, only: get_value_index, lower_case, get_julian_day, split_date
 use mod_parameters
 use mod_grid, only: grid_i, grid_r
 use mod_meteo, only: date, meteo_info
@@ -76,8 +76,8 @@ subroutine open_daily_discharges_file(file_name,mn_src_tbl,source_nr,error_flag)
     call split_date(date_string, date_start, date_end)
     call split_date(date_start, mn_src_tbl%start)
     call split_date(date_end, mn_src_tbl%finish)
-    mn_src_tbl%start%doy = calc_doy(mn_src_tbl%start%day, mn_src_tbl%start%month, mn_src_tbl%start%year)
-    mn_src_tbl%finish%doy = calc_doy(mn_src_tbl%finish%day, mn_src_tbl%finish%month, mn_src_tbl%finish%year)
+    mn_src_tbl%start%doy = get_julian_day(mn_src_tbl%start%day, mn_src_tbl%start%month, mn_src_tbl%start%year)
+    mn_src_tbl%finish%doy = get_julian_day(mn_src_tbl%finish%day, mn_src_tbl%finish%month, mn_src_tbl%finish%year)
     ! Check if the length of the time series matches the dates limits
     if (n_rows /= mn_src_tbl%finish%doy - mn_src_tbl%start%doy + 1) then
         stop "Diversion time series have incoherent lengths with respect to declared dates. Execution will be aborted..."
