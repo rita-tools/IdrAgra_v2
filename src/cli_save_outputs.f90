@@ -894,9 +894,6 @@ subroutine save_step_data(a_step_map,doy,domain,calendar, init_total)
     integer,dimension(:),intent(in)::calendar
     integer,intent(in)::init_total
     integer::i,total
-    integer::errorflag
-
-    errorflag=0
     total=init_total
 
     do i=1,size(calendar)
@@ -916,18 +913,18 @@ subroutine save_step_data(a_step_map,doy,domain,calendar, init_total)
                 a_step_map%et_pot%mat=real(domain%header%nan)
                 a_step_map%et_act%mat=real(domain%header%nan)
             end where
-            call print_mat_as_grid(trim(a_step_map%rain%fn),domain%header,a_step_map%rain%mat,errorflag)
-            call print_mat_as_grid(trim(a_step_map%transp_act%fn),domain%header,a_step_map%transp_act%mat,errorflag)
-            call print_mat_as_grid(trim(a_step_map%transp_pot%fn),domain%header,a_step_map%transp_pot%mat,errorflag)
-            call print_mat_as_grid(trim(a_step_map%irr%fn),domain%header,a_step_map%irr%mat,errorflag)
-            call print_mat_as_grid(trim(a_step_map%irr_loss%fn),domain%header,a_step_map%irr_loss%mat,errorflag)
-            call print_mat_as_grid(trim(a_step_map%cap_rise%fn),domain%header,a_step_map%cap_rise%mat,errorflag)
-            call print_mat_as_grid(trim(a_step_map%irr_nm_priv%fn),domain%header,a_step_map%irr_nm_priv%mat,errorflag)
-            call print_mat_as_grid(trim(a_step_map%irr_nm_col%fn),domain%header,a_step_map%irr_nm_col%mat,errorflag)
-            call print_mat_as_grid(trim(a_step_map%deep_perc%fn),domain%header,a_step_map%deep_perc%mat,errorflag)
-            call print_mat_as_grid(trim(a_step_map%runoff%fn),domain%header,a_step_map%runoff%mat,errorflag)
-            call print_mat_as_grid(trim(a_step_map%et_pot%fn),domain%header,a_step_map%et_pot%mat,errorflag)
-            call print_mat_as_grid(trim(a_step_map%et_act%fn),domain%header,a_step_map%et_act%mat,errorflag)
+            call print_mat_as_grid(trim(a_step_map%rain%fn),domain%header,a_step_map%rain%mat)
+            call print_mat_as_grid(trim(a_step_map%transp_act%fn),domain%header,a_step_map%transp_act%mat)
+            call print_mat_as_grid(trim(a_step_map%transp_pot%fn),domain%header,a_step_map%transp_pot%mat)
+            call print_mat_as_grid(trim(a_step_map%irr%fn),domain%header,a_step_map%irr%mat)
+            call print_mat_as_grid(trim(a_step_map%irr_loss%fn),domain%header,a_step_map%irr_loss%mat)
+            call print_mat_as_grid(trim(a_step_map%cap_rise%fn),domain%header,a_step_map%cap_rise%mat)
+            call print_mat_as_grid(trim(a_step_map%irr_nm_priv%fn),domain%header,a_step_map%irr_nm_priv%mat)
+            call print_mat_as_grid(trim(a_step_map%irr_nm_col%fn),domain%header,a_step_map%irr_nm_col%mat)
+            call print_mat_as_grid(trim(a_step_map%deep_perc%fn),domain%header,a_step_map%deep_perc%mat)
+            call print_mat_as_grid(trim(a_step_map%runoff%fn),domain%header,a_step_map%runoff%mat)
+            call print_mat_as_grid(trim(a_step_map%et_pot%fn),domain%header,a_step_map%et_pot%mat)
+            call print_mat_as_grid(trim(a_step_map%et_act%fn),domain%header,a_step_map%et_act%mat)
             exit
         else
             cycle
@@ -943,9 +940,6 @@ subroutine save_step_irrigation(a_step_map,doy,domain,calendar, init_total)
     integer,dimension(:),intent(in)::calendar
     integer,intent(in)::init_total
     integer::i,total
-    integer::errorflag
-
-    errorflag=0
     total=init_total
 
     do i=1,size(calendar)
@@ -954,7 +948,7 @@ subroutine save_step_irrigation(a_step_map,doy,domain,calendar, init_total)
             where(domain%mat==domain%header%nan)
                 a_step_map%irr%mat=real(domain%header%nan)
             end where
-            call print_mat_as_grid(trim(a_step_map%irr%fn),domain%header,a_step_map%irr%mat,errorflag)
+            call print_mat_as_grid(trim(a_step_map%irr%fn),domain%header,a_step_map%irr%mat)
         else
             cycle
         end if
@@ -969,9 +963,6 @@ subroutine save_debug_step_data(a_debug_asc,doy,domain,calendar, total_init)
     integer,dimension(:),intent(in)::calendar
     integer,intent(in)::total_init
     integer::i,total
-    integer::errorflag
-
-    errorflag=0
     total=total_init
 
     do i=1,size(calendar)
@@ -985,12 +976,12 @@ subroutine save_debug_step_data(a_debug_asc,doy,domain,calendar, total_init)
                 a_debug_asc%h_soil1%mat=real(domain%header%nan)
                 a_debug_asc%h_soil2%mat=real(domain%header%nan)
             end where
-            call print_mat_as_grid(trim(a_debug_asc%eva_act%fn),domain%header,a_debug_asc%eva_act%mat,errorflag)
-            call print_mat_as_grid(trim(a_debug_asc%eff_rain%fn),domain%header,a_debug_asc%eff_rain%mat,errorflag)
-            call print_mat_as_grid(trim(a_debug_asc%perc1%fn),domain%header,a_debug_asc%perc1%mat,errorflag)
-            call print_mat_as_grid(trim(a_debug_asc%perc2%fn),domain%header,a_debug_asc%perc2%mat,errorflag)
-            call print_mat_as_grid(trim(a_debug_asc%h_soil1%fn),domain%header,a_debug_asc%h_soil1%mat,errorflag)
-            call print_mat_as_grid(trim(a_debug_asc%h_soil2%fn),domain%header,a_debug_asc%h_soil2%mat,errorflag)
+            call print_mat_as_grid(trim(a_debug_asc%eva_act%fn),domain%header,a_debug_asc%eva_act%mat)
+            call print_mat_as_grid(trim(a_debug_asc%eff_rain%fn),domain%header,a_debug_asc%eff_rain%mat)
+            call print_mat_as_grid(trim(a_debug_asc%perc1%fn),domain%header,a_debug_asc%perc1%mat)
+            call print_mat_as_grid(trim(a_debug_asc%perc2%fn),domain%header,a_debug_asc%perc2%mat)
+            call print_mat_as_grid(trim(a_debug_asc%h_soil1%fn),domain%header,a_debug_asc%h_soil1%mat)
+            call print_mat_as_grid(trim(a_debug_asc%h_soil2%fn),domain%header,a_debug_asc%h_soil2%mat)
             exit
         else
             cycle
@@ -1003,9 +994,6 @@ subroutine save_yearly_data(yr_map,domain)
     type(annual_map),intent(in)::yr_map
     type(grid_i),intent(in)::domain
 
-    integer::errorflag
-
-    errorflag=0
     where(domain%mat==domain%header%nan)
         yr_map%rain%mat=real(domain%header%nan)
         yr_map%rain_crop_season%mat=real(domain%header%nan)
@@ -1022,19 +1010,19 @@ subroutine save_yearly_data(yr_map,domain)
         yr_map%h_irr_mean%mat=real(domain%header%nan)
     end where
 
-    call print_mat_as_grid(trim(yr_map%rain%fn),domain%header,yr_map%rain%mat,errorflag)
-    call print_mat_as_grid(trim(yr_map%irr%fn),domain%header,yr_map%irr%mat,errorflag)
-    call print_mat_as_grid(trim(yr_map%irr_loss%fn),domain%header,yr_map%irr_loss%mat,errorflag)
-    call print_mat_as_grid(trim(yr_map%eva_act_crop_season%fn),domain%header,yr_map%eva_act_crop_season%mat,errorflag)
-    call print_mat_as_grid(trim(yr_map%eva_pot_crop_season%fn),domain%header,yr_map%eva_pot_crop_season%mat,errorflag)
-    call print_mat_as_grid(trim(yr_map%transp_act%fn),domain%header,yr_map%transp_act%mat,errorflag)
-    call print_mat_as_grid(trim(yr_map%transp_pot%fn),domain%header,yr_map%transp_pot%mat,errorflag)
-    call print_mat_as_grid(trim(yr_map%runoff%fn),domain%header,yr_map%runoff%mat,errorflag)
-    call print_mat_as_grid(trim(yr_map%net_flux_gw%fn),domain%header,yr_map%net_flux_gw%mat,errorflag)
-    call print_mat_as_grid(trim(yr_map%total_eff%fn),domain%header,yr_map%total_eff%mat,errorflag)
-    call print_mat_as_grid(trim(yr_map%n_irr_events%fn),domain%header,yr_map%n_irr_events%mat,errorflag)
-    call print_mat_as_grid(trim(yr_map%h_irr_mean%fn),domain%header,yr_map%h_irr_mean%mat,errorflag)
-    call print_mat_as_grid(trim(yr_map%rain_crop_season%fn),domain%header,yr_map%rain_crop_season%mat,errorflag)
+    call print_mat_as_grid(trim(yr_map%rain%fn),domain%header,yr_map%rain%mat)
+    call print_mat_as_grid(trim(yr_map%irr%fn),domain%header,yr_map%irr%mat)
+    call print_mat_as_grid(trim(yr_map%irr_loss%fn),domain%header,yr_map%irr_loss%mat)
+    call print_mat_as_grid(trim(yr_map%eva_act_crop_season%fn),domain%header,yr_map%eva_act_crop_season%mat)
+    call print_mat_as_grid(trim(yr_map%eva_pot_crop_season%fn),domain%header,yr_map%eva_pot_crop_season%mat)
+    call print_mat_as_grid(trim(yr_map%transp_act%fn),domain%header,yr_map%transp_act%mat)
+    call print_mat_as_grid(trim(yr_map%transp_pot%fn),domain%header,yr_map%transp_pot%mat)
+    call print_mat_as_grid(trim(yr_map%runoff%fn),domain%header,yr_map%runoff%mat)
+    call print_mat_as_grid(trim(yr_map%net_flux_gw%fn),domain%header,yr_map%net_flux_gw%mat)
+    call print_mat_as_grid(trim(yr_map%total_eff%fn),domain%header,yr_map%total_eff%mat)
+    call print_mat_as_grid(trim(yr_map%n_irr_events%fn),domain%header,yr_map%n_irr_events%mat)
+    call print_mat_as_grid(trim(yr_map%h_irr_mean%fn),domain%header,yr_map%h_irr_mean%mat)
+    call print_mat_as_grid(trim(yr_map%rain_crop_season%fn),domain%header,yr_map%rain_crop_season%mat)
 
 end subroutine save_yearly_data
 
@@ -1042,10 +1030,8 @@ subroutine save_yield_data(yield,domain)
     type(yield_t),intent(inout)::yield
     type(grid_i),intent(in)::domain
     integer::j
-    integer::errorflag
     character(len=55)::strj
 
-    errorflag=0
 
     do j=1, size(yield%yield_pot%mat,3)
         yield%yield_pot%mat(:,:,j) = merge(yield%yield_pot%mat(:,:,j),dble(domain%header%nan),domain%mat/=domain%header%nan)
@@ -1062,15 +1048,15 @@ subroutine save_yield_data(yield,domain)
         write(strj,*)j
         if (yield%yield_pot%fn/='') then
             call print_mat_as_grid(trim(trim(yield%yield_pot%fn)//"_"//trim(adjustl(strj))//".asc"), &
-                & domain%header,yield%yield_pot%mat(:,:,j),errorflag)
+                & domain%header,yield%yield_pot%mat(:,:,j))
         end if
         if (yield%yield_act%fn/='') then
             call print_mat_as_grid(trim(trim(yield%yield_act%fn)//"_"//trim(adjustl(strj))//".asc"), &
-                & domain%header,yield%yield_act%mat(:,:,j),errorflag)
+                & domain%header,yield%yield_act%mat(:,:,j))
         end if
         if (yield%biomass_pot%fn/='') then
             call print_mat_as_grid(trim(trim(yield%biomass_pot%fn)//"_"//trim(adjustl(strj))//".asc"), &
-                & domain%header,yield%biomass_pot%mat(:,:,j),errorflag)
+                & domain%header,yield%biomass_pot%mat(:,:,j))
         end if
     end do
 end subroutine save_yield_data
@@ -1079,43 +1065,35 @@ subroutine save_annual_irrigation_data(yr_map,domain)
     type(annual_map),intent(in)::yr_map
     type(grid_i),intent(in)::domain
 
-    integer::errorflag
-
-    errorflag=0
     where(domain%mat==domain%header%nan)
         yr_map%irr%mat=real(domain%header%nan)
     end where
-    call print_mat_as_grid(trim(yr_map%irr%fn),domain%header,yr_map%irr%mat,errorflag)
+    call print_mat_as_grid(trim(yr_map%irr%fn),domain%header,yr_map%irr%mat)
 
 end subroutine save_annual_irrigation_data
 
 subroutine save_annual_debug_data(yr_dbg_map, domain)
     type(annual_debug_map),intent(in)::yr_dbg_map
     type(grid_i),intent(in)::domain
-    integer::errorflag
-
-    errorflag=0
     where(domain%mat==domain%header%nan)
         yr_dbg_map%eva_act_tot%mat=real(domain%header%nan)
         yr_dbg_map%rain_eff%mat=real(domain%header%nan)
         yr_dbg_map%iter1%mat=domain%header%nan
         yr_dbg_map%iter2%mat=domain%header%nan
     end where
-    call print_mat_as_grid(trim(yr_dbg_map%eva_act_tot%fn),domain%header,yr_dbg_map%eva_act_tot%mat,errorflag)
-    call print_mat_as_grid(trim(yr_dbg_map%rain_eff%fn),domain%header,yr_dbg_map%rain_eff%mat,errorflag)
-    call print_mat_as_grid(trim(yr_dbg_map%iter1%fn),domain%header,yr_dbg_map%iter1%mat,errorflag)
-    call print_mat_as_grid(trim(yr_dbg_map%iter2%fn),domain%header,yr_dbg_map%iter2%mat,errorflag)
+    call print_mat_as_grid(trim(yr_dbg_map%eva_act_tot%fn),domain%header,yr_dbg_map%eva_act_tot%mat)
+    call print_mat_as_grid(trim(yr_dbg_map%rain_eff%fn),domain%header,yr_dbg_map%rain_eff%mat)
+    call print_mat_as_grid(trim(yr_dbg_map%iter1%fn),domain%header,yr_dbg_map%iter1%mat)
+    call print_mat_as_grid(trim(yr_dbg_map%iter2%fn),domain%header,yr_dbg_map%iter2%mat)
 
 end subroutine save_annual_debug_data
 
 subroutine save_yield_debug_data(yield,domain)
     type(yield_t),intent(in)::yield
     type(grid_i),intent(in)::domain
-    integer::errorflag
     integer::i,j
     character(len=55)::stri,strj
 
-    errorflag=0
 
     do i =1, size(yield%T_act_sum%mat,3)
         write(stri,*)i
@@ -1124,12 +1102,12 @@ subroutine save_yield_debug_data(yield,domain)
             if (yield%T_act_sum%fn/='') then
                 call print_mat_as_grid &
                     & (trim(trim(yield%T_act_sum%fn)//"_"//trim(adjustl(stri))//"_"//trim(adjustl(strj))//".asc"), &
-                    & domain%header,yield%T_act_sum%mat(:,:,i,j),errorflag)
+                    & domain%header,yield%T_act_sum%mat(:,:,i,j))
             end if
             if (yield%T_pot_sum%fn/='') then
                 call print_mat_as_grid &
                     & (trim(trim(yield%T_pot_sum%fn)//"_"//trim(adjustl(stri))//"_"//trim(adjustl(strj))//".asc"), &
-                    & domain%header,yield%T_pot_sum%mat(:,:,i,j),errorflag)
+                    & domain%header,yield%T_pot_sum%mat(:,:,i,j))
             end if
         end do
     end do
@@ -1137,15 +1115,15 @@ subroutine save_yield_debug_data(yield,domain)
         write(stri,*)i
         if (yield%f_WS_tot%fn/='') then
             call print_mat_as_grid(trim(trim(yield%f_WS_tot%fn)//"_"//trim(adjustl(stri))//".asc"), &
-                & domain%header,yield%f_WS_tot%mat(:,:,i),errorflag)
+                & domain%header,yield%f_WS_tot%mat(:,:,i))
         end if
         if (yield%f_WS_stage%fn/='') then
             call print_mat_as_grid(trim(trim(yield%f_WS_stage%fn)//"_"//trim(adjustl(stri))//".asc"), &
-                & domain%header,yield%f_WS_stage%mat(:,:,i),errorflag)
+                & domain%header,yield%f_WS_stage%mat(:,:,i))
         end if
         if (yield%f_HS%fn/='') then
             call print_mat_as_grid(trim(trim(yield%f_HS%fn)//"_"//trim(adjustl(stri))//".asc"), &
-                & domain%header,yield%f_HS%mat(:,:,i),errorflag)
+                & domain%header,yield%f_HS%mat(:,:,i))
         end if
     end do
 end subroutine save_yield_debug_data

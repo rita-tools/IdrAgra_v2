@@ -330,7 +330,7 @@ subroutine save_TDx_statistics(unit_deficit,domain,path,threshold_num,TDx)
 
     integer::time_step,y,ios
     character(len=255)::filename
-    integer::free_unit,errorflag
+    integer :: free_unit
     real(dp),parameter::nan=-9999.
     character(len=*),intent(in)::TDx
     character(len=55)::str_y,str7,nfile
@@ -398,11 +398,11 @@ subroutine save_TDx_statistics(unit_deficit,domain,path,threshold_num,TDx)
 
         ! output creation
         filename=trim(adjustl(trim(path)//TDx//'_alpha_'//trim(adjustl(str7))//'.asc'))
-        call print_mat_as_grid(filename,domain%header,alpha_hat,errorflag)
+        call print_mat_as_grid(filename,domain%header,alpha_hat)
         filename=trim(adjustl(trim(path)//TDx//'_beta_'//trim(adjustl(str7))//'.asc'))
-        call print_mat_as_grid(filename,domain%header,beta_hat,errorflag)
+        call print_mat_as_grid(filename,domain%header,beta_hat)
         filename=trim(adjustl(trim(path)//TDx//'_zero_prob_'//trim(adjustl(str7))//'.asc'))
-        call print_mat_as_grid(filename,domain%header,zero_prob,errorflag)
+        call print_mat_as_grid(filename,domain%header,zero_prob)
     end do time_step_cycle
 
 end subroutine save_TDx_statistics
@@ -413,7 +413,7 @@ subroutine make_TDx_report(domain,path,n_week,TDx)
     integer,intent(in)::n_week
     integer::ios
     character(len=255)::filename
-    integer::free_unit,errorflag
+    integer :: free_unit
     real(dp),parameter::nan=-9999.
     real(dp),dimension(size(domain%mat,1),size(domain%mat,2))::mat
     character(len=*),intent(in)::TDx
@@ -444,7 +444,7 @@ subroutine make_TDx_report(domain,path,n_week,TDx)
     where(domain%mat==domain%header%nan) mat=nan
     ! output creation
     filename=trim(adjustl(trim(path)//TDx//'_mm_'//trim(adjustl(str7))//'.asc'))
-    call print_mat_as_grid(filename,domain%header,mat,errorflag)
+    call print_mat_as_grid(filename,domain%header,mat)
 end subroutine make_TDx_report
 
 subroutine sum_TD(transp_act,transp_pot,k_cb,doy,year,TD)

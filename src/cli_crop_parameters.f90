@@ -70,20 +70,18 @@ subroutine init_daily_crop_par_file_common(stored_name, next_pos, file_name)
     close(unit)
 end subroutine init_daily_crop_par_file_common
 
-subroutine init_crop_par_from_file(file_name, n_crop, n_crop_alt, string_elements, n_crops_by_year, error_flag)
+subroutine init_crop_par_from_file(file_name, n_crop, n_crop_alt, string_elements, n_crops_by_year)
     ! init static crop parameters from parameter file
     character(len=*), intent(in) :: file_name
     integer, intent(in) :: n_crop
     integer, intent(out) :: n_crop_alt
     integer, intent(out) :: string_elements
     integer, dimension(n_crop), intent(out) :: n_crops_by_year
-    integer, intent(out) :: error_flag
     integer :: free_unit, ios, p
     integer, dimension(:), allocatable :: crop_counts
     character(len=n_crop*20) :: buffer, label !EAC: use mcrop_max x 20
     character(len=10), dimension(:), allocatable :: dummy, dummy_clean
 
-    error_flag = 0
     open(newunit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios)
     if (ios /= 0 ) then
         print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. Execution will be aborted..."
@@ -125,19 +123,17 @@ subroutine init_crop_par_from_file(file_name, n_crop, n_crop_alt, string_element
     close (free_unit)
 end subroutine init_crop_par_from_file
 
-subroutine read_water_prod_file(file_name, string_elements, n_crops_by_year,          &
-                              & unit_param, sim_end_year, weath_start_year, error_flag)
+subroutine read_water_prod_file(file_name, string_elements, n_crops_by_year, &
+                                unit_param, sim_end_year, weath_start_year)
     ! read water productivity related parameters
     character(len=*), intent(in) :: file_name
     integer, intent(in) :: string_elements
     integer, dimension(:), intent(in) :: n_crops_by_year
     real(dp), dimension(:,:,:), intent(inout) :: unit_param
     integer, intent(in) :: sim_end_year, weath_start_year
-    integer, intent(out) :: error_flag
     integer :: free_unit, ios, line, p, year
     character(len=string_elements*20) :: buffer, label  !EAC:  use string_elements x 20
 
-    error_flag = 0
     line = 0
     open(newunit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios)
     if (ios /= 0 ) then
@@ -174,17 +170,15 @@ subroutine read_water_prod_file(file_name, string_elements, n_crops_by_year,    
     close (free_unit)
 end subroutine read_water_prod_file
 
-subroutine read_canopy_resistance_file(file_name, unit_param, sim_end_year, weath_start_year, error_flag)
+subroutine read_canopy_resistance_file(file_name, unit_param, sim_end_year, weath_start_year)
     ! read canopy resistance parameters
     character(len=*), intent(in) :: file_name
     real(dp), dimension(:), intent(inout) :: unit_param
     integer, intent(in) :: sim_end_year, weath_start_year
-    integer, intent(out) :: error_flag
     integer :: free_unit, ios, line, year
     real(dp) :: resistance
     character(len=255) :: full_line
 
-    error_flag = 0
     open(newunit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios)
     if (ios /= 0 ) then
         print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. Execution will be aborted..."
@@ -247,20 +241,18 @@ subroutine spread_col_r(string_in, sep, string_el, string_space, string_out)
     end do
 end subroutine spread_col_r
 
-subroutine read_crop_par_file(file_name, string_elements, ze_fix, unit_param, error_flag)
+subroutine read_crop_par_file(file_name, string_elements, ze_fix, unit_param)
     ! read static crop parameters file
     ! TODO: merge with init_crop_par_from_file ?
     character(len=*), intent(in) :: file_name
     integer, intent(in) :: string_elements
     real(dp), intent(in) :: ze_fix
     type(crop_pheno_info) :: unit_param
-    integer, intent(out) :: error_flag
     integer :: free_unit
     integer :: ios
     integer :: line, p
     character(len=string_elements*20) :: buffer, label !EAC: use string_elements x 20
 
-    error_flag = 0
     open(newunit=free_unit, file=trim(file_name), status='old', action="read", iostat=ios)
     if (ios /= 0 ) then
         print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. &
@@ -404,7 +396,7 @@ subroutine init_crop_phenology_pars(sim, info_pheno, info_meteo, ze_fix, verbose
 
     type(crop_pheno_info),dimension(:),allocatable::info_pheno
     character(len=255)::dir,froot,dir_name
-    integer::i,errorflag,string_elements
+    integer :: i, string_elements
     integer, dimension(sim%n_lus) :: n_crops_by_year
     real(dp), parameter :: nan = -9999.0D0
     integer, parameter :: phases = 4
@@ -419,10 +411,10 @@ subroutine init_crop_phenology_pars(sim, info_pheno, info_meteo, ze_fix, verbose
     ! init from crop parameters file (actually produced by cropcoeff)
     dir_name = info_meteo(1)%filename(1:(index(trim(info_meteo(1)%filename),"."))-1)  ! directory has the same name as the weather station dataset
     call init_crop_par_from_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropParam.dat", &
-        & sim%n_lus, sim%n_crops, string_elements, n_crops_by_year, ErrorFlag)
+        & sim%n_lus, sim%n_crops, string_elements, n_crops_by_year)
 
     call read_canopy_resistance_file(trim(dir)//delimiter//'CanopyRes.dat', sim%res_canopy, &
-        & sim%end_simulation%year, sim%start_year, ErrorFlag)
+        & sim%end_simulation%year, sim%start_year)
 
     do i=1,size(info_pheno)
         dir_name = info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)
@@ -481,13 +473,13 @@ subroutine init_crop_phenology_pars(sim, info_pheno, info_meteo, ze_fix, verbose
         info_pheno(i)%cycle_crop_slot = 0
         call read_water_prod_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"WPadj.dat",  &
                                 & string_elements, n_crops_by_year, info_pheno(i)%wp_adj,          &
-                                & sim%end_simulation%year, sim%start_year, ErrorFlag)
+                                & sim%end_simulation%year, sim%start_year)
         call read_crop_par_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropParam.dat", &
-                              & string_elements, ze_fix, info_pheno(i), ErrorFlag                   )
+                              & string_elements, ze_fix, info_pheno(i))
 
         ! TODO
         ! EAC: overwrite p values if exits
-        ! call open_daily_crop_par_file(info_pheno(i)%p%unit,trim(dir)//trim(froot)//trim(fname)//"\praw.dat",errorflag)
+        ! call open_daily_crop_par_file(info_pheno(i)%p%unit,trim(dir)//trim(froot)//trim(fname)//"\praw.dat")
 
     end do
     if (verbose .eqv. .true.) then
@@ -692,10 +684,7 @@ subroutine check_crop_parameters(info_pheno,weather_station)
 ! if k_cb is null than all the other parameters must be null
     type(crop_pheno_info),intent(in)::info_pheno
     character(len=*),intent(in)::weather_station
-    integer::error_flag
     integer::d,k
-
-    error_flag = 0
 
     write(*,*)'INPUT CHECK - SOIL USE PARAMETERS - STATION:',trim(weather_station)
     do k=1, size(info_pheno%k_cb%tab,2) ! loop over crops
@@ -703,15 +692,12 @@ subroutine check_crop_parameters(info_pheno,weather_station)
             if(info_pheno%k_cb%tab(d,k).gt.0)then
                 if(info_pheno%z_r%tab(d,k).eq.0.) then
                     write(*,*)' Warning: Sr null. Day: ',d,' Soil use class: ', k
-                    error_flag = -1
                 end if
                 if(info_pheno%h%tab(d,k).eq.0.) then
                     write(*,*)' Warning: H null. Day: ',d,'  Soil use class:', k
-                    error_flag = -1
                 end if
                 if(info_pheno%LAI%tab(d,k).eq.0.) then
                     write(*,*)' Warning: LAI null. Day: ',d,'  Soil use class:', k
-                    error_flag = -1
                 end if
             end if
         end do

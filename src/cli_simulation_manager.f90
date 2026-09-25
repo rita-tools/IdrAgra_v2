@@ -72,7 +72,6 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::priv_irr
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::coll_irr
     integer,dimension(12)::days_in_yr
-    integer::error_flag
     integer::xx,yy ! Test cells coordinates
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::iter1,iter2
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::irr_loss ! Irrigation application losses
@@ -995,8 +994,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     info_spat%theta(1)%old%mat = wat_bal1%h_soil/(1000.*wat_bal1%d_e)
     info_spat%theta(2)%old%mat = wat_bal2%h_soil/(1000.*wat_bal2%d_t)
     if (pars%sim%f_theta_out .eqv. .true.) then
-        call write_grid(trim(pars%sim%final_condition)//trim(pars%sim%thetaI_end_fn)//'.asc',info_spat%theta(1)%old,error_flag)
-        call write_grid(trim(pars%sim%final_condition)//trim(pars%sim%thetaII_end_fn)//'.asc',info_spat%theta(2)%old,error_flag)
+        call write_grid(trim(pars%sim%final_condition)//trim(pars%sim%thetaI_end_fn)//'.asc',info_spat%theta(1)%old)
+        call write_grid(trim(pars%sim%final_condition)//trim(pars%sim%thetaII_end_fn)//'.asc',info_spat%theta(2)%old)
     end if
 
     ! calculate DTx statistics
@@ -1044,7 +1043,7 @@ subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, b
     real(dp), dimension(:,:), intent(inout) :: a_loss, b_loss, c_loss
     real(dp), dimension(:,:), intent(inout) :: f_interception
 
-    integer :: error_flag, i
+    integer :: i
     character(len=255) :: irandom_file, landuse_file
     character(len=255) :: yearly_irr_meth_map, yearly_irr_eff_map
     logical :: file_exists
@@ -1127,14 +1126,11 @@ subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, b
 
     ! Debug output
     if (pars%sim%prt_debug_out == 'y') then
-        call write_grid(trim(pars%sim%path)//'out_'//trim(pars%sim%soiluse_fn)//'_'//period_label//'.asc', &
-            & info_spat%soil_use_id, error_flag)
+        call write_grid(trim(pars%sim%path)//'out_'//trim(pars%sim%soiluse_fn)//'_'//period_label//'.asc', info_spat%soil_use_id)
         if (pars%sim%mode > 0) then
-            call write_grid(trim(pars%sim%path)//'out_'//yearly_irr_meth_map, &
-                & info_spat%irr_meth_id, error_flag)
+            call write_grid(trim(pars%sim%path)//'out_'//yearly_irr_meth_map, info_spat%irr_meth_id)
             if (pars%sim%mode == 2 .or. pars%sim%mode == 4) then
-                call write_grid(trim(pars%sim%path)//'out_'//yearly_irr_eff_map, &
-                    & info_spat%eff_met, error_flag)
+                call write_grid(trim(pars%sim%path)//'out_'//yearly_irr_eff_map, info_spat%eff_met)
             end if
         end if
     end if
@@ -1142,7 +1138,7 @@ subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, b
 end subroutine update_yearly_spatial_data
 
 subroutine initialize_yearly_crop_state(pars, year_idx, period_label, info_pheno, info_meteo, info_spat, &
-    & meteo_weight, dir_meteo, dir_phenofases, crop_map, yield, pheno)
+                                      & meteo_weight, dir_meteo, dir_phenofases, crop_map, yield, pheno  )
 
     type(parameters), intent(in) :: pars
     integer, intent(in) :: year_idx
@@ -1157,8 +1153,7 @@ subroutine initialize_yearly_crop_state(pars, year_idx, period_label, info_pheno
     type(yield_t), intent(inout) :: yield
     type(crop_pars_matrices), intent(inout) :: pheno
 
-    integer :: unit_crop, error_flag
-    integer :: i, j, z
+    integer :: unit_crop, i, j, z
 
     ! Read all phenological tables and allocation of info_pheno%prm%tab(:,:)
     call read_all_crop_pars(pars%sim%days_in_year(year_idx), pars%sim%n_lus, info_pheno)
@@ -1205,18 +1200,14 @@ subroutine initialize_yearly_crop_state(pars, year_idx, period_label, info_pheno
 
     if (pars%sim%prt_debug_out == 'y') then
         ! write debug files of reference data for crop randomization
-        call print_mat_as_grid(trim(pars%sim%path)//period_label//"_irandom.asc", &
-            & info_spat%irandom%header,info_spat%irandom%mat,error_flag)
+        call print_mat_as_grid(trim(pars%sim%path)//period_label//"_irandom.asc", info_spat%irandom%header,info_spat%irandom%mat)
         do i=1,size(crop_map%ii0,3)
             call print_mat_as_grid(trim(pars%sim%path)//period_label//"_ii0_" &
-                & //itoa(i)//".asc",info_spat%domain%header,crop_map%ii0(:,:,i), &
-                & error_flag)
+                & //itoa(i)//".asc", info_spat%domain%header, crop_map%ii0(:,:,i))
             call print_mat_as_grid(trim(pars%sim%path)//period_label//"_iie_" &
-                & //itoa(i)//".asc",info_spat%domain%header,crop_map%iie(:,:,i), &
-                & error_flag)
+                & //itoa(i)//".asc", info_spat%domain%header, crop_map%iie(:,:,i))
             call print_mat_as_grid(trim(pars%sim%path)//period_label//"_dij_" &
-                & //itoa(i)//".asc",info_spat%domain%header,crop_map%dij(:,:,i), &
-                & error_flag)
+                & //itoa(i)//".asc", info_spat%domain%header, crop_map%dij(:,:,i))
         end do
     end if
 

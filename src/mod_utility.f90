@@ -325,28 +325,27 @@ subroutine split_date_d(instring, outdate)
     character(len=300) :: string
     character(len=4) :: date_num
     integer :: index
-    integer :: ErrorFlag
-
-    ErrorFlag = 0
     string = trim(instring)
     index = scan(string, delimiter)
-    if (index == 0) ErrorFlag = -1
+    if (index == 0) then
+        print *, 'Input files are not correctly formatted'
+        print *, 'Right date format is dd/mm/yyyy'
+        stop 'Execution will be aborted...'
+    end if
     date_num = adjustl(string(1:index-1)) ! select the day
     read(date_num, '(i2)') outdate%day
     string = string(index+1:)
     index = scan(string, delimiter)
-    if (index == 0) ErrorFlag = -1
+    if (index == 0) then
+        print *, 'Input files are not correctly formatted'
+        print *, 'Right date format is dd/mm/yyyy'
+        stop 'Execution will be aborted...'
+    end if
     date_num = string(1:index-1) ! select the month
     read(date_num, '(i2)') outdate%month
     date_num = string(index+1:) ! select the year
     read(date_num, '(i4)') outdate%year
     ! TODO: add control to check date validity
-    if (ErrorFlag == -1) then
-        print *, 'Input files are not correctly formatted'
-        print *, 'Right date format is dd/mm/yyyy'
-        print *, 'Execution will be aborted...'
-        stop
-    end if
 end subroutine split_date_d
 
 function string_to_integers(str, sep) result(a)

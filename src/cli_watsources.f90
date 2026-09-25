@@ -8,7 +8,7 @@ implicit none
 
 contains
 
-subroutine open_daily_discharges_file(file_name,mn_src_tbl,source_nr,error_flag)
+subroutine open_daily_discharges_file(file_name, mn_src_tbl, source_nr)
     ! open the file in the following format
     ! 3     4   ...
     ! 10.0  6.0 ...
@@ -20,7 +20,6 @@ subroutine open_daily_discharges_file(file_name,mn_src_tbl,source_nr,error_flag)
     character(len=*), intent(in) :: file_name
     type(monitored_sources_table),intent(out)::mn_src_tbl
     integer, intent(out) :: source_nr
-    integer, intent(out) :: error_flag
     integer :: i
     integer :: ios = 0
     integer :: n_rows
@@ -29,7 +28,6 @@ subroutine open_daily_discharges_file(file_name,mn_src_tbl,source_nr,error_flag)
     integer:: strlen
     character(len=1),parameter :: delimiter = achar(9)   ! Delimiter: horizontal tab
 
-    error_flag = 0
     open(newunit=mn_src_tbl%unit, file=trim(file_name), status='old', action="read", iostat=ios)
     if (ios /= 0 ) then
         print *, "Cannot open file ", trim(file_name), ". The specified file does not exist. Execution will be aborted..."
@@ -85,7 +83,7 @@ subroutine open_daily_discharges_file(file_name,mn_src_tbl,source_nr,error_flag)
 
 end subroutine open_daily_discharges_file
 
-subroutine read_unm_coll_sources_list(file_name, unm_coll_src_tbl, error_flag, n_unm_coll_src, pars)
+subroutine read_unm_coll_sources_list(file_name, unm_coll_src_tbl, n_unm_coll_src, pars)
     ! open the file with the list of unmonitored collective sources (i.e. public wells)
     ! the file must be structured as follow (# are comments):
     ! # SourceWellTotNum: number of public wells
@@ -98,7 +96,6 @@ subroutine read_unm_coll_sources_list(file_name, unm_coll_src_tbl, error_flag, n
    character(len=*), intent(in):: file_name
     type(unmonitored_sources_table),intent(inout)::unm_coll_src_tbl
     type(parameters),intent(inout)::pars
-    integer, intent(out):: error_flag
     integer, intent(out):: n_unm_coll_src
     character(len=300) :: comment, buffer, label
     integer :: ios, p, line, tablestart
@@ -110,7 +107,6 @@ subroutine read_unm_coll_sources_list(file_name, unm_coll_src_tbl, error_flag, n
     n_unm_coll_src = 0
     ios = 0
     line = 0
-    error_flag = 0
     open(newunit=free_unit, file=file_name, action="read", iostat=ios)
     if (ios /= 0) then
         print *, "Error opening file ", file_name, "; iostat = ", ios, &
@@ -146,8 +142,7 @@ subroutine read_unm_coll_sources_list(file_name, unm_coll_src_tbl, error_flag, n
                         tablestart = line
                         do i=1, n_unm_coll_src
                             read (free_unit, *) temp
-                            call read_unm_coll_source_par(trim(pars%sim%watsour_path)//trim(temp),&
-                                                          & unm_coll_src_tbl, error_flag, i, pars)
+                            call read_unm_coll_source_par(trim(pars%sim%watsour_path)//trim(temp), unm_coll_src_tbl, i, pars)
                             line = line + 1
                         end do
                     case ('endlist')
@@ -170,12 +165,11 @@ subroutine read_unm_coll_sources_list(file_name, unm_coll_src_tbl, error_flag, n
     close(free_unit)
 end subroutine read_unm_coll_sources_list
 
-subroutine read_unm_coll_source_par(file_name,unm_col_sour_tbl,error_flag,k,pars)
+subroutine read_unm_coll_source_par(file_name, unm_col_sour_tbl, k, pars)
    character(len=*), intent(in) :: file_name
     integer,intent(in)::k
     type(parameters),intent(inout)::pars
     type(unmonitored_sources_table),intent(out)::unm_col_sour_tbl
-    integer, intent(out) :: error_flag
 
     integer :: i
     integer :: ios = 0
@@ -185,7 +179,6 @@ subroutine read_unm_coll_source_par(file_name,unm_col_sour_tbl,error_flag,k,pars
     integer :: p
 
     ! open the file
-    error_flag = 0
     open(newunit=unm_col_sour_tbl%unit(k), file=trim(file_name), status='old', action="read", iostat=ios)
     if( ios /= 0 ) then
         print *, "Error opening file '", trim(file_name), "'; iostat=", ios
@@ -276,11 +269,9 @@ subroutine open_scheduled_irrigation(file_name,sch_irr,debug)
    character(len=*), intent(in) :: file_name
     logical, intent(in):: debug
     type(scheduled_irrigation),dimension(:),allocatable,intent(out)::sch_irr
-    integer :: error_flag
     integer :: i,n_rec,free_unit
     integer :: ios
 
-    error_flag = 0
     ios=0
 
     ! open the file
@@ -312,7 +303,7 @@ subroutine open_scheduled_irrigation(file_name,sch_irr,debug)
 
 end subroutine open_scheduled_irrigation
 
-subroutine read_water_sources_table(wat_sour_tbl_fn, wat_sour_tbl, error_flag)
+subroutine read_water_sources_table(wat_sour_tbl_fn, wat_sour_tbl)
     ! Read the list of water sources for each irrigation units.
     ! Each sources have an id, a type and the release ratio
     ! The shape of the file must be:
@@ -322,7 +313,6 @@ subroutine read_water_sources_table(wat_sour_tbl_fn, wat_sour_tbl, error_flag)
     !   ...
     character(len=*), intent(in):: wat_sour_tbl_fn
     type(water_sources_table), dimension(:), allocatable,intent(inout) :: wat_sour_tbl
-    integer, intent(out) :: error_flag
 
     integer :: i, free_unit
     integer :: ios = 0
@@ -333,7 +323,6 @@ subroutine read_water_sources_table(wat_sour_tbl_fn, wat_sour_tbl, error_flag)
     ! open the file
     open(newunit=free_unit, file=trim(wat_sour_tbl_fn), status='old', action="read", iostat=ios)
     if(ios /= 0) then
-        error_flag=1
         print *, "Error opening file '", trim(wat_sour_tbl_fn), "'; iostat=", ios, &
             & '. Execution will be aborted...'
         stop
@@ -382,10 +371,9 @@ subroutine init_water_sources_duty(pars,wat_src_tbl,src_info,weather_info)
     type(source_info),intent(inout)::src_info
     type(meteo_info),dimension(:),intent(in)::weather_info
 
-    integer::error_flag
     integer::i
 
-    call read_water_sources_table(trim(pars%sim%watsour_path)//trim(pars%sim%watsources_fn), wat_src_tbl, error_flag)
+    call read_water_sources_table(trim(pars%sim%watsour_path)//trim(pars%sim%watsources_fn), wat_src_tbl)
 
     nullify(src_info%mn_src_tbl1%q_daily)
     nullify(src_info%mn_src_tbl2%q_daily)
@@ -393,7 +381,7 @@ subroutine init_water_sources_duty(pars,wat_src_tbl,src_info,weather_info)
 
     if(pars%ms_i%f_exists .eqv. .true.)then
         call open_daily_discharges_file(trim(pars%sim%watsour_path)//trim(pars%sim%mon_sources_i_div_fn),src_info%mn_src_tbl1, &
-            & pars%ms_i%n_withdrawals,error_flag)
+            & pars%ms_i%n_withdrawals)
         ! Check dates match weather data
         if (src_info%mn_src_tbl1%start%doy /= weather_info(1)%start%doy) then
             stop 'Meteorological and monitored sources (i) time series start in different days'
@@ -404,7 +392,7 @@ subroutine init_water_sources_duty(pars,wat_src_tbl,src_info,weather_info)
 
     if(pars%ms_ii%f_exists .eqv. .true.)then
         call open_daily_discharges_file(trim(pars%sim%watsour_path)//trim(pars%sim%mon_sources_ii_div_fn),src_info%mn_src_tbl2, &
-            & pars%ms_ii%n_withdrawals,error_flag)
+            & pars%ms_ii%n_withdrawals)
         if (pars%ms_i%f_exists .eqv. .true.) then ! check dates match between different monitored water sources
             if (src_info%mn_src_tbl1%start%doy /= src_info%mn_src_tbl2%start%doy) then
                 stop 'monitored sources (i) and monitored sources (ii) time series start in different days'
@@ -421,7 +409,8 @@ subroutine init_water_sources_duty(pars,wat_src_tbl,src_info,weather_info)
     end if
 
     if(pars%intreu%f_exists .eqv. .true.)then
-        call open_daily_discharges_file(trim(pars%sim%watsour_path)//trim(pars%sim%int_reuse_div_fn),src_info%int_reuse_tbl,pars%intreu%n_withdrawals,error_flag)
+        call open_daily_discharges_file(trim(pars%sim%watsour_path)//trim(pars%sim%int_reuse_div_fn), &
+            src_info%int_reuse_tbl, pars%intreu%n_withdrawals)
         if (pars%ms_ii%f_exists .eqv. .true.) then ! Check dates match monitored water sources 2
             if (src_info%mn_src_tbl2%start%doy /= src_info%int_reuse_tbl%start%doy) then
                 stop 'monitored sources (ii) and internal reuse time series start in different days'
@@ -445,7 +434,7 @@ subroutine init_water_sources_duty(pars,wat_src_tbl,src_info,weather_info)
 
     if(pars%cr%f_exists .eqv. .true.)then
         call read_unm_coll_sources_list(trim(pars%sim%watsour_path)//trim(pars%sim%cr_sources_list_fn), src_info%unm_src_tbl, &
-            & error_flag, pars%cr%n_withdrawals, pars)
+            & pars%cr%n_withdrawals, pars)
     end if
 
     ! Assign column index to each water sources
