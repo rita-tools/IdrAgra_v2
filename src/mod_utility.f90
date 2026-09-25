@@ -407,12 +407,6 @@ pure recursive function replace_str(string,search,substitute) result(modifiedStr
     end do
 end function replace_str
 
-function round(val, n)
-    real(dp) :: val, round
-    integer :: n
-    round = anint(val*10.0**n)/10.0**n
-end function round
-
 function round_2darray(mat, n) result(res)
     real(dp), dimension(:,:)::mat
     real(dp), allocatable ::res(:,:)
