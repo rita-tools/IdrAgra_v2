@@ -81,7 +81,7 @@ type simulation
     real(dp) :: cell_size = 250                 ! lateral dimension of the square cell of the raster map
     real(dp) :: x0 = 1.0                        ! x coordinate of the reference corner
     real(dp) :: y0 = 1.0                        ! y coordinate of the reference corner
-    integer :: n_voronoi = 1                    ! number of voronoi polygons
+    integer :: n_weather_stations = 1           ! Total number of weather stations
     integer :: n_lus = 1                        ! total number of land uses
     integer :: n_crops = 1                      ! max number of crops per year
     integer,dimension(:),pointer :: lu_list     ! list of ids if the simulated land uses
@@ -89,7 +89,7 @@ type simulation
     logical :: f_cap_rise = .false.             ! if true, capillary rise is calculated
     logical :: f_shapearea = .false.            ! if true, use shapes area (for vectorialization)
     logical :: f_irandom                        ! if true, use user defined random values
-    integer :: n_ws = 1                         ! maximum number of weather station
+    integer :: n_interpolation_stations = 1     ! Number of nearby weather stations used to interpolate each cell's weather & phenology
     logical :: interpolate_temp = .true.        ! if false, each cell's temperature is equal to the closest station's (not interpolated)
     logical :: interpolate_rain = .true.        ! if false, each cell's precipitation is equal to the closest station's (not interpolated)
     logical :: interpolate_hum = .true.         ! if false, each cell's humidity is equal to the closest station's (not interpolated)

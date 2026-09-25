@@ -412,7 +412,7 @@ subroutine init_crop_phenology_pars(sim, info_pheno, info_meteo, ze_fix, verbose
     dir= trim(sim%pheno_path)
     froot = sim%pheno_root
 
-    allocate(info_pheno(sim%n_voronoi)) ! init to the number of weather stations
+    allocate(info_pheno(sim%n_weather_stations)) ! init to the number of weather stations
 
     allocate(sim%res_canopy(sim%meteo_years))
     sim%res_canopy=0

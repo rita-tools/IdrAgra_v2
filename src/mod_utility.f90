@@ -24,6 +24,16 @@ end interface
 
 contains
 
+! Integer-to-string conversion without leading or trailing spaces.
+pure function itoa(value) result(string)
+    integer, intent(in) :: value
+    character(len=:), allocatable :: string
+    character(len=32) :: buffer
+
+    write(buffer, '(I0)') value
+    string = trim(buffer)
+end function itoa
+
 ! Count occurrences of each unique string, preserving first-seen order.
 ! e.g. ["a","a","b","a","c","c"] --> [3, 1, 2]
 subroutine count_elements(strings, counts)
@@ -181,8 +191,7 @@ pure function make_numbered_name(n,ext) result(num_name)
     integer, intent(in)::n              ! number of file
     character(len=4),intent(in)::ext    ! file extention
     character(len=30)::num_name         ! complete numbered name
-    write(num_name,*)n
-    num_name=trim(adjustl(num_name))//trim(adjustl(ext))
+    num_name = itoa(n)//trim(adjustl(ext))
 end function make_numbered_name
 
 subroutine get_uniform_sample(irandom, amplitude, rand_symmetry,repeatable)

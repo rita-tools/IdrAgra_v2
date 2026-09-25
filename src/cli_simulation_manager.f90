@@ -1,9 +1,9 @@
 module cli_simulation_manager
-use mod_utility, only: dp, get_value_index, get_uniform_sample, days_x_month, calc_date, day_of_week, get_julian_day
+use mod_utility, only: dp, get_value_index, get_uniform_sample, days_x_month, calc_date, day_of_week, get_julian_day, itoa
 use mod_parameters
 use mod_grid, only: read_grid, write_grid, print_mat_as_grid, overlay_domain, bound, id_to_par, set_default_par
 use mod_evapotranspiration, only: ET_reference, calculateDLH
-use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data, create_meteo_matrices
+use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data, create_meteo_matrices, skip_meteo_days
 use mod_runoff
 use mod_crop_soil_water
 use mod_crop_phenology, only: crop_pheno_info, crop_matrices, populate_crop_pars_matrices, &
@@ -65,7 +65,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     type(crop_matrices)::crop_map
 
     integer:: unit_crop
-    integer::i,j,k,y,current_year,day_idx,hour,z,w                           ! for cycles
+    integer::i,j,k,y,period_start_year,day_idx,hour,z,w                           ! for cycles
     !integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::irandom ! %EAC% use irandom map instead
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::dir_phenofases
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::dir_meteo
@@ -98,7 +98,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     integer::cont_td    ! cycles
     character(len=33)::str_td
     character(len=255)::str_delete, landuse_file, upfilename, yearly_irr_meth_map, yearly_irr_eff_map
-    character(len=55)::s_year,s_years,s_doy
+    character(len=:), allocatable :: period_label
     logical :: file_exists
     !! percolation model
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::day_from_irr ! days past from the latest irrigation event
@@ -107,8 +107,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     integer::days_before_year, year_start_julian, days_to_skip, days_to_run
     integer::tmax_d, tmin_d, time
     ! to account for skipped years
-    integer:: s_meteostat, s_step
-    real(dp):: value, h_irr_hour
+    real(dp):: h_irr_hour
     !CHARACTER(LEN=20)::fc_name
     type(grid_r)::pheno_grd
 
@@ -254,46 +253,35 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     end select
 
     ! Yearly simulation cycle
-    year_cycle: do y=1,sim_years
-        if (pars%sim%start_simulation%doy >= info_meteo(1)%start%doy + sum(pars%sim%days_in_year(1:y))) then
-            ! Skip all year if not simulated
-            do s_meteostat = 1, pars%sim%n_voronoi   ! read in call xmeteo
-                do s_step = 1, pars%sim%days_in_year(y)
-                    read (info_meteo(s_meteostat)%unit, *) value
-                end do
-            end do
-            cycle
-        else if (pars%sim%start_simulation%doy > &
-            & info_meteo(1)%start%doy + sum(pars%sim%days_in_year(1:(y-1)))) then
-            ! Eventually skip some days
-            do s_meteostat = 1, pars%sim%n_voronoi
-                do s_step = 1, &
-                    & (pars%sim%start_simulation%doy - (info_meteo(1)%start%doy + sum(pars%sim%days_in_year(1:(y-1)))))
-                    read (info_meteo(s_meteostat)%unit, *) value
-                end do
-            end do
+    year_cycle: do y = 1, sim_years
+
+        days_before_year = sum(pars%sim%days_in_year(:y-1))
+        year_start_julian = info_meteo(1)%start%doy + days_before_year
+
+        ! Skip un-simulated info_meteo days
+        days_to_skip = min(max(0, pars%sim%start_simulation%doy - year_start_julian), pars%sim%days_in_year(y))
+        days_to_run = pars%sim%days_in_year(y) - days_to_skip
+        if (days_to_skip > 0) then
+            call skip_meteo_days(info_meteo, days_to_skip)
         end if
+        if (days_to_run == 0) cycle year_cycle
 
-        n_week=0
+        n_week = 0
 
-        ! TODO: check if effectively required
-        current_year = pars%sim%start_year+y-1
-        if (info_meteo(1)%start%month > 1) then
-
-            write (s_year,*) current_year
-            write (s_years,*) current_year+1
-            write (s_years,*) adjustr(trim(s_year))//'-'//adjustl(trim(s_years))
+        ! Input/output files use yyyy suffixes for simulations starting january 1, and yyyy-yyyy for all other cases
+        period_start_year = pars%sim%start_year + y - 1
+        if (info_meteo(1)%start%month /= 1 .or. info_meteo(1)%start%day /= 1) then
+            period_label = itoa(period_start_year)//'-'//itoa(period_start_year+1)
         else
-            write (s_year,*) current_year
-            write (s_years,*) current_year
+            period_label = itoa(period_start_year)
         end if
 
         ! Yearly irandom: change irandom map each year at the beginning, if the file exists
         ! if not, it will be generated in the following step
-        inquire (file=trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//trim(adjustl(s_years))//'.asc', exist=pars%sim%f_irandom)
+        inquire (file=trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//period_label//'.asc', exist=pars%sim%f_irandom)
         if (pars%sim%f_irandom .eqv. .true.) then
-            print *,'Init irandom: ', trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//trim(adjustl(s_years))//'.asc'
-            call read_grid(trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//trim(adjustl(s_years))//'.asc', info_spat%irandom,pars%sim,boundaries)
+            print *,'Init irandom: ', trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//period_label//'.asc'
+            call read_grid(trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//period_label//'.asc', info_spat%irandom,pars%sim,boundaries)
         end if
 
 
@@ -303,12 +291,12 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             info_spat%domain%mat = info_spat%backup_domain%mat
 
             ! %PS%: a missing landuse yearly file is allowed, in that case we reuse last year's
-            landuse_file = trim(pars%sim%input_path)//trim(pars%sim%soiluse_fn)//'_'//trim(adjustl(s_years))//'.asc'
+            landuse_file = trim(pars%sim%input_path)//trim(pars%sim%soiluse_fn)//'_'//period_label//'.asc'
             inquire(file=trim(landuse_file), exist=file_exists)
             if (file_exists) then
                 call read_grid(trim(landuse_file), info_spat%soil_use_id, pars%sim, boundaries)
             else
-                print *, "Landuse file for year ", trim(adjustl(s_years)), " is missing. Relying on the previous year instead."
+                print *, "Landuse file for year ", period_label, " is missing. Relying on the previous year instead."
             end if
 
             if (minval(info_spat%soil_use_id%mat,info_spat%soil_use_id%mat/=info_spat%soil_use_id%header%nan) < 1 &
@@ -329,7 +317,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             ! update irrigation related parameters map as they can change during the simulation period
             !%PS%: refactored to avoid duplicated code
             if (pars%sim%mode > 0) then
-                yearly_irr_meth_map = trim(pars%sim%id_irr_meth_fn)//'_'//trim(adjustl(s_years))//".asc"
+                yearly_irr_meth_map = trim(pars%sim%id_irr_meth_fn)//'_'//period_label//".asc"
                 call read_grid(trim(pars%sim%input_path)//yearly_irr_meth_map, info_spat%irr_meth_id, pars%sim, boundaries) ! TODO: check if file exists
                 call validate_irr_method_map(info_spat%irr_meth_id, info_spat%domain, pars%sim%n_irr_meth, yearly_irr_meth_map)
 
@@ -359,7 +347,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
                 ! Only read efficiency maps in modes 2 and 4
                 if (pars%sim%mode == 2 .or. pars%sim%mode == 4) then
-                    yearly_irr_eff_map = trim(pars%sim%eff_irr_fn)//'_'//trim(adjustl(s_years))//".asc"
+                    yearly_irr_eff_map = trim(pars%sim%eff_irr_fn)//'_'//period_label//".asc"
                     call read_grid(trim(pars%sim%input_path)//yearly_irr_eff_map, info_spat%eff_met, pars%sim, boundaries)
                     call set_default_par(info_spat%eff_met, info_spat%domain, 1.0D0)
                 end if
@@ -368,7 +356,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
             ! Debug output
             if (pars%sim%prt_debug_out == 'y') then
-                call write_grid(trim(pars%sim%path)//'out_'//trim(pars%sim%soiluse_fn)//'_'//trim(adjustl(s_years))//'.asc', &
+                call write_grid(trim(pars%sim%path)//'out_'//trim(pars%sim%soiluse_fn)//'_'//period_label//'.asc', &
                     & info_spat%soil_use_id, error_flag)
                 if (pars%sim%mode > 0) then
                     call write_grid(trim(pars%sim%path)//'out_'//yearly_irr_meth_map, info_spat%irr_meth_id, error_flag)
@@ -397,7 +385,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 end do
             end do
             close(unit_crop)
-            call init_cell_output_file(unit_crop,trim(pars%sim%path)//trim(adjustl(s_years))//'_PhenoLengths.csv',&
+            call init_cell_output_file(unit_crop,trim(pars%sim%path)//period_label//'_PhenoLengths.csv',&
                 &'MeteoStat; SoilUse; nCrop; ii0; iie; iid')
             do i=1,size(info_pheno)
                 do j=1,size(info_pheno(i)%ii0,1)
@@ -426,17 +414,17 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
         if (pars%sim%prt_debug_out == 'y') then
             ! write debug files of reference data for crop randomization
-            call print_mat_as_grid(trim(pars%sim%path)//trim(adjustl(s_years))//"_irandom.asc", &
+            call print_mat_as_grid(trim(pars%sim%path)//period_label//"_irandom.asc", &
                 & info_spat%irandom%header,info_spat%irandom%mat,error_flag)
             do i=1,size(crop_map%ii0,3)
                 write(str,*)i
-                call print_mat_as_grid(trim(pars%sim%path)//trim(adjustl(s_years))//"_ii0_" &
+                call print_mat_as_grid(trim(pars%sim%path)//period_label//"_ii0_" &
                     & //trim(adjustl(str))//".asc",info_spat%domain%header,crop_map%ii0(:,:,i), &
                     & error_flag)
-                call print_mat_as_grid(trim(pars%sim%path)//trim(adjustl(s_years))//"_iie_" &
+                call print_mat_as_grid(trim(pars%sim%path)//period_label//"_iie_" &
                     & //trim(adjustl(str))//".asc",info_spat%domain%header,crop_map%iie(:,:,i), &
                     & error_flag)
-                call print_mat_as_grid(trim(pars%sim%path)//trim(adjustl(s_years))//"_dij_" &
+                call print_mat_as_grid(trim(pars%sim%path)//period_label//"_dij_" &
                     & //trim(adjustl(str))//".asc",info_spat%domain%header,crop_map%dij(:,:,i), &
                     & error_flag)
             end do
@@ -489,22 +477,22 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
         ! Output files *.csv inizialization
         if (pars%sim%mode == 1) then
-            call init_cell_output_by_year(out_tbl_list, pars%sim%path, s_years, info_meteo%filename, &
+            call init_cell_output_by_year(out_tbl_list, pars%sim%path, period_label, info_meteo%filename, &
                 & pars%sim%mode, pars%sim%f_out_cells, pars%sim, irr_units%id, pars%cr%n_withdrawals)
         else
-            call init_cell_output_by_year(out_tbl_list,pars%sim%path,s_years,info_meteo%filename, &
+            call init_cell_output_by_year(out_tbl_list,pars%sim%path,period_label,info_meteo%filename, &
                 & pars%sim%mode, pars%sim%f_out_cells, pars%sim)
         end if
         if(pars%sim%f_out_cells .eqv. .true.)then
             call write_cell_info(info_spat, out_tbl_list%cell_info, pars%sim%mode, pars%sim%f_cap_rise, &
-                               & pars%depth%ze_fix, pars%depth%zr_fix, current_year                     )
+                               & pars%depth%ze_fix, pars%depth%zr_fix, period_start_year                )
         end if
 
-        call init_yearly_output_file(yr_map,pars%sim%path,s_years,pars%sim)
+        call init_yearly_output_file(yr_map,pars%sim%path,period_label,pars%sim)
         ! TODO: Verify when output_yield_iniz needs to be activated
-        call init_yield_output_file(yield,pars%sim%path,s_years,pars%sim)
+        call init_yield_output_file(yield,pars%sim%path,period_label,pars%sim)
 
-        call init_debug_yearly_output_file(yr_deb_map,pars%sim%path,s_years,pars%sim)
+        call init_debug_yearly_output_file(yr_deb_map,pars%sim%path,period_label,pars%sim)
 
         ! Calendar initializing to take into account start of year
         if (info_meteo(1)%start%month > 2) then
@@ -513,11 +501,6 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             call days_x_month(days_in_yr,pars%sim%start_year+y-1)
         end if
         days_in_yr = cshift(days_in_yr, info_meteo(1)%start%month-1)
-
-        days_before_year = sum(pars%sim%days_in_year(1:y-1))
-        year_start_julian = info_meteo(1)%start%doy + days_before_year
-        days_to_skip = max(0, pars%sim%start_simulation%doy - year_start_julian)
-        days_to_run = pars%sim%days_in_year(y) - days_to_skip
 
         ! Daily simulation cycle
         day_cycle: do day_idx = 1, days_to_run
@@ -529,16 +512,14 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             iter1 = 0
             iter2 = 0
             h_irr = 0.
-            write (s_doy,*) day_idx
-
-            print*,'Simulation day', achar(9), trim(adjustl(s_doy)), achar(9), 'year', achar(9), trim(adjustl(s_year))
+            print*,'Simulation day', achar(9), day_idx, achar(9), 'year', achar(9), period_start_year
 
 
             ! Updating daily data matrix for water table depth
             if(pars%sim%f_cap_rise .eqv. .true.)then
                 ! update cycling water table maps (only doy)
                 upfilename = trim(pars%sim%input_path)//trim(pars%sim%wat_table_fn)//"_"//"yyyy"//"_"&
-                    & //trim(adjustl(s_doy))//".asc" ! "
+                    & //itoa(day_idx)//".asc" ! "
                 inquire(file=trim(upfilename), exist=file_exists)   ! file_exists will be TRUE if the file exists
                 if (file_exists .eqv. .true.) then
                     print *,'Water table data are updated: ', upfilename
@@ -551,8 +532,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 end if
 
                 ! update specific water table maps (year/doy)
-                upfilename = trim(pars%sim%input_path)//trim(pars%sim%wat_table_fn)//"_"//trim(adjustl(s_year))//"_"&
-                    & //trim(adjustl(s_doy))//".asc" ! "
+                upfilename = trim(pars%sim%input_path)//trim(pars%sim%wat_table_fn)//"_"//itoa(period_start_year)//"_"&
+                    & //itoa(day_idx)//".asc" ! "
                 inquire(file=trim(upfilename), exist=file_exists)   ! file_exists will be TRUE if the file exists
                 if (file_exists .eqv. .true.) then
                     print *,'Water table data are updated: ', upfilename
@@ -570,16 +551,16 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
             ! Monthly output *.asc file inizialization
             if(pars%sim%step_out == 0)then
-                call init_step_output_file(stp_map,pars%sim%path,s_years,day_idx,days_in_yr,0, 'month',pars%sim)
-                call init_step_debug_output_file(deb_map, pars%sim%path, s_years, day_idx, days_in_yr, 0, 'month',pars%sim)
+                call init_step_output_file(stp_map,pars%sim%path,period_label,day_idx,days_in_yr,0, 'month',pars%sim)
+                call init_step_debug_output_file(deb_map, pars%sim%path, period_label, day_idx, days_in_yr, 0, 'month',pars%sim)
             else if (pars%sim%step_out == 1) then
                 ! In output_asc_month_iniz, uses 0 as first day (as in monthly routine)
-                call init_step_output_file(stp_map,pars%sim%path,s_years,day_idx,pars%sim%intervals,0, 'week',pars%sim)
-                call init_step_debug_output_file(deb_map, pars%sim%path, s_years, day_idx, pars%sim%intervals, 0, 'week',pars%sim)
+                call init_step_output_file(stp_map,pars%sim%path,period_label,day_idx,pars%sim%intervals,0, 'week',pars%sim)
+                call init_step_debug_output_file(deb_map, pars%sim%path, period_label, day_idx, pars%sim%intervals, 0, 'week',pars%sim)
             else
                 ! In output_asc_month_iniz, uses (StartDate - 1) as first day
-                call init_step_output_file(stp_map,pars%sim%path,s_years,day_idx,pars%sim%intervals,pars%sim%clock(1)-1, 'step',pars%sim)
-                call init_step_debug_output_file(deb_map, pars%sim%path, s_years, day_idx, pars%sim%intervals, &
+                call init_step_output_file(stp_map,pars%sim%path,period_label,day_idx,pars%sim%intervals,pars%sim%clock(1)-1, 'step',pars%sim)
+                call init_step_debug_output_file(deb_map, pars%sim%path, period_label, day_idx, pars%sim%intervals, &
                     &   pars%sim%clock(1)-1, 'step',pars%sim)
             end if
             ! Phenological parameters spatialization
@@ -858,7 +839,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                     end do
 
                 case (4)! SCHEDULED mode
-                    call irrigation_scheduled(info_spat, day_idx, current_year, irr_sch, pheno, &
+                    call irrigation_scheduled(info_spat, day_idx, period_start_year, irr_sch, pheno, &
                         & h_irr, debug, wat_bal1_old, wat_bal2, wat_bal2_old, &
                         & a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min),irr_loss,&
                         wat_bal1%h_eff_rain, theta2_rice%k_sat_2, is_rice_paddy, wat%layer(2)%h_sat)

@@ -248,10 +248,10 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
                         read(buffer, *, iostat=ios) xml%sim%f_cap_rise
                     case('soilusevarflag') ! T: land use update yearly
                         read(buffer, *, iostat=ios) xml%sim%f_soiluse
-                    case ('meteostatweightnum') ! number of weather stations
-                        read(buffer, *, iostat=ios)xml%sim%n_ws
+                    case ('meteostatweightnum') ! Number of weather stations used to interpolate each cell's weather & phenology
+                        read(buffer, *, iostat=ios)xml%sim%n_interpolation_stations
                     case ('meteostattotnum') ! number of areas of weather stations TODO: check
-                        read(buffer, *, iostat=ios)xml%sim%n_voronoi
+                        read(buffer, *, iostat=ios)xml%sim%n_weather_stations
                     case ('interpolatetemperature')
                         read(buffer, *, iostat=ios) xml%sim%interpolate_temp
                     case ('interpolaterain')
@@ -905,7 +905,7 @@ subroutine read_grid_files(info_spat, extent, sim)
     end if
 
     ! read weather station weights
-    allocate(info_spat%weight_ws(sim%n_ws))
+    allocate(info_spat%weight_ws(sim%n_interpolation_stations))
     do k=1,size(info_spat%weight_ws)
         write(k_str,*) k
         call read_grid(trim(dir)//trim(sim%meteoweight_fn)//'_'//trim(adjustl(k_str))//'.asc',&
