@@ -70,7 +70,7 @@ type yield_t
     type(out_3d_mat):: transp_ratio_sum              ! somma del rapporto tra traspirazione potenziale ed evapotraspirazione di riferimento
     type(out_4d_mat):: T_act_sum                     ! somma della traspirazione effettiva per ciascuna fase del kcb
     type(out_4d_mat):: T_pot_sum                     ! somma della traspirazione potenziale per ciascuna fase del kcb
-    type(out_4d_mat):: dev_stage                     ! durata delle fasi del kcb
+    type(out_4d_mat):: days_in_stage                 ! Number of days spent in each stage (%mat(i, j, stage, crop_n))
 end type yield_t
 
 type step_map
@@ -725,7 +725,7 @@ subroutine init_yearly_yield_output(yield_map,domain,cs)
     allocate(yield_map%transp_ratio_sum%mat(size(domain,1),size(domain,2),cs))
     allocate(yield_map%T_act_sum%mat(size(domain,1),size(domain,2),fasi_kcb, cs))
     allocate(yield_map%T_pot_sum%mat(size(domain,1),size(domain,2),fasi_kcb, cs))
-    allocate(yield_map%dev_stage%mat(size(domain,1),size(domain,2),fasi_kcb, cs))
+    allocate(yield_map%days_in_stage%mat(size(domain,1),size(domain,2),fasi_kcb, cs))
 end subroutine init_yearly_yield_output
 
 subroutine init_yearly_debug_output(dbg_yr_map,domain)
@@ -796,7 +796,7 @@ subroutine destroy_yield_output(yld_map)
     deallocate(yld_map%transp_ratio_sum%mat)
     deallocate(yld_map%T_act_sum%mat)
     deallocate(yld_map%T_pot_sum%mat)
-    deallocate(yld_map%dev_stage%mat)
+    deallocate(yld_map%days_in_stage%mat)
 end subroutine destroy_yield_output
 
 subroutine destroy_annual_debug_output(dbg_yr_map)
@@ -1275,7 +1275,7 @@ subroutine assign_yield_map(yield_map,a)
     yield_map%transp_ratio_sum%mat = a
     yield_map%T_act_sum%mat = a
     yield_map%T_pot_sum%mat = a
-    yield_map%dev_stage%mat = a
+    yield_map%days_in_stage%mat = a
 end subroutine assign_yield_map
 
 subroutine assign_annual_debug_map(yr_debug_map,a)
