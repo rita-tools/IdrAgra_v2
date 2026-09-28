@@ -1,6 +1,6 @@
 module mod_meteo
 use mod_constants, only: dp
-use mod_utility, only: date, lower_case, days_x_month, calc_doy, split_date
+use mod_utility, only: date, lower_case, days_x_month, get_julian_day, split_date
 use mod_parameters, only: simulation, par_method
 use mod_evapotranspiration, only: ET_reference
 use mod_grid, only: grid_i
@@ -61,8 +61,8 @@ subroutine meteo_series_length(sim, verbose)
     call read_meteo_parameters(sim,info_meteo,verbose)
 
     ! Set simulation dates, if not already set
-    if(sim%start_simulation%doy==calc_doy(29,02,1600)) sim%start_simulation = info_meteo(1)%start
-    if(sim%end_simulation%doy==calc_doy(29,02,1600))   sim%end_simulation = info_meteo(1)%finish
+    if(sim%start_simulation%doy==get_julian_day(29,02,1600)) sim%start_simulation = info_meteo(1)%start
+    if(sim%end_simulation%doy==get_julian_day(29,02,1600))   sim%end_simulation = info_meteo(1)%finish
 
     ! Verify that meteorological series are coherent
     if(any(info_meteo(:)%start%doy/=info_meteo(1)%start%doy))then
@@ -81,7 +81,7 @@ subroutine meteo_series_length(sim, verbose)
     end if
 
     ! Check length of time series
-    do k = 1,sim%n_voronoi   ! TODO: n_voronoi or n_ws?
+    do k = 1,sim%n_weather_stations
         gg_diff = info_meteo(k)%finish%doy - info_meteo(k)%start%doy + 1
         count=0
         do while (.true.)
@@ -130,9 +130,9 @@ subroutine meteo_series_length(sim, verbose)
         end do
     end if
 
-    allocate(sim%year_step(sim%sim_years))
+    allocate(sim%days_in_year(sim%sim_years))
 
-    sim%year_step=0
+    sim%days_in_year=0
 
     ! calculate the number of days for each simulation years
     do k=1,sim%sim_years
@@ -142,9 +142,9 @@ subroutine meteo_series_length(sim, verbose)
             else
                 call days_x_month(calendario,sim%start_year+k-1)
             end if
-            sim%year_step(k)=sum(calendario)
+            sim%days_in_year(k)=sum(calendario)
         else ! the last year fo the dataset could be uncompleted
-            sim%year_step(k)=gg_count-sum(sim%year_step)
+            sim%days_in_year(k)=gg_count-sum(sim%days_in_year)
         end if
     end do
     call close_meteo_file(info_meteo)
@@ -157,7 +157,7 @@ subroutine meteo_series_length(sim, verbose)
         print*,"Simulation length: ",sim%sim_years, " years"
         print*,"Number of days for each year:"
         do k=1,sim%sim_years
-            print*," ",sim%year_step(k),"<---",sim%start_year+k-1
+            print*," ",sim%days_in_year(k),"<---",sim%start_year+k-1
         end do
         print *,'===== END DEBUG ====='
     end if
@@ -215,13 +215,13 @@ subroutine read_meteo_parameters(sim,info_meteo,verbose)
                 select case (label)
                     case ('statnum')
                         read(buffer, *, iostat=ios) n_stations ! number of weather station
-                        if (n_stations /= sim%n_voronoi) then
+                        if (n_stations /= sim%n_weather_stations) then
                             print *, "Meteorological stations number (MeteoStatTotNum) in simulation parameter &
                                 & file is not equal to the number (StatNum) in ", filemeteo_name, " database"
                             print *, 'Execution will be aborted...'
                             stop
                         end if
-                        allocate(info_meteo(sim%n_voronoi))    ! allocate enough memory to store weather stations information
+                        allocate(info_meteo(sim%n_weather_stations))    ! allocate enough memory to store weather stations information
                     case ('table')
                         tablestart = line
                         read (free_unit, *); line = line + 1 ! skip the header of the table
@@ -268,9 +268,9 @@ subroutine read_meteo_parameters(sim,info_meteo,verbose)
                             call split_date(date_start, info_meteo(i)%start)
                             call split_date(date_end, info_meteo(i)%finish)
                             info_meteo(i)%start%doy = &
-                                & calc_doy(info_meteo(i)%start%day,info_meteo(i)%start%month,info_meteo(i)%start%year)
+                                & get_julian_day(info_meteo(i)%start%day,info_meteo(i)%start%month,info_meteo(i)%start%year)
                             info_meteo(i)%finish%doy = &
-                                & calc_doy(info_meteo(i)%finish%day,info_meteo(i)%finish%month,info_meteo(i)%finish%year)
+                                & get_julian_day(info_meteo(i)%finish%day,info_meteo(i)%finish%month,info_meteo(i)%finish%year)
                             read(info_meteo(i)%unit,*)  ! skip line
                         end do
                     case ('endtable')
@@ -330,6 +330,20 @@ subroutine close_meteo_file(info_meteo)
     end do
     deallocate(info_meteo)
 end subroutine close_meteo_file
+
+! Advance every weather-station file read skipping n_days records.
+subroutine skip_meteo_days(info_meteo, n_days)
+    type(meteo_info), dimension(:), intent(inout) :: info_meteo
+    integer, intent(in) :: n_days
+    integer :: station_idx, day_idx
+    real(dp) :: unused_value
+
+    do station_idx = 1, size(info_meteo)
+        do day_idx = 1, n_days
+            read(info_meteo(station_idx)%unit, *) unused_value
+        end do
+    end do
+end subroutine skip_meteo_days
 
 subroutine read_meteo_data(info_meteo,current_doy,res_surf, forecast_day)
     ! read meteo data and update ET0
