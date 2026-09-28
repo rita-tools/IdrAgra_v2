@@ -169,7 +169,6 @@ subroutine read_meteo_parameters(sim,info_meteo,verbose)
    type(simulation),intent(inout)::sim
     type(meteo_info),dimension(:),allocatable,intent(inout)::info_meteo
     logical, intent(in)::verbose
-    integer::errorflag
 
     integer :: free_unit, i
     integer :: ios
@@ -187,7 +186,6 @@ subroutine read_meteo_parameters(sim,info_meteo,verbose)
     ios = 0
     line = 0; tablestart = 0
     dir=trim(sim%meteo_path)
-    errorflag=0
     filemeteo_name=trim(sim%ws_list_fn)
 
     open(newunit=free_unit, file=filemeteo_name, status='old', action="read", iostat=ios)

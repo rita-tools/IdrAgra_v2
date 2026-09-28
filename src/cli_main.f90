@@ -28,7 +28,6 @@ type(soil2_rice)::theta2_rice                               ! stores soil parame
 real(dp), allocatable :: warmup_theta(:, :, :)              ! passes soil theta from warmup to the actual simulation
 
 integer,dimension(8)::t_start,t_stop
-integer :: errorflag
 character(len = 255) :: filename = 'idragra_parameters.txt'
 
 character(len=50) :: arg
@@ -79,7 +78,7 @@ call print_header()
 call date_and_time(values=t_start)
 
 ! Reads simulation input parameters
-call read_all_parameters(filename, xml, xml_TDx, ErrorFlag, verbose)
+call read_all_parameters(filename, xml, xml_TDx, verbose)
 
 if (showpreview .eqv. .true.) then
     print *, '=== PREVIEW ==='
@@ -133,8 +132,8 @@ if(xml%sim%f_init_wc .eqv. .false.)then ! Generates soil initial condition
 
     ! Prints initial condition values
     if (xml%sim%prt_init_cond == 'y') then
-        call write_grid(trim(xml%sim%path)//'IC_thetaI.asc',info_spat%theta(1)%old,errorflag)
-        call write_grid(trim(xml%sim%path)//'IC_thetaII.asc',info_spat%theta(2)%old,errorflag)
+        call write_grid(trim(xml%sim%path)//'IC_thetaI.asc',info_spat%theta(1)%old)
+        call write_grid(trim(xml%sim%path)//'IC_thetaII.asc',info_spat%theta(2)%old)
     end if
 
     ! Closes input files

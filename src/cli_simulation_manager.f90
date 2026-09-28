@@ -6,7 +6,8 @@ use mod_evapotranspiration, only: ET_reference, calculateDLH
 use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data, create_meteo_matrices, skip_meteo_days
 use mod_runoff
 use mod_crop_soil_water
-use mod_crop_phenology, only: crop_pheno_info, crop_matrices, populate_crop_pars_matrices, populate_crop_yield_matrices
+use mod_crop_phenology, only: crop_pheno_info, crop_matrices, populate_crop_pars_matrices, populate_crop_yield_matrices,
+                            & make_random_emergence
 use mod_TDx_index
 use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva
 use mod_common, only: wat_matrix, soil2_rice, hourly, unit_file_scratch
@@ -63,9 +64,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     type(scheduled_irrigation),dimension(:),allocatable::irr_sch ! Allocated in 'open_scheduled_irrigation' function
     type(crop_matrices)::crop_map
 
-    integer:: unit_crop
-    integer::i,j,k,y,period_start_year,day_idx,hour,z,w                           ! for cycles
-    !integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::irandom ! %EAC% use irandom map instead
+    integer :: i, j, k, y, period_start_year, day_idx, hour, z ! for cycles
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::dir_phenofases
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::dir_meteo
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::meteo_weight
@@ -73,11 +72,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::priv_irr
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::coll_irr
     integer,dimension(12)::days_in_yr
-    integer::error_flag
     integer::xx,yy ! Test cells coordinates
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::iter1,iter2
-    character(len=33)::str
-
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::irr_loss ! Irrigation application losses
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::alpha_ms_map, alpha_unm_map
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::fw_irr
@@ -96,7 +92,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     type(unit_file_scratch),dimension(:),allocatable::unit_Dxi
     integer::cont_td    ! cycles
     character(len=33)::str_td
-    character(len=255)::str_delete, landuse_file, upfilename, yearly_irr_meth_map, yearly_irr_eff_map
+    character(len=255) :: str_delete, upfilename
     character(len=:), allocatable :: period_label
     logical :: file_exists
     !! percolation model
@@ -267,7 +263,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
         n_week = 0
 
-        ! Input/output files use yyyy suffixes for simulations starting january 1, and yyyy-yyyy for all other cases
+        ! Set the label for this period: input/output files use yyyy suffixes for simulations beginning at january 1, and yyyy-yyyy for all other cases
         period_start_year = pars%sim%start_year + y - 1
         if (info_meteo(1)%start%month /= 1 .or. info_meteo(1)%start%day /= 1) then
             period_label = itoa(period_start_year)//'-'//itoa(period_start_year+1)
@@ -275,167 +271,13 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             period_label = itoa(period_start_year)
         end if
 
-        ! Yearly irandom: change irandom map each year at the beginning, if the file exists
-        ! if not, it will be generated in the following step
-        inquire (file=trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//period_label//'.asc', exist=pars%sim%f_irandom)
-        if (pars%sim%f_irandom .eqv. .true.) then
-            print *,'Init irandom: ', trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//period_label//'.asc'
-            call read_grid(trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//period_label//'.asc', info_spat%irandom,pars%sim,boundaries)
-        end if
+        ! Read irandom, landuse and irrigation method maps for the new period if needed
+        call update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, period_label,         &
+                                      & alpha_ms_map, alpha_unm_map, fw_irr, a_loss, b_loss, c_loss, f_interception)
 
-
-        ! Yearly soil use: change soil use map each year at the beginning
-        if (pars%sim%f_soiluse .eqv. .true.) then
-            info_spat%domain = info_spat%backup_domain
-            info_spat%domain%mat = info_spat%backup_domain%mat
-
-            ! %PS%: a missing landuse yearly file is allowed, in that case we reuse last year's
-            landuse_file = trim(pars%sim%input_path)//trim(pars%sim%soiluse_fn)//'_'//period_label//'.asc'
-            inquire(file=trim(landuse_file), exist=file_exists)
-            if (file_exists) then
-                call read_grid(trim(landuse_file), info_spat%soil_use_id, pars%sim, boundaries)
-            else
-                print *, "Landuse file for year ", period_label, " is missing. Relying on the previous year instead."
-            end if
-
-            if (minval(info_spat%soil_use_id%mat,info_spat%soil_use_id%mat/=info_spat%soil_use_id%header%nan) < 1 &
-                & .or. maxval(info_spat%soil_use_id%mat) > pars%sim%n_lus) then
-                print *,"Soil use maps have soil uses not defined in crop database"
-                print *,"Verify the maximum allowed crop uses (SoilUsesNum) and soil maps"
-                print *, 'Execution will be aborted...'
-                stop
-            end if
-
-            do w=1,size(pars%sim%no_lu_list)
-                where (info_spat%soil_use_id%mat == pars%sim%no_lu_list(w)) info_spat%soil_use_id%mat = info_spat%soil_use_id%header%nan
-            end do
-
-            ! Soil uses that aren't simulated are removed from domain
-            call overlay_domain(info_spat%soil_use_id, info_spat%domain, trim(landuse_file))
-
-            ! update irrigation related parameters map as they can change during the simulation period
-            !%PS%: refactored to avoid duplicated code
-            if (pars%sim%mode > 0) then
-                yearly_irr_meth_map = trim(pars%sim%id_irr_meth_fn)//'_'//period_label//".asc"
-                call read_grid(trim(pars%sim%input_path)//yearly_irr_meth_map, info_spat%irr_meth_id, pars%sim, boundaries) ! TODO: check if file exists
-                call validate_irr_method_map(info_spat%irr_meth_id, info_spat%domain, pars%sim%n_irr_meth, yearly_irr_meth_map)
-
-                ! Spreads parameters across the simulation domain according to each cell's method
-                !%PS%: note that a/b/c_losses and h_meth are not used in mode 2, but setting them anyway is safe and makes for clearer code
-                alpha_ms_map =  id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%irr_th_ms)
-                alpha_unm_map = id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%irr_th_unm)
-                fw_irr =        id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%f_wet)
-                a_loss =        id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%a_loss)
-                b_loss =        id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%b_loss)
-                c_loss =        id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%c_loss)
-                f_interception= id_to_par(info_spat%irr_meth_id, dble(pars%irr%met(:)%f_interception))
-
-                info_spat%h_meth=info_spat%domain
-                info_spat%h_meth%mat=id_to_par(info_spat%irr_meth_id,pars%irr%met(:)%h_irr)
-
-                info_spat%irr_starts%mat = id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%irr_starts)
-                info_spat%irr_ends%mat   = id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%irr_ends)
-
-                call calc_perc_booster_pars(info_spat, pars%irr%met, pars%sim%quantiles)
-
-                ! Only update irrigation units in mode 1
-                if (pars%sim%mode == 1) then
-                    call init_irrigation_units(info_spat%domain, info_spat%irr_unit_id, info_spat%eff_net, &
-                                             & irr_units, wat_src_tbl, pars, info_spat%h_meth              )
-                end if
-
-                ! Only read efficiency maps in modes 2 and 4
-                if (pars%sim%mode == 2 .or. pars%sim%mode == 4) then
-                    yearly_irr_eff_map = trim(pars%sim%eff_irr_fn)//'_'//period_label//".asc"
-                    call read_grid(trim(pars%sim%input_path)//yearly_irr_eff_map, info_spat%eff_met, pars%sim, boundaries)
-                    call set_default_par(info_spat%eff_met, info_spat%domain, 1.0D0)
-                end if
-
-            end if
-
-            ! Debug output
-            if (pars%sim%prt_debug_out == 'y') then
-                call write_grid(trim(pars%sim%path)//'out_'//trim(pars%sim%soiluse_fn)//'_'//period_label//'.asc', &
-                    & info_spat%soil_use_id, error_flag)
-                if (pars%sim%mode > 0) then
-                    call write_grid(trim(pars%sim%path)//'out_'//yearly_irr_meth_map, info_spat%irr_meth_id, error_flag)
-                    if (pars%sim%mode == 2 .or. pars%sim%mode == 4) then
-                        call write_grid(trim(pars%sim%path)//'out_'//yearly_irr_eff_map, info_spat%eff_met, error_flag)
-                    end if
-                end if
-            end if
-
-        end if ! end change soil use map condition
-
-        ! Read all phenological tables and allocation of info_pheno%prm%tab(:,:)
-        call read_all_crop_pars(pars%sim%days_in_year(y), pars%sim%n_lus, info_pheno)
-        if (pars%sim%prt_debug_out == 'y') then
-            call check_pheno_parameters(info_pheno,info_meteo)
-            call init_cell_output_file(unit_crop,trim(pars%sim%path)//'Kcb_levels.csv',&
-                &'MeteoStat; SoilUse; nCrop; low; mid; high')
-            do i=1, size(info_pheno)
-                do j = 1, size(info_pheno(i)%k_cb%tab, 2)
-                    do z = 1, info_pheno(i)%n_crops_by_year(j)
-                        write(unit_crop,*) trim(info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)), &
-                            & '; ', j, '; ', z, '; ', &
-                            & info_pheno(i)%kcb_phases%low(j,z), '; ', &
-                            & info_pheno(i)%kcb_phases%mid(j,z), '; ', info_pheno(i)%kcb_phases%high(j,z)
-                    end do
-                end do
-            end do
-            close(unit_crop)
-            call init_cell_output_file(unit_crop,trim(pars%sim%path)//period_label//'_PhenoLengths.csv',&
-                &'MeteoStat; SoilUse; nCrop; ii0; iie; iid')
-            do i=1,size(info_pheno)
-                do j=1,size(info_pheno(i)%ii0,1)
-                    do z=1,size(info_pheno(i)%ii0,2)
-                        if (info_pheno(i)%ii0(j,z)>0) then
-                            write(unit_crop,*)trim(info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)), &
-                                & '; ',j,'; ', z, '; ',info_pheno(i)%ii0(j,z),'; ',&
-                                & info_pheno(i)%iie(j,z),'; ',info_pheno(i)%iid(j,z)
-                        end if
-                    end do
-                end do
-            end do
-            close(unit_crop)
-        end if
-
-        ! Randomization and spatial distribution of crop emergence
-        if (pars%sim%f_irandom .eqv. .false.) then
-            call get_uniform_sample(info_spat%irandom%mat,pars%sim%sowing_range,pars%sim%rand_symmetry,pars%sim%repeatable)
-        end if
-
-        call allocate_crop_map (crop_map,info_spat%domain%mat,pars%sim%n_crops,info_spat%domain%header%nan)
-        ! make_random_emergence calculates reference data to estimate crop emergence date
-        ! which will be calculated in populate_crop_pars_matrices
-        call make_random_emergence(info_pheno,meteo_weight,dir_meteo,info_spat%domain,info_spat%soil_use_id%mat, &
-            & crop_map, info_spat%irandom%mat, pars%sim%days_in_year(y))
-
-        if (pars%sim%prt_debug_out == 'y') then
-            ! write debug files of reference data for crop randomization
-            call print_mat_as_grid(trim(pars%sim%path)//period_label//"_irandom.asc", &
-                & info_spat%irandom%header,info_spat%irandom%mat,error_flag)
-            do i=1,size(crop_map%ii0,3)
-                write(str,*)i
-                call print_mat_as_grid(trim(pars%sim%path)//period_label//"_ii0_" &
-                    & //trim(adjustl(str))//".asc",info_spat%domain%header,crop_map%ii0(:,:,i), &
-                    & error_flag)
-                call print_mat_as_grid(trim(pars%sim%path)//period_label//"_iie_" &
-                    & //trim(adjustl(str))//".asc",info_spat%domain%header,crop_map%iie(:,:,i), &
-                    & error_flag)
-                call print_mat_as_grid(trim(pars%sim%path)//period_label//"_dij_" &
-                    & //trim(adjustl(str))//".asc",info_spat%domain%header,crop_map%dij(:,:,i), &
-                    & error_flag)
-            end do
-        end if
-
-        call populate_crop_yield_matrices(info_pheno, dir_phenofases, info_spat%domain, info_spat%soil_use_id%mat, crop_map, y)
-        call initialize_yield(yield, info_spat%domain%mat, size(info_pheno(1)%ii0,2))
-
-        ! Inizialization of kcb_low and phenological phase
-        pheno%k_cb_low = info_spat%domain%header%nan
-        pheno%n_crop_in_year = 1
-        pheno%pheno_idx = 1
+        ! Initialize crop calendar
+        call initialize_yearly_crop_state(pars, y, period_label, info_pheno, info_meteo, info_spat, &
+            & meteo_weight, dir_meteo, dir_phenofases, crop_map, yield, pheno)
 
         select case(pars%sim%mode)
             case (1)                                                ! USE mode
@@ -1153,8 +995,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     info_spat%theta(1)%old%mat = wat_bal1%h_soil/(1000.*wat_bal1%d_e)
     info_spat%theta(2)%old%mat = wat_bal2%h_soil/(1000.*wat_bal2%d_t)
     if (pars%sim%f_theta_out .eqv. .true.) then
-        call write_grid(trim(pars%sim%final_condition)//trim(pars%sim%thetaI_end_fn)//'.asc',info_spat%theta(1)%old,error_flag)
-        call write_grid(trim(pars%sim%final_condition)//trim(pars%sim%thetaII_end_fn)//'.asc',info_spat%theta(2)%old,error_flag)
+        call write_grid(trim(pars%sim%final_condition)//trim(pars%sim%thetaI_end_fn)//'.asc',info_spat%theta(1)%old)
+        call write_grid(trim(pars%sim%final_condition)//trim(pars%sim%thetaII_end_fn)//'.asc',info_spat%theta(2)%old)
     end if
 
     ! calculate DTx statistics
@@ -1187,6 +1029,189 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         & pars%sim%imax,pars%sim%jmax)
 
 end subroutine simulation_manager
+
+subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, period_label,         &
+                                    & alpha_ms_map, alpha_unm_map, fw_irr, a_loss, b_loss, c_loss, f_interception)
+
+    type(parameters), intent(inout) :: pars
+    type(spatial_info), intent(inout) :: info_spat
+    type(water_sources_table), dimension(:), intent(inout) :: wat_src_tbl
+    type(irr_units_table), dimension(:), allocatable, intent(inout) :: irr_units
+    type(bound), intent(in) :: boundaries
+    character(len=*), intent(in) :: period_label
+    real(dp), dimension(:,:), intent(inout) :: alpha_ms_map, alpha_unm_map
+    real(dp), dimension(:,:), intent(inout) :: fw_irr
+    real(dp), dimension(:,:), intent(inout) :: a_loss, b_loss, c_loss
+    real(dp), dimension(:,:), intent(inout) :: f_interception
+
+    integer :: i
+    character(len=255) :: irandom_file, landuse_file
+    character(len=255) :: yearly_irr_meth_map, yearly_irr_eff_map
+    logical :: file_exists
+
+    ! Change the crop-emergence randomization map (if one exists for this period).
+    irandom_file = trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//period_label//'.asc'
+    inquire(file=trim(irandom_file), exist=pars%sim%f_irandom)
+    if (pars%sim%f_irandom) then
+        print *, 'Reading irandom values from: ', trim(irandom_file)
+        call read_grid(trim(irandom_file), info_spat%irandom, pars%sim, boundaries)
+    end if
+
+    ! Change soil use and irrigation method maps (if they exist for this period)
+    if (.not. pars%sim%f_soiluse) return
+
+    ! Restore the complete domain
+    info_spat%domain = info_spat%backup_domain
+    info_spat%domain%mat = info_spat%backup_domain%mat
+
+    ! %PS%: a missing landuse yearly file is allowed, in that case we reuse last year's
+    landuse_file = trim(pars%sim%input_path)//trim(pars%sim%soiluse_fn)//'_'//period_label//'.asc'
+    inquire(file=trim(landuse_file), exist=file_exists)
+    if (file_exists) then
+        call read_grid(trim(landuse_file), info_spat%soil_use_id, pars%sim, boundaries)
+    else
+        print *, 'Landuse file for year ', period_label, ' is missing. Relying on the previous year instead.'
+    end if
+
+    if (minval(info_spat%soil_use_id%mat, info_spat%soil_use_id%mat /= info_spat%soil_use_id%header%nan) < 1 &
+        & .or. maxval(info_spat%soil_use_id%mat) > pars%sim%n_lus) then
+        print *, 'Soil use maps have soil uses not defined in crop database'
+        print *, 'Verify the maximum allowed crop uses (SoilUsesNum) and soil maps'
+        print *, 'Execution will be aborted...'
+        stop
+    end if
+
+    do i = 1, size(pars%sim%no_lu_list)
+        where (info_spat%soil_use_id%mat == pars%sim%no_lu_list(i)) info_spat%soil_use_id%mat = info_spat%soil_use_id%header%nan
+    end do
+    call overlay_domain(info_spat%soil_use_id, info_spat%domain, trim(landuse_file)) ! Remove NaNs from the domain
+
+    ! Irrigation method - todo: add indipendent flag; should not follow pars%sim%f_soiluse
+    if (pars%sim%mode > 0) then
+        yearly_irr_meth_map = trim(pars%sim%id_irr_meth_fn)//'_'//period_label//'.asc'
+        call read_grid(trim(pars%sim%input_path)//yearly_irr_meth_map, info_spat%irr_meth_id, &
+            & pars%sim, boundaries) ! TODO: check if file exists
+        call validate_irr_method_map(info_spat%irr_meth_id, info_spat%domain, pars%sim%n_irr_meth, &
+            & yearly_irr_meth_map)
+
+        ! Spreads parameters across the simulation domain according to each cell's method
+        !%PS%: note that a/b/c_losses and h_meth are not used in mode 2, but setting them anyway is safe and makes for clearer code
+        alpha_ms_map = id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%irr_th_ms)
+        alpha_unm_map = id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%irr_th_unm)
+        fw_irr = id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%f_wet)
+        a_loss = id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%a_loss)
+        b_loss = id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%b_loss)
+        c_loss = id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%c_loss)
+        f_interception = id_to_par(info_spat%irr_meth_id, dble(pars%irr%met(:)%f_interception))
+
+        info_spat%h_meth = info_spat%domain
+        info_spat%h_meth%mat = id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%h_irr)
+        info_spat%irr_starts%mat = id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%irr_starts)
+        info_spat%irr_ends%mat = id_to_par(info_spat%irr_meth_id, pars%irr%met(:)%irr_ends)
+
+        call calc_perc_booster_pars(info_spat, pars%irr%met, pars%sim%quantiles)
+
+        ! Only update irrigation units in mode 1
+        if (pars%sim%mode == 1) then
+            call init_irrigation_units(info_spat%domain, info_spat%irr_unit_id, info_spat%eff_net, &
+                                     & irr_units, wat_src_tbl, pars, info_spat%h_meth              )
+        end if
+
+        ! Only read efficiency maps in modes 2 and 4
+        if (pars%sim%mode == 2 .or. pars%sim%mode == 4) then
+            yearly_irr_eff_map = trim(pars%sim%eff_irr_fn)//'_'//period_label//'.asc'
+            call read_grid(trim(pars%sim%input_path)//yearly_irr_eff_map, info_spat%eff_met, pars%sim, boundaries)
+            call set_default_par(info_spat%eff_met, info_spat%domain, 1.0D0)
+        end if
+    end if
+
+    ! Debug output
+    if (pars%sim%prt_debug_out == 'y') then
+        call write_grid(trim(pars%sim%path)//'out_'//trim(pars%sim%soiluse_fn)//'_'//period_label//'.asc', info_spat%soil_use_id)
+        if (pars%sim%mode > 0) then
+            call write_grid(trim(pars%sim%path)//'out_'//yearly_irr_meth_map, info_spat%irr_meth_id)
+            if (pars%sim%mode == 2 .or. pars%sim%mode == 4) then
+                call write_grid(trim(pars%sim%path)//'out_'//yearly_irr_eff_map, info_spat%eff_met)
+            end if
+        end if
+    end if
+
+end subroutine update_yearly_spatial_data
+
+subroutine initialize_yearly_crop_state(pars, year_idx, period_label, info_pheno, info_meteo, info_spat, &
+                                      & meteo_weight, dir_meteo, dir_phenofases, crop_map, yield, pheno  )
+
+    type(parameters), intent(in) :: pars
+    integer, intent(in) :: year_idx
+    character(len=*), intent(in) :: period_label
+    type(crop_pheno_info), dimension(:), intent(inout) :: info_pheno
+    type(meteo_info), dimension(:), intent(in) :: info_meteo
+    type(spatial_info), intent(inout) :: info_spat
+    real(dp), dimension(:,:,:), intent(in) :: meteo_weight
+    integer, dimension(:,:,:), intent(in) :: dir_meteo
+    integer, dimension(:,:), intent(in) :: dir_phenofases
+    type(crop_matrices), intent(inout) :: crop_map
+    type(yield_t), intent(inout) :: yield
+    type(crop_pars_matrices), intent(inout) :: pheno
+
+    integer :: unit_kcb_levels, unit_pheno_lengths
+    integer :: i, j, z, crop_slot
+
+    ! Allocate and fill info_pheno
+    call read_all_crop_pars(pars%sim%days_in_year(year_idx), pars%sim%n_lus, info_pheno)
+    call check_pheno_parameters(info_pheno, info_meteo)
+
+    ! Randomization and spatial distribution of crop emergence
+    if (.not. pars%sim%f_irandom) then
+        call get_uniform_sample(info_spat%irandom%mat, pars%sim%sowing_range, pars%sim%rand_symmetry, pars%sim%repeatable)
+    end if
+    call allocate_crop_map(crop_map, info_spat%domain%mat, pars%sim%n_crops, info_spat%domain%header%nan)
+    call make_random_emergence(info_pheno,meteo_weight,dir_meteo,info_spat%domain,info_spat%soil_use_id%mat, &
+                             & crop_map, info_spat%irandom%mat, pars%sim%days_in_year(year_idx)              )
+
+    ! Spread crop yield parameters across the domain
+    call populate_crop_yield_matrices(info_pheno, dir_phenofases, info_spat%domain, info_spat%soil_use_id%mat, crop_map, year_idx)
+
+    ! Initialize yield accumulation for each crop cycle
+    call initialize_yield(yield, info_spat%domain%mat, size(info_pheno(1)%ii0, 2))
+
+    ! Inizialization of kcb_low and phenological phase
+    pheno%k_cb_low = info_spat%domain%header%nan
+    pheno%n_crop_in_year = 1
+    pheno%pheno_idx = 1
+
+    ! Debug output
+    if (pars%sim%prt_debug_out == 'y') then
+        call init_cell_output_file(unit_kcb_levels, trim(pars%sim%path)//period_label//'_Kcb_levels.csv', &
+                                 & 'MeteoStat; SoilUse; nCrop; low; mid; high'                            )
+        call init_cell_output_file(unit_pheno_lengths, trim(pars%sim%path)//period_label//'_PhenoLengths.csv', &
+                                 & 'MeteoStat; SoilUse; nCrop; ii0; iie; iid'                                  )
+        do i = 1, size(info_pheno)
+            do j = 1, size(info_pheno(i)%ii0, 1)
+                do z = 1, size(info_pheno(i)%ii0, 2)
+                    if (info_pheno(i)%ii0(j,z) <= 0) cycle
+                    crop_slot = info_pheno(i)%cycle_crop_slot(j,z)
+                    write(unit_kcb_levels,*) trim(info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)), &
+                        & '; ', j, '; ', z, '; ', info_pheno(i)%kcb_phases%low(j,crop_slot), '; ', &
+                        & info_pheno(i)%kcb_phases%mid(j,crop_slot), '; ', info_pheno(i)%kcb_phases%high(j,crop_slot)
+                    write(unit_pheno_lengths,*) trim(info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)), &
+                        & '; ', j, '; ', z, '; ', info_pheno(i)%ii0(j,z), '; ', &
+                        & info_pheno(i)%iie(j,z), '; ', info_pheno(i)%iid(j,z)
+                end do
+            end do
+        end do
+        close(unit_kcb_levels)
+        close(unit_pheno_lengths)
+
+        call print_mat_as_grid(trim(pars%sim%path)//period_label//"_irandom.asc", info_spat%irandom%header,info_spat%irandom%mat)
+        do i=1,size(crop_map%ii0,3)
+            call print_mat_as_grid(trim(pars%sim%path)//period_label//"_ii0_"//itoa(i)//".asc", info_spat%domain%header, crop_map%ii0(:,:,i))
+            call print_mat_as_grid(trim(pars%sim%path)//period_label//"_iie_"//itoa(i)//".asc", info_spat%domain%header, crop_map%iie(:,:,i))
+            call print_mat_as_grid(trim(pars%sim%path)//period_label//"_dij_"//itoa(i)//".asc", info_spat%domain%header, crop_map%dij(:,:,i))
+        end do
+    end if
+
+end subroutine initialize_yearly_crop_state
 
 subroutine write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal1, wat_bal2, wat_bal2_old, &
     & info_spat, pars, wat, wat_bal_hour, fw, fw_old, esp_perc, out_cn, out_cn_day, h_bypass, coll_irr, &

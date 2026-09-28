@@ -154,11 +154,9 @@ subroutine read_grid_r( filename, prm, sim, extent)
     integer :: i
     integer :: free_unit
     integer :: ios ! To check for read errors or end of file
-    integer :: ErrorFlag
     real(dp),dimension(:,:),allocatable::aux_parametro
     character(len=14)::str
 
-    ErrorFlag = 0
     ios=0
 
     ! open the file in read only mode
@@ -223,11 +221,9 @@ subroutine read_grid_i( filename, prm, sim, extent)
     integer :: free_unit
     integer :: ios              ! To check for read errors or end of file
     integer :: ierror           ! %AB% To check for read errors in file content (real instead of integer)
-    integer :: ErrorFlag
     integer,dimension(:,:),allocatable::aux_parametro
     character(len=14)::str
 
-    ErrorFlag = 0
     ios=0
     ierror=0
 
@@ -287,13 +283,11 @@ subroutine read_grid_i( filename, prm, sim, extent)
 
 end subroutine read_grid_i
 
-subroutine write_grid_r( filename, grid, ErrorFlag)
+subroutine write_grid_r(filename, grid)
     ! save real grid in ascii format file *.ASC
    character(len=*), intent(in) ::filename
     type(grid_r),intent(in)::grid
-    integer, intent(out) :: ErrorFlag
     integer :: i, ios, free_unit
-    ErrorFlag = 0
     ios=0
 
     ! exit if filename is empty
@@ -320,14 +314,11 @@ subroutine write_grid_r( filename, grid, ErrorFlag)
 
 end subroutine write_grid_r
 
-subroutine write_grid_i( filename, grid, ErrorFlag)
+subroutine write_grid_i(filename, grid)
     ! save integer grid in ascii format file *.ASC
    character(len=*), intent(in) ::filename
     type(grid_i),intent(in)::grid
-    integer, intent(out) :: ErrorFlag
-
     integer :: i, ios, free_unit
-    ErrorFlag = 0
     ios=0
 
     ! exit if filename is empty
@@ -353,12 +344,11 @@ subroutine write_grid_i( filename, grid, ErrorFlag)
 
 end subroutine write_grid_i
 
-subroutine write_head_and_mat_i(filename,header,mat,errorflag)
+subroutine write_head_and_mat_i(filename, header, mat)
     ! save header and matrix of integers in ascii format file *.ASC
    character(len=*),intent(in)::filename
     integer,dimension(:,:),intent(in)::mat
     type(grid_header_i),intent(in)::header
-    integer,intent(inout)::errorflag
     type(grid_i)::grid
 
     allocate(grid%mat(size(mat,1),size(mat,2)))
@@ -369,16 +359,15 @@ subroutine write_head_and_mat_i(filename,header,mat,errorflag)
     grid%header%y0string = header%y0string
     grid%header%nan = header%nan
     grid%header%cellsize = header%cellsize
-    call write_grid(filename,grid,errorflag)
+    call write_grid(filename, grid)
     deallocate(grid%mat)
 end subroutine write_head_and_mat_i
 
-subroutine write_header_and_mat_r(filename,titolo,matrice,errorflag)
+subroutine write_header_and_mat_r(filename, titolo, matrice)
     ! save header and matrix of reals in ascii format file *.ASC
    character(len=*),intent(in)::filename
     real(dp),dimension(:,:),intent(in)::matrice
     type(grid_header_i),intent(in)::titolo
-    integer,intent(inout)::errorflag
     type(grid_r)::grid
 
     allocate(grid%mat(size(matrice,1),size(matrice,2)))
@@ -389,7 +378,7 @@ subroutine write_header_and_mat_r(filename,titolo,matrice,errorflag)
     grid%header%y0string = titolo%y0string
     grid%header%nan = real(titolo%nan)
     grid%header%cellsize = titolo%cellsize
-    call write_grid(filename,grid,errorflag)
+    call write_grid(filename, grid)
     deallocate(grid%mat)
 end subroutine write_header_and_mat_r
 

@@ -13,10 +13,9 @@ implicit none
 
 contains
 
-subroutine read_all_parameters(file_xml, xml, xml_dtx, ErrorFlag, debug)
+subroutine read_all_parameters(file_xml, xml, xml_dtx, debug)
    character(len=*), intent(in) :: file_xml
     logical, intent(in) :: debug
-    integer, intent(out) :: ErrorFlag
     type(TDx_index), intent(inout) :: xml_dtx
     type(parameters), intent(inout) :: xml
     ! Input related variables used in parsing loop
@@ -24,11 +23,10 @@ subroutine read_all_parameters(file_xml, xml, xml_dtx, ErrorFlag, debug)
     integer :: line, tablestart
     logical :: file_exists
 
-    ErrorFlag = 0
     line = 0; tablestart = 0
     ios = 0
 
-    call read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,debug)
+    call read_sim_parameters(file_xml, xml, xml_dtx, debug)
 
     inquire(file="cells.txt", exist=xml%sim%f_out_cells) ! update "output_cells"
 
@@ -76,16 +74,15 @@ subroutine read_all_parameters(file_xml, xml, xml_dtx, ErrorFlag, debug)
         xml%sim%n_irr_meth = 0
         allocate(xml%irr%met(0))
     else
-        call read_all_irr_methods(xml, ErrorFlag, debug)
+        call read_all_irr_methods(xml, debug)
     end if
 
 end subroutine read_all_parameters
 
 
-subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
+subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose)
     ! read settings for the simulation
     character(len=*), intent(in) :: file_xml
-    integer, intent(out) :: ErrorFlag
     logical, intent(in) :: verbose
     type(TDx_index), intent(inout) :: xml_dtx
     type(parameters), intent(inout) :: xml
@@ -105,7 +102,6 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, ErrorFlag,verbose)
 
     !character :: delimiter
 
-    ErrorFlag = 0
     line = 0
     ios = 0
     actcroplen = 0
@@ -720,9 +716,8 @@ subroutine read_irr_method(irr_method_fn, met, verbose)
     end if
 end subroutine read_irr_method
 
-subroutine read_all_irr_methods(xml, ErrorFlag, debug)
+subroutine read_all_irr_methods(xml, debug)
     logical, intent(in) :: debug
-    integer, intent(out) :: ErrorFlag
     type(parameters), intent(inout) :: xml
     integer :: free_unit
     integer :: i
@@ -733,7 +728,6 @@ subroutine read_all_irr_methods(xml, ErrorFlag, debug)
     integer :: ios          ! state variable (0 = ok)
     integer :: line, tablestart
 
-    ErrorFlag = 0
     line = 0; tablestart = 0
     ios = 0
     print*,'irr_met_path: ',     xml%sim%irr_met_path
@@ -1191,75 +1185,74 @@ subroutine write_init_grids(info_spat,mode,path,sim)
     character(len=*),intent(in)::path
     type(simulation),intent(in)::sim
 
-    integer::errorflag,k
+    integer :: k
     character(len=30)::meteo_stringa
 
-    call write_grid(trim(path)//'out_'//trim(sim%domain_fn)//'.asc',info_spat%domain,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%thetaI_FC_fn)//'.asc',info_spat%theta(1)%fc,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%thetaII_FC_fn)//'.asc',info_spat%theta(2)%fc,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%thetaI_WP_fn)//'.asc',info_spat%theta(1)%wp,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%thetaII_WP_fn)//'.asc',info_spat%theta(2)%wp,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%thetaI_r_fn)//'.asc',info_spat%theta(1)%r,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%thetaII_r_fn)//'.asc',info_spat%theta(2)%r,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%thetaI_SAT_fn)//'.asc',info_spat%theta(1)%sat,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%thetaII_SAT_fn)//'.asc',info_spat%theta(2)%sat,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%slope_fn)//'.asc',info_spat%slope,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%dren_fn)//'.asc',info_spat%drainage,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%hydr_group_fn)//'.asc',info_spat%hydr_gr,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%ksat_I_fn)//'.asc',info_spat%k_sat(1),errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%ksat_II_fn)//'.asc',info_spat%k_sat(2),errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%n_I_fn)//'.asc',info_spat%fact_n(1),errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%n_II_fn)//'.asc',info_spat%fact_n(2),errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%soiluse_fn)//'.asc',info_spat%soil_use_id,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%wat_table_fn)//'.asc',info_spat%wat_tab,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%ParRisCap_a3_fn)//'.asc',info_spat%a3,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%ParRisCap_a4_fn)//'.asc',info_spat%a4,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%ParRisCap_b1_fn)//'.asc',info_spat%b1,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%ParRisCap_b2_fn)//'.asc',info_spat%b2,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%ParRisCap_b3_fn)//'.asc',info_spat%b3,errorflag)
-    call write_grid(trim(path)//'out_'//trim(sim%ParRisCap_b4_fn)//'.asc',info_spat%b4,errorflag)
+    call write_grid(trim(path)//'out_'//trim(sim%domain_fn)//'.asc',info_spat%domain)
+    call write_grid(trim(path)//'out_'//trim(sim%thetaI_FC_fn)//'.asc',info_spat%theta(1)%fc)
+    call write_grid(trim(path)//'out_'//trim(sim%thetaII_FC_fn)//'.asc',info_spat%theta(2)%fc)
+    call write_grid(trim(path)//'out_'//trim(sim%thetaI_WP_fn)//'.asc',info_spat%theta(1)%wp)
+    call write_grid(trim(path)//'out_'//trim(sim%thetaII_WP_fn)//'.asc',info_spat%theta(2)%wp)
+    call write_grid(trim(path)//'out_'//trim(sim%thetaI_r_fn)//'.asc',info_spat%theta(1)%r)
+    call write_grid(trim(path)//'out_'//trim(sim%thetaII_r_fn)//'.asc',info_spat%theta(2)%r)
+    call write_grid(trim(path)//'out_'//trim(sim%thetaI_SAT_fn)//'.asc',info_spat%theta(1)%sat)
+    call write_grid(trim(path)//'out_'//trim(sim%thetaII_SAT_fn)//'.asc',info_spat%theta(2)%sat)
+    call write_grid(trim(path)//'out_'//trim(sim%slope_fn)//'.asc',info_spat%slope)
+    call write_grid(trim(path)//'out_'//trim(sim%dren_fn)//'.asc',info_spat%drainage)
+    call write_grid(trim(path)//'out_'//trim(sim%hydr_group_fn)//'.asc',info_spat%hydr_gr)
+    call write_grid(trim(path)//'out_'//trim(sim%ksat_I_fn)//'.asc',info_spat%k_sat(1))
+    call write_grid(trim(path)//'out_'//trim(sim%ksat_II_fn)//'.asc',info_spat%k_sat(2))
+    call write_grid(trim(path)//'out_'//trim(sim%n_I_fn)//'.asc',info_spat%fact_n(1))
+    call write_grid(trim(path)//'out_'//trim(sim%n_II_fn)//'.asc',info_spat%fact_n(2))
+    call write_grid(trim(path)//'out_'//trim(sim%soiluse_fn)//'.asc',info_spat%soil_use_id)
+    call write_grid(trim(path)//'out_'//trim(sim%wat_table_fn)//'.asc',info_spat%wat_tab)
+    call write_grid(trim(path)//'out_'//trim(sim%ParRisCap_a3_fn)//'.asc',info_spat%a3)
+    call write_grid(trim(path)//'out_'//trim(sim%ParRisCap_a4_fn)//'.asc',info_spat%a4)
+    call write_grid(trim(path)//'out_'//trim(sim%ParRisCap_b1_fn)//'.asc',info_spat%b1)
+    call write_grid(trim(path)//'out_'//trim(sim%ParRisCap_b2_fn)//'.asc',info_spat%b2)
+    call write_grid(trim(path)//'out_'//trim(sim%ParRisCap_b3_fn)//'.asc',info_spat%b3)
+    call write_grid(trim(path)//'out_'//trim(sim%ParRisCap_b4_fn)//'.asc',info_spat%b4)
 
     select case (mode)
         case (1)
-            call write_grid(trim(path)//'out_'//trim(sim%irr_units_fn)//'.asc',info_spat%irr_unit_id,errorflag)
-            call write_grid(trim(path)//'out_'//trim(sim%eff_net_fn)//'.asc',info_spat%eff_net,errorflag)
-            call write_grid(trim(path)//'out_'//trim(sim%id_irr_meth_fn)//'.asc',info_spat%irr_meth_id,errorflag)
-            call write_grid(trim(path)//"out_am_percI.asc",info_spat%a_perc(1),errorflag)
-            call write_grid(trim(path)//"out_am_percII.asc",info_spat%a_perc(2),errorflag)
-            call write_grid(trim(path)//"out_bm_percI.asc",info_spat%b_perc(1),errorflag)
-            call write_grid(trim(path)//"out_bm_percII.asc",info_spat%b_perc(2),errorflag)
+            call write_grid(trim(path)//'out_'//trim(sim%irr_units_fn)//'.asc',info_spat%irr_unit_id)
+            call write_grid(trim(path)//'out_'//trim(sim%eff_net_fn)//'.asc',info_spat%eff_net)
+            call write_grid(trim(path)//'out_'//trim(sim%id_irr_meth_fn)//'.asc',info_spat%irr_meth_id)
+            call write_grid(trim(path)//"out_am_percI.asc",info_spat%a_perc(1))
+            call write_grid(trim(path)//"out_am_percII.asc",info_spat%a_perc(2))
+            call write_grid(trim(path)//"out_bm_percI.asc",info_spat%b_perc(1))
+            call write_grid(trim(path)//"out_bm_percII.asc",info_spat%b_perc(2))
         case (2)
-            call write_grid(trim(path)//'out_'//trim(sim%eff_irr_fn)//'.asc',info_spat%eff_met,errorflag)
-            !call write_matrices(trim(path)//'out_'//trim(sim%eff_rete_fn)//'.asc',info_spat%eff_rete,errorflag)! - RR
-            call write_grid(trim(path)//'out_'//trim(sim%id_irr_meth_fn)//'.asc',info_spat%irr_meth_id,errorflag)
-            call write_grid(trim(path)//"out_am_percI.asc",info_spat%a_perc(1),errorflag)
-            call write_grid(trim(path)//"out_am_percII.asc",info_spat%a_perc(2),errorflag)
-            call write_grid(trim(path)//"out_bm_percI.asc",info_spat%b_perc(1),errorflag)
-            call write_grid(trim(path)//"out_bm_percII.asc",info_spat%b_perc(2),errorflag)
+            call write_grid(trim(path)//'out_'//trim(sim%eff_irr_fn)//'.asc',info_spat%eff_met)
+            !call write_matrices(trim(path)//'out_'//trim(sim%eff_rete_fn)//'.asc',info_spat%eff_rete)! - RR
+            call write_grid(trim(path)//'out_'//trim(sim%id_irr_meth_fn)//'.asc',info_spat%irr_meth_id)
+            call write_grid(trim(path)//"out_am_percI.asc",info_spat%a_perc(1))
+            call write_grid(trim(path)//"out_am_percII.asc",info_spat%a_perc(2))
+            call write_grid(trim(path)//"out_bm_percI.asc",info_spat%b_perc(1))
+            call write_grid(trim(path)//"out_bm_percII.asc",info_spat%b_perc(2))
         case (3)
-            !call write_matrices(trim(path)//'out_'//trim(sim%eff_rete_fn)//'.asc',info_spat%eff_rete,errorflag)! - RR
-            call write_grid(trim(path)//'out_'//trim(sim%id_irr_meth_fn)//'.asc',info_spat%irr_meth_id,errorflag)
-            call write_grid(trim(path)//"out_am_percI.asc",info_spat%a_perc(1),errorflag)
-            call write_grid(trim(path)//"out_am_percII.asc",info_spat%a_perc(2),errorflag)
-            call write_grid(trim(path)//"out_bm_percI.asc",info_spat%b_perc(1),errorflag)
-            call write_grid(trim(path)//"out_bm_percII.asc",info_spat%b_perc(2),errorflag)
+            !call write_matrices(trim(path)//'out_'//trim(sim%eff_rete_fn)//'.asc',info_spat%eff_rete)! - RR
+            call write_grid(trim(path)//'out_'//trim(sim%id_irr_meth_fn)//'.asc',info_spat%irr_meth_id)
+            call write_grid(trim(path)//"out_am_percI.asc",info_spat%a_perc(1))
+            call write_grid(trim(path)//"out_am_percII.asc",info_spat%a_perc(2))
+            call write_grid(trim(path)//"out_bm_percI.asc",info_spat%b_perc(1))
+            call write_grid(trim(path)//"out_bm_percII.asc",info_spat%b_perc(2))
         case (4)
-            call write_grid(trim(path)//'out_'//trim(sim%irr_units_fn)//'.asc',info_spat%irr_unit_id,errorflag)
-            call write_grid(trim(path)//'out_'//trim(sim%eff_irr_fn)//'.asc',info_spat%eff_met,errorflag)
-            call write_grid(trim(path)//'out_'//trim(sim%eff_net_fn)//'.asc',info_spat%eff_net,errorflag)
-            call write_grid(trim(path)//'out_'//trim(sim%id_irr_meth_fn)//'.asc',info_spat%irr_meth_id,errorflag)
-            call write_grid(trim(path)//"out_am_percI.asc",info_spat%a_perc(1),errorflag)
-            call write_grid(trim(path)//"out_am_percII.asc",info_spat%a_perc(2),errorflag)
-            call write_grid(trim(path)//"out_bm_percI.asc",info_spat%b_perc(1),errorflag)
-            call write_grid(trim(path)//"out_bm_percII.asc",info_spat%b_perc(2),errorflag)
+            call write_grid(trim(path)//'out_'//trim(sim%irr_units_fn)//'.asc',info_spat%irr_unit_id)
+            call write_grid(trim(path)//'out_'//trim(sim%eff_irr_fn)//'.asc',info_spat%eff_met)
+            call write_grid(trim(path)//'out_'//trim(sim%eff_net_fn)//'.asc',info_spat%eff_net)
+            call write_grid(trim(path)//'out_'//trim(sim%id_irr_meth_fn)//'.asc',info_spat%irr_meth_id)
+            call write_grid(trim(path)//"out_am_percI.asc",info_spat%a_perc(1))
+            call write_grid(trim(path)//"out_am_percII.asc",info_spat%a_perc(2))
+            call write_grid(trim(path)//"out_bm_percI.asc",info_spat%b_perc(1))
+            call write_grid(trim(path)//"out_bm_percII.asc",info_spat%b_perc(2))
         case default
     end select
 
     !meteo weigths
     do k=1,size(info_spat%weight_ws)
         write(meteo_stringa,*) k
-        call write_grid(trim(path)//trim(adjustl('out_meteo_'//trim(adjustl(meteo_stringa))//'.asc')), &
-            & info_spat%weight_ws(k),errorflag)
+        call write_grid(trim(path)//trim(adjustl('out_meteo_'//trim(adjustl(meteo_stringa))//'.asc')), info_spat%weight_ws(k))
     end do
 
 end subroutine write_init_grids
