@@ -94,7 +94,7 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose)
     integer :: line
     logical :: dir_exists
 
-    integer :: i, j, k
+    integer :: i, j, k, n_output_days, n_output_intervals
     integer :: actcroplen
     integer,parameter :: nanvalue=-9999       ! general NaN value
     integer,dimension(:),allocatable :: dummy
@@ -258,46 +258,46 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose)
                         read(buffer, *, iostat=ios) xml%sim%interpolate_wind
                     case ('interpolateradiation')
                         read(buffer, *, iostat=ios) xml%sim%interpolate_rad
-                    case ('monthlyflag') ! monthly outputs flag
+                    case ('monthlyflag') !%PS%, todo: rename or add aliases
                         select case (trim(adjustl(buffer)))
                             case ('monthly', 'month', 'm', 't')
-                                xml%sim%step_out = 0
+                                xml%sim%step_out = output_monthly
                             case ('weekly', 'week', 'w')
-                                xml%sim%step_out = 1
-                            case ('periodic', 'f')
-                                xml%sim%step_out = 2
+                                xml%sim%step_out = output_weekly
+                            case ('periodic', 'f', 'fixed')
+                                xml%sim%step_out = output_periodic
                             case default
-                                xml%sim%step_out = 0
-                                print *, "Monthly output is printed"
+                                xml%sim%step_out = output_monthly
+                                print *, 'Unrecognized output timestep option "', trim(adjustl(buffer)),'". Will use "monthly".'
                                 read *
                         end select
                     case ('weekday')
                         select case (trim(adjustl(buffer)))
                             case ('monday', 'mon', '1')
-                                xml%sim%weekday = 1
+                                xml%sim%weekly_output_weekday = 1
                             case ('tuesday', 'tue', '2')
-                                xml%sim%weekday = 2
+                                xml%sim%weekly_output_weekday = 2
                             case ('wednesday', 'wed', '3')
-                                xml%sim%weekday = 3
+                                xml%sim%weekly_output_weekday = 3
                             case ('thursday', 'thu', '4')
-                                xml%sim%weekday = 4
+                                xml%sim%weekly_output_weekday = 4
                             case ('friday', 'fri', '5')
-                                xml%sim%weekday = 5
+                                xml%sim%weekly_output_weekday = 5
                             case ('saturday', 'sat', '6')
-                                xml%sim%weekday = 6
+                                xml%sim%weekly_output_weekday = 6
                             case ('sunday', 'sun', '7')
-                                xml%sim%weekday = 7
+                                xml%sim%weekly_output_weekday = 7
                             case default
-                                xml%sim%weekday = 1
+                                xml%sim%weekly_output_weekday = 1
                                 print *, "Weekly output is printed each Monday"
                                 read *
                         end select
                     case ('startdate')
-                        read(buffer, *, iostat=ios)xml%sim%clock(1)
+                        read(buffer, *, iostat=ios) xml%sim%output_period_start_doy
                     case ('enddate')
-                        read(buffer, *, iostat=ios)xml%sim%clock(2)
+                        read(buffer, *, iostat=ios) xml%sim%output_period_end_doy
                     case ('deltadate')
-                        read(buffer, *, iostat=ios)xml%sim%clock(3)
+                        read(buffer, *, iostat=ios) xml%sim%output_period_days
                     case ('soilusesnum') ! number of land uses to be processed
                         read(buffer, *, iostat=ios)xml%sim%n_lus
                     !!!! %AB% TODO: to be checked
@@ -527,12 +527,16 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose)
         end if
     end do
 
-    if (xml%sim%step_out == 1) then
-        ! take into account the last week of the previos year and the first of the following year
-        allocate(xml%sim%intervals(54))
-    else if (xml%sim%step_out == 2) then
-        allocate(xml%sim%intervals(int(((xml%sim%clock(2)-xml%sim%clock(1))/xml%sim%clock(3)))))
-        xml%sim%intervals=xml%sim%clock(3)
+    if (xml%sim%step_out == output_weekly) then
+        ! At most 54 intervals are needed to cover a 366-day period with partial weeks
+        allocate(xml%sim%output_interval_days(54))
+    else if (xml%sim%step_out == output_periodic) then
+        n_output_days = xml%sim%output_period_end_doy - xml%sim%output_period_start_doy + 1 ! Include both start and end day
+        n_output_intervals = (n_output_days + xml%sim%output_period_days - 1) / xml%sim%output_period_days
+        allocate(xml%sim%output_interval_days(n_output_intervals))
+        xml%sim%output_interval_days = xml%sim%output_period_days
+        !%PS%: final interval can be shorter
+        xml%sim%output_interval_days(n_output_intervals) = n_output_days - xml%sim%output_period_days * (n_output_intervals - 1)
     end if
 
     if (xml%sim%initial_condition == dir_ic .and. xml%sim%input_path /= dir_ic) then

@@ -3,6 +3,10 @@ use mod_utility, only: date, lower_case, string_to_integers, get_julian_day, spl
 use mod_constants
 implicit none
 
+integer, parameter :: output_monthly = 0
+integer, parameter :: output_weekly = 1
+integer, parameter :: output_periodic = 2
+
 type simulation
     character(len=200) :: path = '.\\sim_results\\'                     ! path of output
     character(len=200) :: meteo_path = '.\\meteo_data\\'                ! path of meteo tables
@@ -59,13 +63,15 @@ type simulation
     character(len=255) :: shapearea_fn = 'shapearea'
     character(len=255) :: irandom_fn = 'irandom'
 
-    integer :: step_out = 0                     ! monthly output = 0, weekly output = 1, user defined = 2
+    integer :: step_out = output_monthly        ! periodic-output schedule
     integer :: mode = 2                         ! type of simulation:
                                                 ! 0 = without irrigation, 1 = USE mode, 2 = NEED mode at field capacity, 3 = NEED mode at fixed volume, 4 = scheduled irrigation
     logical :: f_soiluse = .false.              ! land use change between years (true) otherwise false
-    integer :: weekday = 1                      ! day of the week of the weekly outputs (1 = Monday, 2 = Tuesday, ..., 7 = Sunday)
-    integer, dimension(3) :: clock = [10, 100, 30]
-    integer,dimension(:),pointer::intervals
+    integer :: weekly_output_weekday = 1        ! day of weekly output (1 = Monday, ..., 7 = Sunday)
+    integer :: output_period_start_doy = 10     ! first day included in custom-period output
+    integer :: output_period_end_doy = 100      ! last day included in custom-period output
+    integer :: output_period_days = 30          ! length of each custom output period [days]
+    integer, dimension(:), allocatable :: output_interval_days
     integer :: start_year                       ! first year of simulation
     integer :: sim_years                        ! number of years for the simulation
     integer :: meteo_years                      ! number of available weather time series

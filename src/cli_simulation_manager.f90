@@ -1,5 +1,6 @@
 module cli_simulation_manager
-use mod_utility, only: dp, get_value_index, get_uniform_sample, days_x_month, calc_date, day_of_week, get_julian_day, itoa
+use mod_utility, only: dp, get_value_index, get_uniform_sample, monthly_interval_days, calc_date, day_of_week, &
+                     & get_julian_day, itoa
 use mod_parameters
 use mod_grid, only: read_grid, write_grid, print_mat_as_grid, overlay_domain, bound, id_to_par, set_default_par
 use mod_evapotranspiration, only: ET_reference, calculateDLH
@@ -71,7 +72,9 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,pars%sim%n_irr_meth)::h_irr ! z depends on number of irrigation methods
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::priv_irr
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::coll_irr
-    integer,dimension(12)::days_in_yr
+    integer, dimension(:), allocatable :: step_interval_days
+    integer :: days_before_1st_interval
+    character(len=5) :: step_label
     integer::xx,yy ! Test cells coordinates
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::iter1,iter2
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::irr_loss ! Irrigation application losses
@@ -189,8 +192,6 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     n_day=0   ! Daily count initialization
     h_irr = 0.
 
-    ! TODO Explore if is possible to have outputs on a specific day of the week (utility:day_of_week)
-
     fw_day = cost_fwEva ! Initialization of fw, set to 1
     fw_old = fw_day
     select case (pars%sim%mode)
@@ -292,56 +293,30 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             case default
         end select
 
-        ! Weekly simulation settings
-        if (pars%sim%step_out == 1) then
-            if (y == 1) then
-                info_meteo(1)%start%weekday = &
-                    & day_of_week(info_meteo(1)%start%day, info_meteo(1)%start%month, info_meteo(1)%start%year)
-                pars%sim%clock(1) = pars%sim%weekday - info_meteo(1)%start%weekday + 3
-            else
-                pars%sim%clock(1) = 8 - (mod((pars%sim%clock(2)-pars%sim%clock(1))/pars%sim%clock(3),7) - pars%sim%clock(1)) ! 8 = 7 + 1 To switch to the next day
-            end if
-            if (pars%sim%clock(1) > 7) pars%sim%clock(1) = pars%sim%clock(1) - 7
-            pars%sim%clock(2) = pars%sim%days_in_year(y)
-            pars%sim%clock(3) = 7
-            pars%sim%intervals = pars%sim%clock(3)
-            pars%sim%intervals(1) = pars%sim%clock(1) - 1 ! Adjusting of first memorized interval
-            pars%sim%intervals(54) = mod((pars%sim%clock(2)-pars%sim%clock(1))/pars%sim%clock(3),7)-pars%sim%clock(1)
-            if (pars%sim%intervals(54) < 0) then ! Skipping last interval if needed
-                pars%sim%intervals(53) = pars%sim%intervals(53) + pars%sim%intervals(54)
-                pars%sim%intervals(54) = 0
-            end if
-            if (pars%sim%intervals(1) == 0) then ! Skipping first interval if void
-                pars%sim%intervals = cshift(pars%sim%intervals,1)
-            end if
-        end if
+        call initialize_yearly_outputs(pars, period_label, period_start_year, info_meteo, info_spat, &
+            & irr_units, out_tbl_list, yr_map, yield, yr_deb_map)
 
-        ! Output files *.csv inizialization
-        if (pars%sim%mode == 1) then
-            call init_cell_output_by_year(out_tbl_list, pars%sim%path, period_label, info_meteo%filename, &
-                & pars%sim%mode, pars%sim%f_out_cells, pars%sim, irr_units%id, pars%cr%n_withdrawals)
-        else
-            call init_cell_output_by_year(out_tbl_list,pars%sim%path,period_label,info_meteo%filename, &
-                & pars%sim%mode, pars%sim%f_out_cells, pars%sim)
-        end if
-        if(pars%sim%f_out_cells .eqv. .true.)then
-            call write_cell_info(info_spat, out_tbl_list%cell_info, pars%sim%mode, pars%sim%f_cap_rise, &
-                               & pars%depth%ze_fix, pars%depth%zr_fix, period_start_year                )
-        end if
+        !%PS%: Divide the yearly period into output-accumulation intervals according to output time-step
+        select case (pars%sim%step_out)
+            case (output_monthly)
+                step_interval_days = monthly_interval_days(period_start_year, info_meteo(1)%start%month)
+                days_before_1st_interval = 0
+                step_label = 'month'
 
-        call init_yearly_output_file(yr_map,pars%sim%path,period_label,pars%sim)
-        ! TODO: Verify when output_yield_iniz needs to be activated
-        call init_yield_output_file(yield,pars%sim%path,period_label,pars%sim)
+            case (output_weekly)
+                call configure_weekly_output_intervals(pars%sim, info_meteo(1)%start%day, info_meteo(1)%start%month, &
+                                                     & period_start_year, days_to_skip, days_to_run                  )
+                step_interval_days = pars%sim%output_interval_days
+                days_before_1st_interval = 0
+                step_label = 'week'
 
-        call init_debug_yearly_output_file(yr_deb_map,pars%sim%path,period_label,pars%sim)
+            case (output_periodic)
+                step_interval_days = pars%sim%output_interval_days
+                days_before_1st_interval = pars%sim%output_period_start_doy - 1
+                step_label = 'step'
 
-        ! Calendar initializing to take into account start of year
-        if (info_meteo(1)%start%month > 2) then
-            call days_x_month(days_in_yr, pars%sim%start_year+y)
-        else
-            call days_x_month(days_in_yr,pars%sim%start_year+y-1)
-        end if
-        days_in_yr = cshift(days_in_yr, info_meteo(1)%start%month-1)
+            case default
+        end select
 
         ! Daily simulation cycle
         day_cycle: do day_idx = 1, days_to_run
@@ -387,23 +362,11 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 end if
             end if
 
-            ! TODO Variabile inizialization only if in the first day of the interval
-            ! TODO As in output_asc_month_iniz
+            call init_step_output_file(stp_map, pars%sim%path, period_label, day_idx, step_interval_days, &
+                                     & days_before_1st_interval, step_label, pars%sim                     )
+            call init_step_debug_output_file(deb_map, pars%sim%path, period_label, day_idx, step_interval_days, &
+                                           & days_before_1st_interval, step_label, pars%sim                     )
 
-            ! Monthly output *.asc file inizialization
-            if(pars%sim%step_out == 0)then
-                call init_step_output_file(stp_map,pars%sim%path,period_label,day_idx,days_in_yr,0, 'month',pars%sim)
-                call init_step_debug_output_file(deb_map, pars%sim%path, period_label, day_idx, days_in_yr, 0, 'month',pars%sim)
-            else if (pars%sim%step_out == 1) then
-                ! In output_asc_month_iniz, uses 0 as first day (as in monthly routine)
-                call init_step_output_file(stp_map,pars%sim%path,period_label,day_idx,pars%sim%intervals,0, 'week',pars%sim)
-                call init_step_debug_output_file(deb_map, pars%sim%path, period_label, day_idx, pars%sim%intervals, 0, 'week',pars%sim)
-            else
-                ! In output_asc_month_iniz, uses (StartDate - 1) as first day
-                call init_step_output_file(stp_map,pars%sim%path,period_label,day_idx,pars%sim%intervals,pars%sim%clock(1)-1, 'step',pars%sim)
-                call init_step_debug_output_file(deb_map, pars%sim%path, period_label, day_idx, pars%sim%intervals, &
-                    &   pars%sim%clock(1)-1, 'step',pars%sim)
-            end if
             ! Phenological parameters spatialization
             ! Updating of pheno%kcb_old to the last day value - pheno%cult_switch is not updated
             pheno%k_cb_old = pheno%k_cb
@@ -912,17 +875,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 & pars%sim%mode,pars%sim%f_out_cells,pars%sim) !! %RR% fw_old
 
             ! save output files by step
-            if (pars%sim%step_out == 0) then
-                call write_outputs_by_step (day_idx, meteo, h_irr_sum, wat_bal1, wat_bal2, &
-                    & info_spat, coll_irr, priv_irr, stp_map, deb_map, h_bypass, days_in_yr, 0, summary)        ! uscite mensili
-            else if (pars%sim%step_out == 1) then
-                call write_outputs_by_step (day_idx, meteo, h_irr_sum, wat_bal1, wat_bal2, &
-                    & info_spat, coll_irr, priv_irr, stp_map, deb_map, h_bypass, pars%sim%intervals, 0, summary)    ! uscite settimanali
-            else
-                call write_outputs_by_step (day_idx, meteo, h_irr_sum, wat_bal1, wat_bal2, &
-                    & info_spat, coll_irr, priv_irr, stp_map, deb_map, h_bypass, pars%sim%intervals, pars%sim%clock(1)-1, &
-                    & summary)    ! scheduled outputs
-            end if
+            call write_outputs_by_step(day_idx, meteo, h_irr_sum, wat_bal1, wat_bal2, info_spat, coll_irr, priv_irr,      &
+                                     & stp_map, deb_map, h_bypass, step_interval_days, days_before_1st_interval, summary)
 
             ! save to file the output bu year
             yr_map%rain%mat = yr_map%rain%mat + meteo%p
@@ -1029,6 +983,47 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         & pars%sim%imax,pars%sim%jmax)
 
 end subroutine simulation_manager
+
+subroutine configure_weekly_output_intervals(sim, period_start_day, period_start_month,     &
+                                           & period_start_year, skipped_days, simulated_days)
+
+    type(simulation), intent(inout) :: sim
+    integer, intent(in) :: period_start_day, period_start_month, period_start_year
+    integer, intent(in) :: skipped_days, simulated_days
+
+    integer, parameter :: days_per_week = 7
+    integer :: period_start_weekday, simulation_start_weekday
+    integer :: first_interval_days, remaining_days
+    integer :: interval_idx
+
+    period_start_weekday = day_of_week(period_start_day, period_start_month, period_start_year)
+    simulation_start_weekday = modulo(period_start_weekday - 1 + skipped_days, days_per_week) + 1
+
+    ! Include both the first simulated day and the requested closing weekday.
+    first_interval_days = modulo(sim%weekly_output_weekday - simulation_start_weekday, days_per_week) + 1
+
+    sim%output_interval_days = 0
+    remaining_days = simulated_days
+    interval_idx = 1
+
+    do while (remaining_days > 0)
+        if (interval_idx > size(sim%output_interval_days)) then
+            print *, 'The weekly output calendar requires more intervals than allocated.'
+            print *, 'Execution will be aborted...'
+            stop
+        end if
+
+        if (interval_idx == 1) then
+            sim%output_interval_days(interval_idx) = min(first_interval_days, remaining_days)
+        else
+            sim%output_interval_days(interval_idx) = min(days_per_week, remaining_days)
+        end if
+
+        remaining_days = remaining_days - sim%output_interval_days(interval_idx)
+        interval_idx = interval_idx + 1
+    end do
+
+end subroutine configure_weekly_output_intervals
 
 subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, period_label,         &
                                     & alpha_ms_map, alpha_unm_map, fw_irr, a_loss, b_loss, c_loss, f_interception)
@@ -1213,6 +1208,40 @@ subroutine initialize_yearly_crop_state(pars, year_idx, period_label, info_pheno
 
 end subroutine initialize_yearly_crop_state
 
+! Initialization of yearly *.csv output files
+subroutine initialize_yearly_outputs(pars, period_label, period_start_year, info_meteo, info_spat, &
+                                   & irr_units, out_tbl_list, yr_map, yield, yr_deb_map            )
+
+    type(parameters), intent(in) :: pars
+    character(len=*), intent(in) :: period_label
+    integer, intent(in) :: period_start_year
+    type(meteo_info), dimension(:), intent(in) :: info_meteo
+    type(spatial_info), intent(in) :: info_spat
+    type(irr_units_table), dimension(:), allocatable, intent(in) :: irr_units
+    type(output_table_list), intent(inout) :: out_tbl_list
+    type(annual_map), intent(inout) :: yr_map
+    type(yield_t), intent(inout) :: yield
+    type(annual_debug_map), intent(inout) :: yr_deb_map
+
+    if (pars%sim%mode == 1) then
+        call init_cell_output_by_year(out_tbl_list, pars%sim%path, period_label, info_meteo%filename,                   &
+                                    & pars%sim%mode, pars%sim%f_out_cells, pars%sim, irr_units%id, pars%cr%n_withdrawals)
+    else
+        call init_cell_output_by_year(out_tbl_list, pars%sim%path, period_label, info_meteo%filename, &
+                                    & pars%sim%mode, pars%sim%f_out_cells, pars%sim                   )
+    end if
+
+    if(pars%sim%f_out_cells)then
+        call write_cell_info(info_spat, out_tbl_list%cell_info, pars%sim%mode, pars%sim%f_cap_rise, &
+                           & pars%depth%ze_fix, pars%depth%zr_fix, period_start_year                )
+    end if
+
+    call init_yearly_output_file(yr_map, pars%sim%path, period_label, pars%sim)
+    call init_yield_output_file(yield, pars%sim%path, period_label, pars%sim)
+    call init_debug_yearly_output_file(yr_deb_map, pars%sim%path, period_label, pars%sim)
+
+end subroutine initialize_yearly_outputs
+
 subroutine write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal1, wat_bal2, wat_bal2_old, &
     & info_spat, pars, wat, wat_bal_hour, fw, fw_old, esp_perc, out_cn, out_cn_day, h_bypass, coll_irr, &
     & priv_irr, out_tbl, mode,cells,sim)
@@ -1366,10 +1395,10 @@ subroutine write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal
     end if
 end subroutine write_daily_output
 
-subroutine write_outputs_by_step (doy, meteo, irrigation_sum, bil1, bil2, &
-    & info_spat, coll_irr, priv_irr, asc, deb_asc,hbypass, intervals, clock_time, summary)
+subroutine write_outputs_by_step(day_idx, meteo, irrigation_sum, bil1, bil2, info_spat, coll_irr, priv_irr, &
+                               & asc, deb_asc, hbypass, interval_days, days_before_1st_interval, summary)
     ! writes periodic (monthly/weekly/custom) output in *.asc files
-   integer, intent(in):: doy
+    integer, intent(in) :: day_idx
     type(meteo_mat), intent(in):: meteo
     real(dp), dimension(:,:), intent(in):: irrigation_sum
     real(dp), dimension(:,:), intent(in):: hbypass
@@ -1379,8 +1408,8 @@ subroutine write_outputs_by_step (doy, meteo, irrigation_sum, bil1, bil2, &
     real(dp), dimension(:,:), intent(in):: coll_irr, priv_irr
     type(step_map), intent(inout):: asc
     type(step_debug_map), intent(inout):: deb_asc
-    integer, dimension(:), intent(in):: intervals
-    integer, intent(in):: clock_time
+    integer, dimension(:), intent(in) :: interval_days
+    integer, intent(in) :: days_before_1st_interval
     logical, intent(in)::summary
 
     asc%runoff%mat = asc%runoff%mat + bil1%h_runoff
@@ -1404,12 +1433,12 @@ subroutine write_outputs_by_step (doy, meteo, irrigation_sum, bil1, bil2, &
     deb_asc%h_soil2%mat = bil2%h_soil
 
     if (summary .eqv. .false.) then
-        call save_step_data(asc,doy,info_spat%domain,intervals,clock_time)
+        call save_step_data(asc, day_idx, info_spat%domain, interval_days, days_before_1st_interval)
     else
-        call save_step_irrigation(asc,doy,info_spat%domain,intervals,clock_time)
+        call save_step_irrigation(asc, day_idx, info_spat%domain, interval_days, days_before_1st_interval)
     end if
 
-    call save_debug_step_data(deb_asc,doy,info_spat%domain,intervals,clock_time)
+    call save_debug_step_data(deb_asc, day_idx, info_spat%domain, interval_days, days_before_1st_interval)
 
 end subroutine write_outputs_by_step
 

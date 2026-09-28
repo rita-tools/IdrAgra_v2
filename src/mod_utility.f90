@@ -269,19 +269,23 @@ subroutine calc_date(julian_day,idd, imm,iyyy)
     if (julian_day < 0) iyyy=iyyy-100*(1-julian_day/36525)
 end subroutine calc_date
 
+! Calculate the day of the week [1 = Monday, ..., 7 = Sunday].
 function day_of_week(idd, imm, iyy)
-    ! Calculate the day of the week [0- Sat, 1-Sun, ..., 6-Fri]
-    ! source: Rosetta Code
     integer, intent(in) :: idd, imm, iyy
-    integer :: day_of_week, j, k, mm, yy
+    integer :: day_of_week, zeller_day, j, k, mm, yy
 
-    if (imm < 2) then
+    if (imm <= 2) then
         mm = imm + 12
         yy = iyy - 1
+    else
+        mm = imm
+        yy = iyy
     end if
+
     j = yy/100           ! first two digits of the year
     k = mod (yy, 100)    ! last two digits of the year
-    day_of_week = mod (idd + (mm+1)*26/10 + k + k/4 + j/4 + 5*j, 7)
+    zeller_day = mod(idd + (mm+1)*26/10 + k + k/4 + j/4 + 5*j, 7)! [0 = Saturday, ..., 6 = Friday]
+    day_of_week = modulo(zeller_day + 5, 7) + 1                  ! [1 = Monday, ..., 7 = Sunday]
 end function day_of_week
 
 subroutine days_x_month(calendar,year)
@@ -295,6 +299,21 @@ subroutine days_x_month(calendar,year)
         calendar=(/31,28,31,30,31,30,31,31,30,31,30,31/)
     end if
 end subroutine days_x_month
+
+! Return month lengths in simulation-period order, beginning with period_start_month
+function monthly_interval_days(period_start_year, period_start_month) result(interval_days)
+    integer, intent(in) :: period_start_year, period_start_month
+    integer, dimension(12) :: interval_days
+
+    integer, dimension(12) :: calendar_month_days
+    integer :: february_year
+
+    february_year = period_start_year
+    if (period_start_month > 2) february_year = february_year + 1
+
+    call days_x_month(calendar_month_days, february_year)
+    interval_days = cshift(calendar_month_days, period_start_month - 1)
+end function monthly_interval_days
 
 subroutine split_date_c(instring, date1, date2)
     ! return the string dates from a string where are separated by delimeter
