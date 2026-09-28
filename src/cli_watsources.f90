@@ -503,6 +503,7 @@ subroutine nom_water_supply(watsources_fn, irr_units, src_info, wat_src_tbl, f_s
     integer,dimension(:,:),intent(in)::irr_unit_map
     logical,intent(in)::verbose
     integer::i,j,k
+    real(dp) :: avg_cell_area
 
     irr_units%q_nom = 0
     irr_units(:)%q_pot_fld(1) = 0
@@ -526,26 +527,27 @@ subroutine nom_water_supply(watsources_fn, irr_units, src_info, wat_src_tbl, f_s
                 print *,"File", trim(watsources_fn), " lists a source type that is not codified: ", wat_src_tbl(i)%type_id
         end select
     end do
-    ! total potential water discharge [m3/s]
+
+    ! Total potential water discharge [m3/s]
     irr_units%q_nom = irr_units%q_pot_fld(1) + irr_units%q_pot_fld(2) + irr_units%q_pot_fld(3) + irr_units%q_pot_fld(4)
-    ! TODO: shapearea
-    if (f_shapearea .eqv. .false.) then
-        !irr_units%n_irrigable_cells = irr_units%q_nom*seconds_per_day / (1.e-3*irr_units%h_irr_mean*cell_size**2)
-        do i=1, size(irr_units)
-            if ((1.e-3* irr_units(i)%h_irr_mean *cell_size**2)>0.)then
-                irr_units(i)%n_irrigable_cells = irr_units(i)%q_nom * seconds_per_day / &
-                                                & (1.e-3* irr_units(i)%h_irr_mean *cell_size**2)
+
+    ! Average number of irrigable cells per day
+    irr_units(:)%n_irrigable_cells = 0._dp
+    do i=1, size(irr_units)
+        if (irr_units(i)%n_cells <= 0) then
+            print *, "Irrigation unit ", irr_units(i)%id, " is outside the active domain."
+        else if (irr_units(i)%h_irr_mean > 0._dp) then
+            if (f_shapearea) then
+                avg_cell_area = sum(shape_area, irr_unit_map == irr_units(i)%id) / irr_units(i)%n_cells
             else
-                print *,"No irrigation required in irrigation unit: ", irr_units(i)%id, " h_irr_mean: ",irr_units(i)%h_irr_mean
-                irr_units(i)%n_irrigable_cells = 0.
+                avg_cell_area = cell_size**2
             end if
-        end do
-    else
-        do i=1, size(irr_units)
             irr_units(i)%n_irrigable_cells = irr_units(i)%q_nom * seconds_per_day / &
-                                           & (1.e-3* irr_units(i)%h_irr_mean * sum(shape_area, irr_unit_map == irr_units(j)%id))
-        end do
-    end if
+                                             (1.e-3 * irr_units(i)%h_irr_mean * avg_cell_area)
+        else
+            print *, "Irrigation unit ", irr_units(i)%id, " contains no irrigable cells. h_irr_mean: ", irr_units(i)%h_irr_mean
+        end if
+    end do
 
     ! TODO: save as CSV file
     if (verbose .eqv. .true.) then

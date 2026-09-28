@@ -1325,12 +1325,18 @@ subroutine init_irrigation_units(domain_map,irr_units_map,eff_net,irr_units_tbl,
         ! set n_day max to n_cells
         if (irr_units_tbl(i)%n_day > irr_units_tbl(i)%n_cells) irr_units_tbl(i)%n_day = irr_units_tbl(i)%n_cells
 
-        ! calculate di average network efficiency: SUM(net_eff)/ n_cells
-        irr_units_tbl(i)%int_distr_eff=sum(eff_net%mat, irr_units_map%mat==irr_units_tbl(i)%id .and. domain_map%mat/=domain_map%header%nan)/irr_units_tbl(i)%n_cells
-        ! f2003 compatibility error
-        irr_units_tbl(i)%int_distr_eff=merge(0.d0,irr_units_tbl(i)%int_distr_eff,irr_units_tbl(i)%int_distr_eff/=irr_units_tbl(i)%int_distr_eff)
-        ! calculate the average irrigation height
-        irr_units_tbl(i)%h_irr_mean=sum(h_met%mat,irr_units_map%mat==irr_units_tbl(i)%id .and. domain_map%mat/=domain_map%header%nan)/irr_units_tbl(i)%n_cells
+        if (irr_units_tbl(i)%n_cells > 0) then
+            ! calculate the average network efficiency: SUM(net_eff)/ n_cells
+            irr_units_tbl(i)%int_distr_eff = sum(eff_net%mat, irr_units_map%mat==irr_units_tbl(i)%id .and. &
+                                               & domain_map%mat/=domain_map%header%nan) / irr_units_tbl(i)%n_cells
+            ! calculate the average irrigation height
+            irr_units_tbl(i)%h_irr_mean = sum(h_met%mat, irr_units_map%mat==irr_units_tbl(i)%id .and. &
+                                            & domain_map%mat/=domain_map%header%nan) / irr_units_tbl(i)%n_cells
+        else
+            ! This IU is listed in irr_districts.txt but has no cells in the active domain. Set values to 0 avoiding unsafe math
+            irr_units_tbl(i)%int_distr_eff = 0.0_dp
+            irr_units_tbl(i)%h_irr_mean = 0.0_dp
+        end if
         if(ios/=0)then
             print *, 'Error reading file ', trim(pars%sim%irrdistr_list_fn), ' in line ', i+1, '.'
             print *, 'Expected format: integer real integer. Execution will be aborted...'
