@@ -300,21 +300,6 @@ subroutine days_x_month(calendar,year)
     end if
 end subroutine days_x_month
 
-! Return month lengths in simulation-period order, beginning with period_start_month
-function monthly_interval_days(period_start_year, period_start_month) result(interval_days)
-    integer, intent(in) :: period_start_year, period_start_month
-    integer, dimension(12) :: interval_days
-
-    integer, dimension(12) :: calendar_month_days
-    integer :: february_year
-
-    february_year = period_start_year
-    if (period_start_month > 2) february_year = february_year + 1
-
-    call days_x_month(calendar_month_days, february_year)
-    interval_days = cshift(calendar_month_days, period_start_month - 1)
-end function monthly_interval_days
-
 subroutine split_date_c(instring, date1, date2)
     ! return the string dates from a string where are separated by delimeter
     character(len=*), intent(in) :: instring

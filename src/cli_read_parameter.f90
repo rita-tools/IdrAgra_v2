@@ -94,7 +94,7 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose)
     integer :: line
     logical :: dir_exists
 
-    integer :: i, j, k, n_output_days, n_output_intervals
+    integer :: i, j, k
     integer :: actcroplen
     integer,parameter :: nanvalue=-9999       ! general NaN value
     integer,dimension(:),allocatable :: dummy
@@ -526,18 +526,6 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose)
             end if
         end if
     end do
-
-    if (xml%sim%step_out == output_weekly) then
-        ! At most 54 intervals are needed to cover a 366-day period with partial weeks
-        allocate(xml%sim%output_interval_days(54))
-    else if (xml%sim%step_out == output_periodic) then
-        n_output_days = xml%sim%output_period_end_doy - xml%sim%output_period_start_doy + 1 ! Include both start and end day
-        n_output_intervals = (n_output_days + xml%sim%output_period_days - 1) / xml%sim%output_period_days
-        allocate(xml%sim%output_interval_days(n_output_intervals))
-        xml%sim%output_interval_days = xml%sim%output_period_days
-        !%PS%: final interval can be shorter
-        xml%sim%output_interval_days(n_output_intervals) = n_output_days - xml%sim%output_period_days * (n_output_intervals - 1)
-    end if
 
     if (xml%sim%initial_condition == dir_ic .and. xml%sim%input_path /= dir_ic) then
         xml%sim%initial_condition = xml%sim%input_path
