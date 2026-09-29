@@ -7,7 +7,7 @@ use mod_evapotranspiration, only: ET_reference, calculateDLH
 use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data, create_meteo_matrices, skip_meteo_days
 use mod_runoff
 use mod_crop_soil_water
-use mod_crop_phenology, only: crop_pheno_info, crop_matrices, populate_crop_pars_matrices, populate_crop_yield_matrices,
+use mod_crop_phenology, only: crop_pheno_info, crop_matrices, populate_crop_pars_matrices, populate_crop_yield_matrices, &
                             & make_random_emergence
 use mod_TDx_index
 use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva
@@ -302,19 +302,16 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 step_interval_days = monthly_interval_days(period_start_year, info_meteo(1)%start%month)
                 days_before_1st_interval = 0
                 step_label = 'month'
-
             case (output_weekly)
-                call configure_weekly_output_intervals(pars%sim, info_meteo(1)%start%day, info_meteo(1)%start%month, &
-                                                     & period_start_year, days_to_skip, days_to_run                  )
-                step_interval_days = pars%sim%output_interval_days
+                step_interval_days = weekly_interval_days(pars%sim%weekly_output_weekday, info_meteo(1)%start%day,              &
+                                                       & info_meteo(1)%start%month, period_start_year, days_to_skip, days_to_run)
                 days_before_1st_interval = 0
                 step_label = 'week'
-
             case (output_periodic)
-                step_interval_days = pars%sim%output_interval_days
+                step_interval_days = periodic_interval_days(pars%sim%output_period_start_doy,                          &
+                                                          & pars%sim%output_period_end_doy, pars%sim%output_period_days)
                 days_before_1st_interval = pars%sim%output_period_start_doy - 1
                 step_label = 'step'
-
             case default
         end select
 
@@ -984,46 +981,70 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
 end subroutine simulation_manager
 
-subroutine configure_weekly_output_intervals(sim, period_start_day, period_start_month,     &
-                                           & period_start_year, skipped_days, simulated_days)
+! Return month lengths in simulation-period order, beginning with period_start_month
+function monthly_interval_days(period_start_year, period_start_month) result(interval_days)
+    integer, intent(in) :: period_start_year, period_start_month
+    integer, dimension(12) :: interval_days, calendar_month_days
+    integer :: february_year
 
-    type(simulation), intent(inout) :: sim
+    february_year = period_start_year
+    if (period_start_month > 2) february_year = february_year + 1
+
+    call days_x_month(calendar_month_days, february_year)
+    interval_days = cshift(calendar_month_days, period_start_month - 1)
+end function monthly_interval_days
+
+function weekly_interval_days(weekly_output_weekday, period_start_day, period_start_month, &
+                            & period_start_year, skipped_days, simulated_days              ) result(interval_days)
+    integer, intent(in) :: weekly_output_weekday
     integer, intent(in) :: period_start_day, period_start_month, period_start_year
     integer, intent(in) :: skipped_days, simulated_days
-
+    integer, allocatable :: interval_days(:)
     integer, parameter :: days_per_week = 7
     integer :: period_start_weekday, simulation_start_weekday
-    integer :: first_interval_days, remaining_days
-    integer :: interval_idx
+    integer :: first_interval_days, remaining_days, n_intervals, interval_idx
+
+    if (simulated_days <= 0) then
+        allocate(interval_days(0))
+        return
+    end if
 
     period_start_weekday = day_of_week(period_start_day, period_start_month, period_start_year)
     simulation_start_weekday = modulo(period_start_weekday - 1 + skipped_days, days_per_week) + 1
 
     ! Include both the first simulated day and the requested closing weekday.
-    first_interval_days = modulo(sim%weekly_output_weekday - simulation_start_weekday, days_per_week) + 1
+    first_interval_days = modulo(weekly_output_weekday - simulation_start_weekday, days_per_week) + 1
+    first_interval_days = min(first_interval_days, simulated_days)
+    n_intervals = 1 + (simulated_days - first_interval_days + days_per_week - 1) / days_per_week
+    allocate(interval_days(n_intervals))
 
-    sim%output_interval_days = 0
     remaining_days = simulated_days
-    interval_idx = 1
-
-    do while (remaining_days > 0)
-        if (interval_idx > size(sim%output_interval_days)) then
-            print *, 'The weekly output calendar requires more intervals than allocated.'
-            print *, 'Execution will be aborted...'
-            stop
-        end if
-
+    do interval_idx = 1, n_intervals
         if (interval_idx == 1) then
-            sim%output_interval_days(interval_idx) = min(first_interval_days, remaining_days)
+            interval_days(interval_idx) = first_interval_days
         else
-            sim%output_interval_days(interval_idx) = min(days_per_week, remaining_days)
+            interval_days(interval_idx) = min(days_per_week, remaining_days)
         end if
-
-        remaining_days = remaining_days - sim%output_interval_days(interval_idx)
-        interval_idx = interval_idx + 1
+        remaining_days = remaining_days - interval_days(interval_idx)
     end do
 
-end subroutine configure_weekly_output_intervals
+end function weekly_interval_days
+
+function periodic_interval_days(period_start_doy, period_end_doy, period_days) result(interval_days)
+    integer, intent(in) :: period_start_doy, period_end_doy, period_days
+    integer, allocatable :: interval_days(:)
+    integer :: n_output_days, n_intervals
+
+    if (period_days <= 0) error stop 'The periodic output interval length must be positive.'
+    if (period_end_doy < period_start_doy) error stop 'The periodic output end day must not precede its start day.'
+
+    n_output_days = period_end_doy - period_start_doy + 1
+    n_intervals = (n_output_days + period_days - 1) / period_days
+    allocate(interval_days(n_intervals))
+    interval_days = period_days
+    interval_days(n_intervals) = n_output_days - period_days * (n_intervals - 1)
+
+end function periodic_interval_days
 
 subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, period_label,         &
                                     & alpha_ms_map, alpha_unm_map, fw_irr, a_loss, b_loss, c_loss, f_interception)

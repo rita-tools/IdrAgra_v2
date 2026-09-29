@@ -71,7 +71,6 @@ type simulation
     integer :: output_period_start_doy = 10     ! first day included in custom-period output
     integer :: output_period_end_doy = 100      ! last day included in custom-period output
     integer :: output_period_days = 30          ! length of each custom output period [days]
-    integer, dimension(:), allocatable :: output_interval_days
     integer :: start_year                       ! first year of simulation
     integer :: sim_years                        ! number of years for the simulation
     integer :: meteo_years                      ! number of available weather time series
