@@ -65,7 +65,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     type(scheduled_irrigation),dimension(:),allocatable::irr_sch ! Allocated in 'open_scheduled_irrigation' function
     type(crop_matrices)::crop_map
 
-    integer :: i, j, k, y, period_start_year, day_idx, hour, z ! for cycles
+    integer :: i, j, k, y, input_start_year, year_idx, day_idx, hour, z ! for cycles
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::dir_phenofases
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::dir_meteo
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::meteo_weight
@@ -96,7 +96,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     integer::cont_td    ! cycles
     character(len=33)::str_td
     character(len=255) :: str_delete, upfilename
-    character(len=:), allocatable :: period_label
+    character(len=:), allocatable :: input_label, output_label
     logical :: file_exists
     !! percolation model
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::day_from_irr ! days past from the latest irrigation event
@@ -266,21 +266,22 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
         n_week = 0
 
-        ! Set the label for this period: input/output files use yyyy suffixes for simulations beginning at january 1, and yyyy-yyyy for all other cases
-        period_start_year = pars%sim%start_year + y - 1
-        if (info_meteo(1)%start%month /= 1 .or. info_meteo(1)%start%day /= 1) then
-            period_label = itoa(period_start_year)//'-'//itoa(period_start_year+1)
-        else
-            period_label = itoa(period_start_year)
-        end if
+        ! Input maps follow the meteorological period. Periods beginning on January 1 use a yyyy suffix;
+        ! periods spanning two calendar years use yyyy-yyyy.
+        input_start_year = get_input_period_start_year(current_date, info_meteo(1)%start)
+        input_label = get_input_period_label(input_start_year, info_meteo(1)%start)
+
+        ! Temporary state: divided output and input label, but they still use the same calculation
+        ! Todo, next state: make output_label always referred to a single calendar-year, regardless of whether input data spans across two years
+        output_label = input_label
 
         ! Read irandom, landuse and irrigation method maps for the new period if needed
-        call update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, period_label,         &
-                                      & alpha_ms_map, alpha_unm_map, fw_irr, a_loss, b_loss, c_loss, f_interception)
+        call update_input_period_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, input_label,          &
+                                            & alpha_ms_map, alpha_unm_map, fw_irr, a_loss, b_loss, c_loss, f_interception)
 
         ! Initialize crop calendar
-        call initialize_yearly_crop_state(pars, y, period_label, info_pheno, info_meteo, info_spat,      &
-                                        & meteo_weight, dir_meteo, dir_phenofases, crop_map, yield, pheno)
+        call initialize_input_period_crop_state(pars, y, input_label, info_pheno, info_meteo, info_spat, &
+                                              & meteo_weight, dir_meteo, dir_phenofases, crop_map, pheno )
 
         select case(pars%sim%mode)
             case (1)                                                ! USE mode
@@ -295,18 +296,21 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             case default
         end select
 
-        call initialize_yearly_outputs(pars, period_label, period_start_year, info_meteo, info_spat, &
-            & irr_units, out_tbl_list, yr_map, yield, yr_deb_map)
+        ! Yield accumulation and output files currently share the input-period boundary, but are initialized
+        ! independently from crop state so they can later follow calendar-year boundaries.
+        call initialize_yield(yield, info_spat%domain%mat, size(info_pheno(1)%ii0, 2))
+        call initialize_output_files(pars, output_label, input_start_year, info_meteo, info_spat, &
+                                   & irr_units, out_tbl_list, yr_map, yield, yr_deb_map           )
 
         !%PS%: Divide the yearly period into output-accumulation intervals according to output time-step
         select case (pars%sim%step_out)
             case (output_monthly)
-                step_interval_days = monthly_interval_days(period_start_year, info_meteo(1)%start%month)
+                step_interval_days = monthly_interval_days(input_start_year, info_meteo(1)%start%month)
                 days_before_1st_interval = 0
                 step_label = 'month'
             case (output_weekly)
                 step_interval_days = weekly_interval_days(pars%sim%weekly_output_weekday, info_meteo(1)%start%day,              &
-                                                       & info_meteo(1)%start%month, period_start_year, days_to_skip, days_to_run)
+                                                        & info_meteo(1)%start%month, input_start_year, days_to_skip, days_to_run)
                 days_before_1st_interval = 0
                 step_label = 'week'
             case (output_periodic)
@@ -328,7 +332,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             iter1 = 0
             iter2 = 0
             h_irr = 0.
-            print*,'Simulation day', achar(9), day_idx, achar(9), 'year', achar(9), period_start_year
+            print*,'Simulation day', achar(9), day_idx, achar(9), 'year', achar(9), input_start_year
 
 
             ! Updating daily data matrix for water table depth
@@ -348,7 +352,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 end if
 
                 ! update specific water table maps (year/doy)
-                upfilename = trim(pars%sim%input_path)//trim(pars%sim%wat_table_fn)//"_"//itoa(period_start_year)//"_"&
+                upfilename = trim(pars%sim%input_path)//trim(pars%sim%wat_table_fn)//"_"//itoa(input_start_year)//"_"&
                     & //itoa(day_idx)//".asc" ! "
                 inquire(file=trim(upfilename), exist=file_exists)   ! file_exists will be TRUE if the file exists
                 if (file_exists .eqv. .true.) then
@@ -362,9 +366,9 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 end if
             end if
 
-            call init_step_output_file(stp_map, pars%sim%path, period_label, day_idx, step_interval_days, &
+            call init_step_output_file(stp_map, pars%sim%path, output_label, day_idx, step_interval_days, &
                                      & days_before_1st_interval, step_label, pars%sim                     )
-            call init_step_debug_output_file(deb_map, pars%sim%path, period_label, day_idx, step_interval_days, &
+            call init_step_debug_output_file(deb_map, pars%sim%path, output_label, day_idx, step_interval_days, &
                                            & days_before_1st_interval, step_label, pars%sim                     )
 
             ! Phenological parameters spatialization
@@ -502,11 +506,12 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             end where
 
             ! read weather daily data and calculate ET0 for each weather stations
-            call read_meteo_data(info_meteo,day_idx,pars%sim%res_canopy(y), pars%sim%forecast_day)
+            year_idx = current_date%year - info_meteo(1)%start%year + 1
+            call read_meteo_data(info_meteo, day_idx, pars%sim%res_canopy(year_idx), pars%sim%forecast_day)
 
             ! spread weather data to the entire domain
             call create_meteo_matrices(info_meteo, dir_meteo, meteo_weight, meteo, info_spat%domain, &
-                                     & current_date%doy, pars%sim%res_canopy(y), pars%sim)
+                                     & current_date%doy, pars%sim%res_canopy(year_idx), pars%sim     )
 
             ! calculate average latitude %PS%: switched from "forall" to an equivalent "do-do-if" structure to avoid compile-time warnings
             if (day_idx == 1) then
@@ -891,46 +896,13 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
         end do day_cycle
 
-        call calculate_annual_yield(yield, crop_map, info_spat%domain)
+        call finalize_output_period(pars, summary, info_spat, crop_map, yield, yr_map, yr_deb_map, out_tbl_list)
 
-        ! Calculate the annual efficiency for the use of the water inputs (rain and irrigation)
-        where ((yr_map%rain_crop_season%mat + yr_map%irr%mat) > 0)
-            yr_map%total_eff%mat = (yr_map%eva_act_crop_season%mat + yr_map%transp_act%mat) &
-                & / (yr_map%rain_crop_season%mat + yr_map%irr%mat)
-        elsewhere
-            yr_map%total_eff%mat = nan_r
-        end where
-
-        where (yr_map%n_irr_events%mat>0)
-            yr_map%h_irr_mean%mat = yr_map%irr%mat /  yr_map%n_irr_events%mat
-        elsewhere
-            yr_map%h_irr_mean%mat = nan_r
-        end where
-
-        if (summary .eqv. .false.) then
-            call save_yearly_data(yr_map,info_spat%domain)
-        else
-            call save_annual_irrigation_data(yr_map,info_spat%domain)
-        end if
-
-        call save_yield_data(yield,info_spat%domain)
-
-        where (yr_map%rain_crop_season%mat > 0)
-            yr_deb_map%rain_eff%mat = (yr_map%eva_act_crop_season%mat + yr_map%transp_act%mat) / yr_map%rain_crop_season%mat
-        elsewhere
-            yr_deb_map%rain_eff%mat = nan_r
-        end where
-
-        call save_annual_debug_data(yr_deb_map, info_spat%domain)
-        call save_yield_debug_data(yield, info_spat%domain)
-
-        ! close the csv files for cell outputs
-        call close_cell_output_by_year(out_tbl_list,pars%sim%mode,pars%sim%f_out_cells, pars%sim,pars%cr%n_withdrawals)
-        ! destroy annual variables
+        ! Destroy input-period state
         call destroy_infofeno_tab(info_pheno)
         call destroy_crop(crop_map)
         if (pars%sim%mode ==1) call destroy_water_sources_duty(info_sources)
-        call destroy_yield(yield)
+
     end do year_cycle
 
     ! Save output for the following year
@@ -971,6 +943,78 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         & pars%sim%imax,pars%sim%jmax)
 
 end subroutine simulation_manager
+
+subroutine finalize_output_period(pars, summary, info_spat, crop_map, yield, yr_map, yr_deb_map, out_tbl_list)
+    type(parameters), intent(in) :: pars
+    logical, intent(in) :: summary
+    type(spatial_info), intent(in) :: info_spat
+    type(crop_matrices), intent(in) :: crop_map
+    type(yield_t), intent(inout) :: yield
+    type(annual_map), intent(inout) :: yr_map
+    type(annual_debug_map), intent(inout) :: yr_deb_map
+    type(output_table_list), intent(inout) :: out_tbl_list
+
+    call calculate_annual_yield(yield, crop_map, info_spat%domain)
+
+    ! Calculate the annual efficiency for the use of the water inputs (rain and irrigation)
+    where ((yr_map%rain_crop_season%mat + yr_map%irr%mat) > 0)
+        yr_map%total_eff%mat = (yr_map%eva_act_crop_season%mat + yr_map%transp_act%mat) / &
+                             & (yr_map%rain_crop_season%mat + yr_map%irr%mat)
+    elsewhere
+        yr_map%total_eff%mat = nan_r
+    end where
+
+    where (yr_map%n_irr_events%mat > 0)
+        yr_map%h_irr_mean%mat = yr_map%irr%mat / yr_map%n_irr_events%mat
+    elsewhere
+        yr_map%h_irr_mean%mat = nan_r
+    end where
+
+    if (.not. summary) then
+        call save_yearly_data(yr_map, info_spat%domain)
+    else
+        call save_annual_irrigation_data(yr_map, info_spat%domain)
+    end if
+
+    call save_yield_data(yield, info_spat%domain)
+
+    where (yr_map%rain_crop_season%mat > 0)
+        yr_deb_map%rain_eff%mat = (yr_map%eva_act_crop_season%mat + yr_map%transp_act%mat) / yr_map%rain_crop_season%mat
+    elsewhere
+        yr_deb_map%rain_eff%mat = nan_r
+    end where
+
+    call save_annual_debug_data(yr_deb_map, info_spat%domain)
+    call save_yield_debug_data(yield, info_spat%domain)
+
+    call close_cell_output_by_year(out_tbl_list, pars%sim%mode, pars%sim%f_out_cells, pars%sim, pars%cr%n_withdrawals)
+    call destroy_yield(yield)
+
+end subroutine finalize_output_period
+
+! Return the starting year of the meteorological input period containing current_date.
+pure function get_input_period_start_year(cd, period_start_date) result(start_year)
+    type(cd), intent(in) :: cd, period_start_date
+    integer :: start_year
+
+    start_year = cd%year
+    if (cd%month < period_start_date%month .or. (cd%month == period_start_date%month .and. cd%day < period_start_date%day)) then
+        start_year = start_year - 1
+    end if
+end function get_input_period_start_year
+
+! yyyy for calendar-year periods and yyyy-yyyy for periods which cross a calendar-year boundary
+function get_input_period_label(start_year, period_start_date) result(label)
+    integer, intent(in) :: start_year
+    type(date), intent(in) :: period_start_date
+    character(len=:), allocatable :: label
+
+    if (period_start_date%month == 1 .and. period_start_date%day == 1) then
+        label = itoa(start_year)
+    else
+        label = itoa(start_year)//'-'//itoa(start_year + 1)
+    end if
+end function get_input_period_label
 
 ! Return month lengths in simulation-period order, beginning with period_start_month
 function monthly_interval_days(period_start_year, period_start_month) result(interval_days)
@@ -1037,8 +1081,8 @@ function periodic_interval_days(period_start_doy, period_end_doy, period_days) r
 
 end function periodic_interval_days
 
-subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, period_label,         &
-                                    & alpha_ms_map, alpha_unm_map, fw_irr, a_loss, b_loss, c_loss, f_interception)
+subroutine update_input_period_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, period_label,         &
+                                          & alpha_ms_map, alpha_unm_map, fw_irr, a_loss, b_loss, c_loss, f_interception)
 
     type(parameters), intent(inout) :: pars
     type(spatial_info), intent(inout) :: info_spat
@@ -1143,10 +1187,10 @@ subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, b
         end if
     end if
 
-end subroutine update_yearly_spatial_data
+end subroutine update_input_period_spatial_data
 
-subroutine initialize_yearly_crop_state(pars, year_idx, period_label, info_pheno, info_meteo, info_spat, &
-                                      & meteo_weight, dir_meteo, dir_phenofases, crop_map, yield, pheno  )
+subroutine initialize_input_period_crop_state(pars, year_idx, period_label, info_pheno, info_meteo, info_spat, &
+                                            & meteo_weight, dir_meteo, dir_phenofases, crop_map, pheno         )
 
     type(parameters), intent(in) :: pars
     integer, intent(in) :: year_idx
@@ -1158,7 +1202,6 @@ subroutine initialize_yearly_crop_state(pars, year_idx, period_label, info_pheno
     integer, dimension(:,:,:), intent(in) :: dir_meteo
     integer, dimension(:,:), intent(in) :: dir_phenofases
     type(crop_matrices), intent(inout) :: crop_map
-    type(yield_t), intent(inout) :: yield
     type(crop_pars_matrices), intent(inout) :: pheno
 
     integer :: unit_kcb_levels, unit_pheno_lengths
@@ -1178,9 +1221,6 @@ subroutine initialize_yearly_crop_state(pars, year_idx, period_label, info_pheno
 
     ! Spread crop yield parameters across the domain
     call populate_crop_yield_matrices(info_pheno, dir_phenofases, info_spat%domain, info_spat%soil_use_id%mat, crop_map, year_idx)
-
-    ! Initialize yield accumulation for each crop cycle
-    call initialize_yield(yield, info_spat%domain%mat, size(info_pheno(1)%ii0, 2))
 
     ! Inizialization of kcb_low and phenological phase
     pheno%k_cb_low = info_spat%domain%header%nan
@@ -1218,11 +1258,11 @@ subroutine initialize_yearly_crop_state(pars, year_idx, period_label, info_pheno
         end do
     end if
 
-end subroutine initialize_yearly_crop_state
+end subroutine initialize_input_period_crop_state
 
-! Initialization of yearly *.csv output files
-subroutine initialize_yearly_outputs(pars, period_label, period_start_year, info_meteo, info_spat, &
-                                   & irr_units, out_tbl_list, yr_map, yield, yr_deb_map            )
+! Initialize the output files for the current output period.
+subroutine initialize_output_files(pars, period_label, period_start_year, info_meteo, info_spat, &
+                                 & irr_units, out_tbl_list, yr_map, yield, yr_deb_map            )
 
     type(parameters), intent(in) :: pars
     character(len=*), intent(in) :: period_label
@@ -1252,7 +1292,7 @@ subroutine initialize_yearly_outputs(pars, period_label, period_start_year, info
     call init_yield_output_file(yield, pars%sim%path, period_label, pars%sim)
     call init_debug_yearly_output_file(yr_deb_map, pars%sim%path, period_label, pars%sim)
 
-end subroutine initialize_yearly_outputs
+end subroutine initialize_output_files
 
 subroutine write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal1, wat_bal2, wat_bal2_old, &
     & info_spat, pars, wat, wat_bal_hour, fw, fw_old, esp_perc, out_cn, out_cn_day, h_bypass, coll_irr, &
