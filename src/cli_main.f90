@@ -36,6 +36,7 @@ integer :: i
 logical :: verbose = .false.
 logical :: summary = .false.
 logical :: showpreview = .false.
+logical :: reckless = .false.
 
 ! get options
 do i = 1, iargc()
@@ -61,6 +62,8 @@ do i = 1, iargc()
                 call print_parameters(xml,xml_TDx)
                 print *, '=== END DEFAULT ==='
                 stop
+            case ('-reckless', '-r')        ! doesn't stop for confirmation before overwriting output folder
+                reckless = .true.
             case default                    ! all other cases ...
                 call print_header()
                 print *, 'Not supported option <',trim(arg),'>'
@@ -78,7 +81,7 @@ call print_header()
 call date_and_time(values=t_start)
 
 ! Reads simulation input parameters
-call read_all_parameters(filename, xml, xml_TDx, verbose)
+call read_all_parameters(filename, xml, xml_TDx, verbose, reckless)
 
 if (showpreview .eqv. .true.) then
     print *, '=== PREVIEW ==='
