@@ -3,23 +3,10 @@ module mod_utility
 use mod_constants, only: dp, pi
 implicit none
 
-! type that stores date
-type date
-    integer::day
-    integer::month
-    integer::year
-    integer::doy
-    integer::weekday
-end type date
-
 private get_value_index_i, get_value_index_c
 
 interface get_value_index
     module procedure get_value_index_i, get_value_index_c
-end interface
-
-interface split_date
-    module procedure split_date_c, split_date_d
 end interface
 
 contains
@@ -217,140 +204,6 @@ subroutine get_uniform_sample(irandom, amplitude, rand_symmetry,repeatable)
     end if
 
 end subroutine get_uniform_sample
-
-function get_julian_day(idd,imm,iyyy)
-    ! Calculate the day of the year from day, month, year
-    ! source: Numerical recipes in FORTRAN 90
-    integer, intent(in) :: imm, idd, iyyy
-    integer :: get_julian_day
-    integer, parameter :: igreg=15+31*(10+12*1582) ! Gregorian Calendar adopted Oct. 15, 1582.
-    integer :: ja,jm,jy
-    jy=iyyy
-    if (jy == 0) stop 'get_julian_day: there is no year zero'
-    if (jy < 0) jy = jy+1
-    if (imm > 2) then
-        jm = imm+1
-    else
-        jy = jy-1
-        jm = imm+13
-    end if
-    get_julian_day = floor(365.25 * jy) + floor(30.6001 * jm) + idd + 1720995
-    if (idd + 31 * (imm+12*iyyy) >= igreg) then !Test whether to change to Gregorian Calendar.
-        ja=floor(0.01 * jy)
-        get_julian_day = get_julian_day + 2 - ja + floor(0.25 * ja)
-    end if
-end function get_julian_day
-
-subroutine calc_date(julian_day,idd, imm,iyyy)
-    ! Calculate the date from the julian date
-    ! source: Numerical recipes in FORTRAN 90
-    integer, intent(in) :: julian_day
-    integer, intent(out) :: imm, idd, iyyy
-    integer :: ja,jalpha,jb,jc,jd,je
-    integer, parameter :: igreg=2299161
-    if (julian_day >= igreg) then
-        jalpha=int(((julian_day-1867216)-0.25)/36524.25)
-        ja=julian_day+1+jalpha-int(0.25*jalpha)
-    else if (julian_day < 0) then
-        ja=julian_day+36525*(1-julian_day/36525)
-    else
-        ja=julian_day
-    end if
-    jb=ja+1524
-    jc=int(6680.0+((jb-2439870)-122.1)/365.25)
-    jd=365*jc+int(0.25*jc)
-    je=int((jb-jd)/30.6001)
-    idd=jb-jd-int(30.6001*je)
-    imm=je-1
-    if (imm > 12) imm = imm-12
-    iyyy=jc-4715
-    if (imm > 2) iyyy=iyyy-1
-    if (iyyy <= 0) iyyy=iyyy-1
-    if (julian_day < 0) iyyy=iyyy-100*(1-julian_day/36525)
-end subroutine calc_date
-
-! Calculate the day of the week [1 = Monday, ..., 7 = Sunday].
-function day_of_week(idd, imm, iyy)
-    integer, intent(in) :: idd, imm, iyy
-    integer :: day_of_week, zeller_day, j, k, mm, yy
-
-    if (imm <= 2) then
-        mm = imm + 12
-        yy = iyy - 1
-    else
-        mm = imm
-        yy = iyy
-    end if
-
-    j = yy/100           ! first two digits of the year
-    k = mod (yy, 100)    ! last two digits of the year
-    zeller_day = mod(idd + (mm+1)*26/10 + k + k/4 + j/4 + 5*j, 7)! [0 = Saturday, ..., 6 = Friday]
-    day_of_week = modulo(zeller_day + 5, 7) + 1                  ! [1 = Monday, ..., 7 = Sunday]
-end function day_of_week
-
-subroutine days_x_month(calendar,year)
-    ! Get the number of days for each months in the provided year
-    integer,dimension(:),intent(out)::calendar
-    integer,intent(in)::year
-
-    if(mod(year,400)==0 .or. (mod(year,4)==0 .and. (.not.(mod(year,100)==0)))) then  ! leap year
-        calendar=(/31,29,31,30,31,30,31,31,30,31,30,31/)
-    else    ! other
-        calendar=(/31,28,31,30,31,30,31,31,30,31,30,31/)
-    end if
-end subroutine days_x_month
-
-subroutine split_date_c(instring, date1, date2)
-    ! return the string dates from a string where are separated by delimeter
-    character(len=*), intent(in) :: instring
-    character(len=300), intent(out):: date1, date2
-    character(len=300) :: string
-    character(len=2), parameter:: delimiter = '->'
-    integer :: index
-
-    string = TRIM(instring)
-    index = SCAN(string, delimiter)
-    if (index == 0) then
-        print *, 'Input files do not list end date or the delimiter "->" is not used'
-        print *, 'Execution will be aborted...'
-        stop
-    end if
-    date1 = string(1:index-1)
-    index = SCAN(string, delimiter, .TRUE.)
-    date2 = string(index+1:)
-end subroutine split_date_c
-
-subroutine split_date_d(instring, outdate)
-    ! return the date from a string where are separated by delimiter in the order day/month/year
-    ! TODO: general format
-    character(len=*), intent(in) :: instring
-    type(date), intent(out):: outdate
-    character(len=1), parameter:: delimiter = '/'
-    character(len=300) :: string
-    character(len=4) :: date_num
-    integer :: index
-    string = trim(instring)
-    index = scan(string, delimiter)
-    if (index == 0) then
-        print *, 'Input files are not correctly formatted'
-        print *, 'Right date format is dd/mm/yyyy'
-        stop 'Execution will be aborted...'
-    end if
-    date_num = adjustl(string(1:index-1)) ! select the day
-    read(date_num, '(i2)') outdate%day
-    string = string(index+1:)
-    index = scan(string, delimiter)
-    if (index == 0) then
-        print *, 'Input files are not correctly formatted'
-        print *, 'Right date format is dd/mm/yyyy'
-        stop 'Execution will be aborted...'
-    end if
-    date_num = string(1:index-1) ! select the month
-    read(date_num, '(i2)') outdate%month
-    date_num = string(index+1:) ! select the year
-    read(date_num, '(i4)') outdate%year
-    ! TODO: add control to check date validity
-end subroutine split_date_d
 
 function string_to_integers(str, sep) result(a)
     ! return a sequence of integers from a string

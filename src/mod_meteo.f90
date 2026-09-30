@@ -1,6 +1,7 @@
 module mod_meteo
 use mod_constants, only: dp
-use mod_utility, only: date, lower_case, days_x_month, get_julian_day, split_date
+use mod_date, only: date, month_lengths, split_date, days_between_dates, dates_are_equal, date_is_before
+use mod_utility, only: lower_case
 use mod_parameters, only: simulation, par_method
 use mod_evapotranspiration, only: ET_reference
 use mod_grid, only: grid_i
@@ -56,33 +57,33 @@ subroutine meteo_series_length(sim, verbose)
     integer::k
     real(dp)::value
     integer::count,gg_count,gg_in_yy, gg_diff
-    integer,dimension(12)::calendario
+    integer, dimension(12) :: days_in_month
 
     call read_meteo_parameters(sim,info_meteo,verbose)
 
     ! Set simulation dates, if not already set
-    if(sim%start_simulation%doy==get_julian_day(29,02,1600)) sim%start_simulation = info_meteo(1)%start
-    if(sim%end_simulation%doy==get_julian_day(29,02,1600))   sim%end_simulation = info_meteo(1)%finish
+    if (sim%start_simulation%year == 0) sim%start_simulation = info_meteo(1)%start
+    if (sim%end_simulation%year == 0) sim%end_simulation = info_meteo(1)%finish
 
     ! Verify that meteorological series are coherent
-    if(any(info_meteo(:)%start%doy/=info_meteo(1)%start%doy))then
+    if (any(.not. dates_are_equal(info_meteo(:)%start, info_meteo(1)%start))) then
         stop 'Meteorological series start in different days. Execution will be aborted...'
     end if
-    if(any(info_meteo(:)%finish%doy/=info_meteo(1)%finish%doy))then
+    if (any(.not. dates_are_equal(info_meteo(:)%finish, info_meteo(1)%finish))) then
         stop 'Meteorological series end in different days. Execution will be aborted...'
     end if
 
     ! Verify that meteorological series are coherent with simulation dates
-    if(any(info_meteo(:)%start%doy>sim%start_simulation%doy)) then
+    if (any(date_is_before(sim%start_simulation, info_meteo(:)%start))) then
         stop 'Meteorological series are not coherent with simulation dates. Execution will be aborted...'
     end if
-    if(any(info_meteo(:)%finish%doy<sim%end_simulation%doy)) then
+    if (any(date_is_before(info_meteo(:)%finish, sim%end_simulation))) then
         stop 'Meteorological series are not coherent with simulation dates. Execution will be aborted...'
     end if
 
     ! Check length of time series
     do k = 1,sim%n_weather_stations
-        gg_diff = info_meteo(k)%finish%doy - info_meteo(k)%start%doy + 1
+        gg_diff = days_between_dates(info_meteo(k)%start, info_meteo(k)%finish) + 1
         count=0
         do while (.true.)
             read (info_meteo(k)%unit, *, end=999) value
@@ -110,22 +111,22 @@ subroutine meteo_series_length(sim, verbose)
     sim%start_year = info_meteo(1)%start%year ! first year
     do
         sim%meteo_years=sim%meteo_years+1
-        call days_x_month(calendario,sim%start_year+sim%meteo_years-1)
-        gg_in_yy=gg_in_yy+sum(calendario)
+        days_in_month = month_lengths(sim%start_year + sim%meteo_years - 1)
+        gg_in_yy = gg_in_yy + sum(days_in_month)
         if(gg_in_yy>=gg_count) exit
     end do
     sim%sim_years=sim%meteo_years
 
     ! Updating gg_count to take into account the end of simulation date
-    if(sim%end_simulation%doy<info_meteo(1)%finish%doy) then
-        gg_count = sim%end_simulation%doy - info_meteo(1)%start%doy + 1
+    if (date_is_before(sim%end_simulation, info_meteo(1)%finish)) then
+        gg_count = days_between_dates(info_meteo(1)%start, sim%end_simulation) + 1
         ! calculate the number of years to be simulated
         sim%sim_years=0; gg_in_yy=0
         sim%start_year = info_meteo(1)%start%year ! first year
         do
             sim%sim_years=sim%sim_years+1
-            call days_x_month(calendario,sim%start_year+sim%sim_years-1)
-            gg_in_yy=gg_in_yy+sum(calendario)
+            days_in_month = month_lengths(sim%start_year + sim%sim_years - 1)
+            gg_in_yy = gg_in_yy + sum(days_in_month)
             if(gg_in_yy>=gg_count) exit
         end do
     end if
@@ -138,11 +139,11 @@ subroutine meteo_series_length(sim, verbose)
     do k=1,sim%sim_years
         if(k/=sim%sim_years)then
             if (info_meteo(1)%start%month > 2) then
-                call days_x_month(calendario,sim%start_year+k)
+                days_in_month = month_lengths(sim%start_year + k)
             else
-                call days_x_month(calendario,sim%start_year+k-1)
+                days_in_month = month_lengths(sim%start_year + k - 1)
             end if
-            sim%days_in_year(k)=sum(calendario)
+            sim%days_in_year(k) = sum(days_in_month)
         else ! the last year fo the dataset could be uncompleted
             sim%days_in_year(k)=gg_count-sum(sim%days_in_year)
         end if
@@ -265,10 +266,6 @@ subroutine read_meteo_parameters(sim,info_meteo,verbose)
                             call split_date(date_string, date_start, date_end)
                             call split_date(date_start, info_meteo(i)%start)
                             call split_date(date_end, info_meteo(i)%finish)
-                            info_meteo(i)%start%doy = &
-                                & get_julian_day(info_meteo(i)%start%day,info_meteo(i)%start%month,info_meteo(i)%start%year)
-                            info_meteo(i)%finish%doy = &
-                                & get_julian_day(info_meteo(i)%finish%day,info_meteo(i)%finish%month,info_meteo(i)%finish%year)
                             read(info_meteo(i)%unit,*)  ! skip line
                         end do
                     case ('endtable')
