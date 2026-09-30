@@ -1,5 +1,6 @@
 module mod_parameters
-use mod_utility, only: date, lower_case, string_to_integers, get_julian_day, split_date
+use mod_date, only: date
+use mod_utility, only: lower_case, string_to_integers
 use mod_constants
 implicit none
 
@@ -109,8 +110,8 @@ type simulation
     real(dp) :: lambda_cn = 0.2                 ! lambda parameters for curve number [-]
     real(dp) :: h_prec_lim = 5.0                ! minimum meaningful precipitation [mm]
 
-    type(date) :: start_simulation = date(29, 2, 1600, 2305507, 0) ! sentinel: use meteo start date
-    type(date) :: end_simulation = date(29, 2, 1600, 2305507, 0)   ! sentinel: use meteo end date
+    type(date) :: start_simulation               ! defaults to the weather-series start date
+    type(date) :: end_simulation                 ! defaults to the weather-series end date
     integer :: forecast_day = 5                 ! number of days to use to cumulate precipitation
     real(dp) :: h_maxpond = 0.0D0               ! overall maximum pond (mm). It will replaced by irrigation method
     real(dp) :: fc_ratio = 1.0D0                ! fraction of FC to fill with irrigation

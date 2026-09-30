@@ -1,9 +1,10 @@
 module cli_watsources
 use mod_constants, only: dp, seconds_per_day
-use mod_utility, only: get_value_index, lower_case, get_julian_day, split_date
+use mod_date, only: date, split_date, days_between_dates, dates_are_equal
+use mod_utility, only: get_value_index, lower_case
 use mod_parameters
 use mod_grid, only: grid_i, grid_r
-use mod_meteo, only: date, meteo_info
+use mod_meteo, only: meteo_info
 implicit none
 
 contains
@@ -74,10 +75,8 @@ subroutine open_daily_discharges_file(file_name, mn_src_tbl, source_nr)
     call split_date(date_string, date_start, date_end)
     call split_date(date_start, mn_src_tbl%start)
     call split_date(date_end, mn_src_tbl%finish)
-    mn_src_tbl%start%doy = get_julian_day(mn_src_tbl%start%day, mn_src_tbl%start%month, mn_src_tbl%start%year)
-    mn_src_tbl%finish%doy = get_julian_day(mn_src_tbl%finish%day, mn_src_tbl%finish%month, mn_src_tbl%finish%year)
     ! Check if the length of the time series matches the dates limits
-    if (n_rows /= mn_src_tbl%finish%doy - mn_src_tbl%start%doy + 1) then
+    if (n_rows /= days_between_dates(mn_src_tbl%start, mn_src_tbl%finish) + 1) then
         stop "Diversion time series have incoherent lengths with respect to declared dates. Execution will be aborted..."
     end if
 
@@ -383,9 +382,9 @@ subroutine init_water_sources_duty(pars,wat_src_tbl,src_info,weather_info)
         call open_daily_discharges_file(trim(pars%sim%watsour_path)//trim(pars%sim%mon_sources_i_div_fn),src_info%mn_src_tbl1, &
             & pars%ms_i%n_withdrawals)
         ! Check dates match weather data
-        if (src_info%mn_src_tbl1%start%doy /= weather_info(1)%start%doy) then
+        if (.not. dates_are_equal(src_info%mn_src_tbl1%start, weather_info(1)%start)) then
             stop 'Meteorological and monitored sources (i) time series start in different days'
-        else if (src_info%mn_src_tbl1%finish%doy /= weather_info(1)%finish%doy) then
+        else if (.not. dates_are_equal(src_info%mn_src_tbl1%finish, weather_info(1)%finish)) then
             stop 'Meteorological and monitored sources (i) time series end in different days'
         end if
     end if
@@ -394,15 +393,15 @@ subroutine init_water_sources_duty(pars,wat_src_tbl,src_info,weather_info)
         call open_daily_discharges_file(trim(pars%sim%watsour_path)//trim(pars%sim%mon_sources_ii_div_fn),src_info%mn_src_tbl2, &
             & pars%ms_ii%n_withdrawals)
         if (pars%ms_i%f_exists .eqv. .true.) then ! check dates match between different monitored water sources
-            if (src_info%mn_src_tbl1%start%doy /= src_info%mn_src_tbl2%start%doy) then
+            if (.not. dates_are_equal(src_info%mn_src_tbl1%start, src_info%mn_src_tbl2%start)) then
                 stop 'monitored sources (i) and monitored sources (ii) time series start in different days'
-            else if (src_info%mn_src_tbl1%finish%doy /= src_info%mn_src_tbl2%finish%doy) then
+            else if (.not. dates_are_equal(src_info%mn_src_tbl1%finish, src_info%mn_src_tbl2%finish)) then
                 stop 'monitored sources (i) and monitored sources (ii) series end in different days'
             end if
         else  ! Check dates match weather data
-            if (src_info%mn_src_tbl2%start%doy /= weather_info(1)%start%doy) then
+            if (.not. dates_are_equal(src_info%mn_src_tbl2%start, weather_info(1)%start)) then
                 stop 'Meteorological and monitored sources (ii) time series start in different days'
-            else if (src_info%mn_src_tbl2%finish%doy /= weather_info(1)%finish%doy) then
+            else if (.not. dates_are_equal(src_info%mn_src_tbl2%finish, weather_info(1)%finish)) then
                 stop 'Meteorological and monitored sources (ii) time series end in different days'
             end if
         end if
@@ -412,21 +411,21 @@ subroutine init_water_sources_duty(pars,wat_src_tbl,src_info,weather_info)
         call open_daily_discharges_file(trim(pars%sim%watsour_path)//trim(pars%sim%int_reuse_div_fn), &
             src_info%int_reuse_tbl, pars%intreu%n_withdrawals)
         if (pars%ms_ii%f_exists .eqv. .true.) then ! Check dates match monitored water sources 2
-            if (src_info%mn_src_tbl2%start%doy /= src_info%int_reuse_tbl%start%doy) then
+            if (.not. dates_are_equal(src_info%mn_src_tbl2%start, src_info%int_reuse_tbl%start)) then
                 stop 'monitored sources (ii) and internal reuse time series start in different days'
-            else if (src_info%mn_src_tbl2%finish%doy /= src_info%int_reuse_tbl%finish%doy) then
+            else if (.not. dates_are_equal(src_info%mn_src_tbl2%finish, src_info%int_reuse_tbl%finish)) then
                 stop 'monitored sources (ii) and internal reuse time series end in different days'
             end if
         else if (pars%ms_i%f_exists .eqv. .true.) then ! Check dates match monitored water sources 1
-            if (src_info%mn_src_tbl1%start%doy /= src_info%int_reuse_tbl%start%doy) then
+            if (.not. dates_are_equal(src_info%mn_src_tbl1%start, src_info%int_reuse_tbl%start)) then
                 stop 'monitored sources (i) and internal reuse time series start in different days'
-            else if (src_info%mn_src_tbl1%finish%doy /= src_info%int_reuse_tbl%finish%doy) then
+            else if (.not. dates_are_equal(src_info%mn_src_tbl1%finish, src_info%int_reuse_tbl%finish)) then
                 stop 'monitored sources (i) and internal reuse time series end in different days'
             end if
         else ! Check dates match weather data
-            if (src_info%int_reuse_tbl%start%doy /= weather_info(1)%start%doy) then
+            if (.not. dates_are_equal(src_info%int_reuse_tbl%start, weather_info(1)%start)) then
                 stop 'Meteorological and internal reuse time series start in different days'
-            else if (src_info%int_reuse_tbl%finish%doy /= weather_info(1)%finish%doy) then
+            else if (.not. dates_are_equal(src_info%int_reuse_tbl%finish, weather_info(1)%finish)) then
                 stop 'Meteorological and internal reuse time series end in different days'
             end if
         end if
