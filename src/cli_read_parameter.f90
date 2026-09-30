@@ -13,9 +13,9 @@ implicit none
 
 contains
 
-subroutine read_all_parameters(file_xml, xml, xml_dtx, debug)
+subroutine read_all_parameters(file_xml, xml, xml_dtx, verbose, reckless)
    character(len=*), intent(in) :: file_xml
-    logical, intent(in) :: debug
+    logical, intent(in) :: verbose, reckless
     type(TDx_index), intent(inout) :: xml_dtx
     type(parameters), intent(inout) :: xml
     ! Input related variables used in parsing loop
@@ -26,7 +26,7 @@ subroutine read_all_parameters(file_xml, xml, xml_dtx, debug)
     line = 0; tablestart = 0
     ios = 0
 
-    call read_sim_parameters(file_xml, xml, xml_dtx, debug)
+    call read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
 
     inquire(file="cells.txt", exist=xml%sim%f_out_cells) ! update "output_cells"
 
@@ -74,16 +74,16 @@ subroutine read_all_parameters(file_xml, xml, xml_dtx, debug)
         xml%sim%n_irr_meth = 0
         allocate(xml%irr%met(0))
     else
-        call read_all_irr_methods(xml, debug)
+        call read_all_irr_methods(xml, verbose)
     end if
 
 end subroutine read_all_parameters
 
 
-subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose)
+subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
     ! read settings for the simulation
     character(len=*), intent(in) :: file_xml
-    logical, intent(in) :: verbose
+    logical, intent(in) :: verbose, reckless
     type(TDx_index), intent(inout) :: xml_dtx
     type(parameters), intent(inout) :: xml
     integer :: unit_txt
@@ -140,14 +140,11 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose)
                                             , substitute = delimiter &
                                             )
                         inquire(file=trim(xml%sim%path), exist=dir_exists)   ! dir_exists will be TRUE if the directory exists
-                        if (dir_exists .eqv. .true.) then
+                        if (dir_exists .and. .not. reckless) then
                             print *,'The directory ', trim(xml%sim%path), ' already exists and will be updated'
                             print *, " <enter> to continue "
                             read *
                         else
-                            ! TODO: intrinsic 'system' not included in std2008
-                            !call get_environment_variable('DELIMITER',delimiter)
-                            !call system('mkdir '//delimiter//trim(xml%sim%path))
                             call make_dir(xml%sim%path)
                         end if
                     case ('inputpath') ! path to spazialized input files
@@ -230,9 +227,6 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose)
                         if (dir_exists .eqv. .true.) then
                             print *,'The directory ', trim(xml%sim%final_condition), ' already exists and will be updated'
                         else
-                            ! TODO: intrinsic 'system' non inclusa nello standard std2008
-                            !call get_environment_variable('DELIMITER',delimiter)
-                            !call system('mkdir '//delimiter//trim(xml%sim%final_condition))
                             call make_dir(xml%sim%final_condition)
                         end if
                     case ('finalcondition') ! final condition input filenames (root)
