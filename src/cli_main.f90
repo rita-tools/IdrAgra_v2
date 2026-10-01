@@ -278,7 +278,7 @@ print *, 'iRandomFileName = '     , xml%sim%irandom_fn
 
 print *, 'mode = ',  xml%sim%mode
 print *, 'mflag = ',  xml%sim%step_out
-print *, 'output period = ', xml%sim%output_period_start_doy, xml%sim%output_period_end_doy, xml%sim%output_period_days
+print *, 'output period = ', xml%sim%out_step_start, xml%sim%out_step_end, xml%sim%out_step_days
 print *, 'InitialThetaFlag = ',  xml%sim%f_init_wc
 print *, 'FinalThetaFlag = ',  xml%sim%f_theta_out
 print *, 'RadnSowDaysWind = ',  xml%sim%sowing_range

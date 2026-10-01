@@ -39,8 +39,8 @@ ROOT_TYPES = {
 # These cases parse or transform the input instead of reading it directly into
 # the value whose declaration supplies the default.
 DESTINATION_EXCEPTIONS = {
-    "startsimulation": "xml%sim%start_simulation",
-    "endsimulation": "xml%sim%end_simulation",
+    "startsimulation": "xml%sim%start",
+    "endsimulation": "xml%sim%end",
 }
 
 # User-facing formats for parser branches that translate text into a different

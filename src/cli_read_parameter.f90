@@ -192,10 +192,10 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
                         read(buffer, *, iostat=ios) xml%sim%f_theta_out
                     case ('startsimulation')    ! date of start simulation
                         read (buffer, *, iostat=ios)
-                        call split_date(buffer, xml%sim%start_simulation)
+                        call split_date(buffer, xml%sim%start)
                     case ('endsimulation')    ! date of end simulation
                         read (buffer, *, iostat=ios)
-                        call split_date(buffer, xml%sim%end_simulation)
+                        call split_date(buffer, xml%sim%end)
                     case ('initialconditionpath') ! path to initial condition input files
                         read(buffer, *, iostat=ios) xml%sim%initial_condition
                         xml%sim%initial_condition = replace_str( string = xml%sim%initial_condition &
@@ -284,11 +284,11 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
                                 read *
                         end select
                     case ('startdate')
-                        read(buffer, *, iostat=ios) xml%sim%output_period_start_doy
+                        read(buffer, *, iostat=ios) xml%sim%out_step_start
                     case ('enddate')
-                        read(buffer, *, iostat=ios) xml%sim%output_period_end_doy
+                        read(buffer, *, iostat=ios) xml%sim%out_step_end
                     case ('deltadate')
-                        read(buffer, *, iostat=ios) xml%sim%output_period_days
+                        read(buffer, *, iostat=ios) xml%sim%out_step_days
                     case ('soilusesnum') ! number of land uses to be processed
                         read(buffer, *, iostat=ios)xml%sim%n_lus
                     !!!! %AB% TODO: to be checked

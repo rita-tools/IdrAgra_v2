@@ -413,8 +413,7 @@ subroutine init_crop_phenology_pars(sim, info_pheno, info_meteo, ze_fix, verbose
     call init_crop_par_from_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropParam.dat", &
         & sim%n_lus, sim%n_crops, string_elements, n_crops_by_year)
 
-    call read_canopy_resistance_file(trim(dir)//delimiter//'CanopyRes.dat', sim%res_canopy, &
-        & sim%end_simulation%year, sim%start_year)
+    call read_canopy_resistance_file(trim(dir)//delimiter//'CanopyRes.dat', sim%res_canopy, sim%end%year, sim%start_year)
 
     do i=1,size(info_pheno)
         dir_name = info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)
@@ -473,7 +472,7 @@ subroutine init_crop_phenology_pars(sim, info_pheno, info_meteo, ze_fix, verbose
         info_pheno(i)%cycle_crop_slot = 0
         call read_water_prod_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"WPadj.dat",  &
                                 & string_elements, n_crops_by_year, info_pheno(i)%wp_adj,          &
-                                & sim%end_simulation%year, sim%start_year)
+                                & sim%end%year, sim%start_year)
         call read_crop_par_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropParam.dat", &
                               & string_elements, ze_fix, info_pheno(i))
 

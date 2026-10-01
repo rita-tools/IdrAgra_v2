@@ -69,9 +69,9 @@ type simulation
                                                 ! 0 = without irrigation, 1 = USE mode, 2 = NEED mode at field capacity, 3 = NEED mode at fixed volume, 4 = scheduled irrigation
     logical :: f_soiluse = .false.              ! land use change between years (true) otherwise false
     integer :: weekly_output_weekday = 1        ! day of weekly output (1 = Monday, ..., 7 = Sunday)
-    integer :: output_period_start_doy = 10     ! first day included in custom-period output
-    integer :: output_period_end_doy = 100      ! last day included in custom-period output
-    integer :: output_period_days = 30          ! length of each custom output period [days]
+    integer :: out_step_start = 10     ! first day included in custom-period output
+    integer :: out_step_end = 100      ! last day included in custom-period output
+    integer :: out_step_days = 30          ! length of each custom output period [days]
     integer :: start_year                       ! first year of simulation
     integer :: sim_years                        ! number of years for the simulation
     integer :: meteo_years                      ! number of available weather time series
@@ -110,8 +110,8 @@ type simulation
     real(dp) :: lambda_cn = 0.2                 ! lambda parameters for curve number [-]
     real(dp) :: h_prec_lim = 5.0                ! minimum meaningful precipitation [mm]
 
-    type(date) :: start_simulation               ! defaults to the weather-series start date
-    type(date) :: end_simulation                 ! defaults to the weather-series end date
+    type(date) :: start               ! defaults to the weather-series start date
+    type(date) :: end                 ! defaults to the weather-series end date
     integer :: forecast_day = 5                 ! number of days to use to cumulate precipitation
     real(dp) :: h_maxpond = 0.0D0               ! overall maximum pond (mm). It will replaced by irrigation method
     real(dp) :: fc_ratio = 1.0D0                ! fraction of FC to fill with irrigation

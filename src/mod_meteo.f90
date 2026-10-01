@@ -51,7 +51,7 @@ contains
 subroutine meteo_series_length(sim, verbose)
     ! calculate the length of the weather time series [days]
     ! check if time series have the same length
-   type(simulation),intent(inout)::sim
+    type(simulation),intent(inout)::sim
     logical,optional,intent(in)::verbose
     type(meteo_info),dimension(:),allocatable::info_meteo
     integer::k
@@ -62,8 +62,8 @@ subroutine meteo_series_length(sim, verbose)
     call read_meteo_parameters(sim,info_meteo,verbose)
 
     ! Set simulation dates, if not already set
-    if (sim%start_simulation%year == 0) sim%start_simulation = info_meteo(1)%start
-    if (sim%end_simulation%year == 0) sim%end_simulation = info_meteo(1)%finish
+    if (sim%start%year == 0) sim%start = info_meteo(1)%start
+    if (sim%end%year == 0) sim%end = info_meteo(1)%finish
 
     ! Verify that meteorological series are coherent
     if (any(.not. dates_are_equal(info_meteo(:)%start, info_meteo(1)%start))) then
@@ -74,10 +74,10 @@ subroutine meteo_series_length(sim, verbose)
     end if
 
     ! Verify that meteorological series are coherent with simulation dates
-    if (any(date_is_before(sim%start_simulation, info_meteo(:)%start))) then
+    if (any(date_is_before(sim%start, info_meteo(:)%start))) then
         stop 'Meteorological series are not coherent with simulation dates. Execution will be aborted...'
     end if
-    if (any(date_is_before(info_meteo(:)%finish, sim%end_simulation))) then
+    if (any(date_is_before(info_meteo(:)%finish, sim%end))) then
         stop 'Meteorological series are not coherent with simulation dates. Execution will be aborted...'
     end if
 
@@ -118,8 +118,8 @@ subroutine meteo_series_length(sim, verbose)
     sim%sim_years=sim%meteo_years
 
     ! Updating gg_count to take into account the end of simulation date
-    if (date_is_before(sim%end_simulation, info_meteo(1)%finish)) then
-        gg_count = days_between_dates(info_meteo(1)%start, sim%end_simulation) + 1
+    if (date_is_before(sim%end, info_meteo(1)%finish)) then
+        gg_count = days_between_dates(info_meteo(1)%start, sim%end) + 1
         ! calculate the number of years to be simulated
         sim%sim_years=0; gg_in_yy=0
         sim%start_year = info_meteo(1)%start%year ! first year
