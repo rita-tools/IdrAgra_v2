@@ -95,9 +95,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     type(unit_file_scratch),dimension(:),allocatable::unit_Dxi
     integer::cont_td    ! cycles
     character(len=33)::str_td
-    character(len=255) :: str_delete, upfilename
+    character(len=255) :: str_delete
     character(len=:), allocatable :: period_label
-    logical :: file_exists
     !! percolation model
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::day_from_irr ! days past from the latest irrigation event
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,2)::esp_perc  ! exponent of the percolation model
@@ -330,37 +329,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             h_irr = 0.
             print*,'Simulation day', achar(9), day_idx, achar(9), 'year', achar(9), period_start_year
 
-
-            ! Updating daily data matrix for water table depth
-            if(pars%sim%f_cap_rise .eqv. .true.)then
-                ! update cycling water table maps (only doy)
-                upfilename = trim(pars%sim%input_path)//trim(pars%sim%wat_table_fn)//"_"//"yyyy"//"_"&
-                    & //itoa(day_idx)//".asc" ! "
-                inquire(file=trim(upfilename), exist=file_exists)   ! file_exists will be TRUE if the file exists
-                if (file_exists .eqv. .true.) then
-                    print *,'Water table data are updated: ', upfilename
-                    call read_grid(trim(upfilename), info_spat%wat_tab,pars%sim,boundaries)
-                    ! fix water table depth to ze
-                    where((info_spat%wat_tab%mat<pars%depth%ze_fix) .and. &
-                        (info_spat%wat_tab%mat/=info_spat%wat_tab%header%nan))
-                        info_spat%wat_tab%mat=pars%depth%ze_fix
-                    end where
-                end if
-
-                ! update specific water table maps (year/doy)
-                upfilename = trim(pars%sim%input_path)//trim(pars%sim%wat_table_fn)//"_"//itoa(period_start_year)//"_"&
-                    & //itoa(day_idx)//".asc" ! "
-                inquire(file=trim(upfilename), exist=file_exists)   ! file_exists will be TRUE if the file exists
-                if (file_exists .eqv. .true.) then
-                    print *,'Water table data are updated: ', upfilename
-                    call read_grid(trim(upfilename), info_spat%wat_tab,pars%sim,boundaries)
-                    ! fix water table depth to ze
-                    where((info_spat%wat_tab%mat<pars%depth%ze_fix) .and. &
-                        (info_spat%wat_tab%mat/=info_spat%wat_tab%header%nan))
-                        info_spat%wat_tab%mat=pars%depth%ze_fix
-                    end where
-                end if
-            end if
+            ! Tries importing updated water table data into info_spat%wtab
+            if (pars%sim%f_cap_rise) call update_water_table(pars, info_spat, boundaries, period_start_year, day_idx)
 
             call init_step_output_file(stp_map, pars%sim%path, period_label, day_idx, step_interval_days, &
                                      & days_before_1st_interval, step_label, pars%sim                     )
@@ -1253,6 +1223,33 @@ subroutine initialize_yearly_outputs(pars, period_label, period_start_year, info
     call init_debug_yearly_output_file(yr_deb_map, pars%sim%path, period_label, pars%sim)
 
 end subroutine initialize_yearly_outputs
+
+subroutine update_water_table(pars, info_spat, boundaries, year, doy)
+    type(parameters), intent(in) :: pars
+    type(spatial_info), intent(inout) :: info_spat
+    type(bound), intent(in) :: boundaries
+    integer, intent(in) :: year, doy
+    character(len=255) :: file
+    logical :: file_exists
+
+    ! Looks for a '*_year_doy' map first; falls back to "*_yyyy_doy" if missing
+    file = trim(pars%sim%input_path)//trim(pars%sim%wat_table_fn)//"_"//itoa(year)//"_"//itoa(doy)//".asc"
+    inquire(file=trim(file), exist=file_exists)
+    if (.not. file_exists) then
+        file = trim(pars%sim%input_path)//trim(pars%sim%wat_table_fn)//"_"//"yyyy"//"_"//itoa(doy)//".asc" !%PS%, todo: is this kind of filename ever used?
+        inquire(file=trim(file), exist=file_exists)
+        if (.not. file_exists) return
+    end if
+
+    ! File is present: imports the data
+    print *, 'Reading updated water table data from: ', file
+    call read_grid(trim(file), info_spat%wat_tab, pars%sim, boundaries)
+
+    ! Ensures the water table can't enter the first soil layer
+    where((info_spat%wat_tab%mat < pars%depth%ze_fix) .and. (info_spat%wat_tab%mat /= info_spat%wat_tab%header%nan))
+        info_spat%wat_tab%mat = pars%depth%ze_fix
+    end where
+end subroutine update_water_table
 
 subroutine write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal1, wat_bal2, wat_bal2_old, &
     & info_spat, pars, wat, wat_bal_hour, fw, fw_old, esp_perc, out_cn, out_cn_day, h_bypass, coll_irr, &
