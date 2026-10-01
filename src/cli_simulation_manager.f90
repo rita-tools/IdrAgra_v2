@@ -1,5 +1,5 @@
 module cli_simulation_manager
-use mod_date, only: date, month_lengths, days_between_dates, advance_calendar_date, day_of_week
+use mod_date, only: date, month_lengths, days_in_year, days_between_dates, advance_calendar_date, day_of_week
 use mod_utility, only: dp, get_value_index, get_uniform_sample, itoa
 use mod_parameters
 use mod_grid, only: read_grid, write_grid, print_mat_as_grid, overlay_domain, bound, id_to_par, set_default_par
@@ -65,7 +65,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     type(scheduled_irrigation),dimension(:),allocatable::irr_sch ! Allocated in 'open_scheduled_irrigation' function
     type(crop_matrices)::crop_map
 
-    integer :: i, j, k, y, day_idx, hour, z ! for cycles
+    integer :: i, j, k, y, doy, hour, z ! for cycles
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::dir_phenofases
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::dir_meteo
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::meteo_weight
@@ -73,7 +73,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::priv_irr
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::coll_irr
     integer, dimension(:), allocatable :: out_steps
-    integer :: days_before_1st_interval
+    integer :: days_before_1st_interval, first_simulated_doy, last_simulated_doy, n_simulation_years
     character(len=5) :: step_label
     integer::xx,yy ! Test cells coordinates
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::iter1,iter2
@@ -90,7 +90,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     !! TDx
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,pars_TDx%temp%n_ind)::tot_deficit      ! TDx sum
     integer,dimension(2)::unit_deficit
-    integer :: dos, n_week
+    integer :: dos, n_week, year_idx, simulation_year_idx, year_day_idx, days_before_simulation
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::TD
     type(unit_file_scratch),dimension(:),allocatable::unit_Dxi
     integer::cont_td    ! cycles
@@ -99,7 +99,6 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     !! percolation model
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::day_from_irr ! days past from the latest irrigation event
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,2)::esp_perc  ! exponent of the percolation model
-    integer :: days_before_period, days_before_simulation, days_to_skip, days_to_run
     type(date) :: current ! Current date
     integer::tmax_d, tmin_d, time
     ! to account for skipped years
@@ -187,10 +186,6 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         end do
     end if scratch_td
 
-    dos = 0
-    current = pars%sim%start
-    days_before_simulation = days_between_dates(info_meteo(1)%start, pars%sim%start)
-
     h_irr = 0.
 
     fw_day = cost_fwEva ! Initialization of fw, set to 1
@@ -249,33 +244,36 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         case default
     end select
 
-    ! Yearly simulation cycle (i.e. any 365-366 days period; not necessarily a calendar jan1-dec31 year)
-    year_cycle: do y = 1, sim_years
+    dos = 0
+    current = pars%sim%start ! Initialize current date to simulation start date
 
-        days_before_period = sum(pars%sim%days_in_year(:y-1))
+    ! Skip leading info_meteo days
+    days_before_simulation = days_between_dates(info_meteo(1)%start, pars%sim%start)
+    if (days_before_simulation > 0) call skip_meteo_days(info_meteo, days_before_simulation)
 
-        ! Skip un-simulated info_meteo days
-        days_to_skip = min(max(0, days_before_simulation - days_before_period), pars%sim%days_in_year(y))
-        days_to_run = pars%sim%days_in_year(y) - days_to_skip
-        if (days_to_skip > 0) then
-            call skip_meteo_days(info_meteo, days_to_skip)
-        end if
-        if (days_to_run == 0) cycle year_cycle
+    n_simulation_years = min(sim_years, pars%sim%end%year - pars%sim%start%year + 1)
+
+    year_cycle: do simulation_year_idx = 1, n_simulation_years
+
+        y = pars%sim%start%year + simulation_year_idx - 1
+        year_idx = y - pars%sim%start_year + 1
+        first_simulated_doy = merge(pars%sim%start%doy, 1, y == pars%sim%start%year)
+        last_simulated_doy = merge(pars%sim%end%doy, days_in_year(y), y == pars%sim%end%year)
 
         n_week = 0
 
         ! Read irandom, landuse and irrigation method maps for the new period if needed
-        call update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, current%year,         &
+        call update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, y,                    &
                                       & alpha_ms_map, alpha_unm_map, fw_irr, a_loss, b_loss, c_loss, f_interception)
 
         ! Initialize crop calendar
-        call initialize_yearly_crop_state(pars, y, current%year, info_pheno, info_meteo, info_spat,      &
+        call initialize_yearly_crop_state(pars, year_idx, y, info_pheno, info_meteo, info_spat,          &
                                         & meteo_weight, dir_meteo, dir_phenofases, crop_map, yield, pheno)
 
         select case(pars%sim%mode)
             case (1)                                                ! USE mode
                 ! Read water sources and dynamic allocation of info_sources%deriv%qt(:,:)
-                call read_water_sources(pars%sim%days_in_year(y),pars,info_sources)
+                call read_water_sources(days_in_year(y), pars, info_sources)
                 call nom_water_supply(trim(pars%sim%watsour_path)//trim(pars%sim%watsources_fn), &
                     & irr_units, info_sources, wat_src_tbl, pars%sim%f_shapearea, info_spat%domain%header%cellsize, &
                     & info_spat%cell_area%mat, info_spat%irr_unit_id%mat, debug)
@@ -285,18 +283,17 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             case default
         end select
 
-        call initialize_yearly_outputs(pars, current%year, info_meteo, info_spat,        &
+        call initialize_yearly_outputs(pars, y, info_meteo, info_spat,                   &
                                      & irr_units, out_tbl_list, yr_map, yield, yr_deb_map)
 
         !%PS%: Divide the yearly period into output-accumulation intervals according to output time-step
         select case (pars%sim%step_out)
             case (output_monthly)
-                out_steps = monthly_interval_days(current%year, info_meteo(1)%start%month)
+                out_steps = month_lengths(y)
                 days_before_1st_interval = 0
                 step_label = 'month'
             case (output_weekly)
-                out_steps = weekly_interval_days(pars%sim%weekly_output_weekday, info_meteo(1)%start%day,          &
-                                               & info_meteo(1)%start%month, current%year, days_to_skip, days_to_run)
+                out_steps = weekly_interval_days(pars%sim%weekly_output_weekday, y)
                 days_before_1st_interval = 0
                 step_label = 'week'
             case (output_periodic)
@@ -307,8 +304,10 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         end select
 
         ! Daily simulation cycle
-        day_cycle: do day_idx = 1, days_to_run
+        day_cycle: do doy = first_simulated_doy, last_simulated_doy
+
             dos = dos + 1 ! Day of Simulation
+            year_day_idx = doy - first_simulated_doy + 1
 
             coll_irr=0           ! Irrigation matrix for collective water sources
             priv_irr=0           ! Irrigation matrix for private water sources
@@ -317,41 +316,35 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             iter1 = 0
             iter2 = 0
             h_irr = 0.
-            print*,'Simulation day', achar(9), current%doy, achar(9), 'year', achar(9), current%year
+            print*,'Simulation day', achar(9), doy, achar(9), 'year', achar(9), y
 
             ! Tries importing updated water table data into info_spat%wtab
-            if (pars%sim%f_cap_rise) call update_water_table(pars, info_spat, boundaries, current%year, current%doy)
+            if (pars%sim%f_cap_rise) call update_water_table(pars, info_spat, boundaries, y, doy)
 
-            call init_step_output_file(stp_map, pars%sim%path, itoa(current%year), day_idx, out_steps, &
-                                     & days_before_1st_interval, step_label, pars%sim                  )
-            call init_step_debug_output_file(deb_map, pars%sim%path, itoa(current%year), day_idx, out_steps, &
-                                           & days_before_1st_interval, step_label, pars%sim                  )
+            call init_step_output_file(stp_map, pars%sim%path, itoa(y), doy, out_steps,                   &
+                                     & days_before_1st_interval, first_simulated_doy, step_label, pars%sim)
+            call init_step_debug_output_file(deb_map, pars%sim%path, itoa(y), doy, out_steps,                   &
+                                           & days_before_1st_interval, first_simulated_doy, step_label, pars%sim)
 
             ! Phenological parameters spatialization
             ! Updating of pheno%kcb_old to the last day value - pheno%cult_switch is not updated
             pheno%k_cb_old = pheno%k_cb
-            if (y==pars%sim%start%year - info_meteo(1)%start%year + 1 &
-                & .and. (pars%sim%start%day > 1 .or. pars%sim%start%month > 1)) then
-                call populate_crop_pars_matrices(pheno, info_pheno, info_spat%irandom%mat, current%doy, dir_phenofases,     &
-                                               & info_spat%domain, info_spat%soil_use_id, pars%sim%days_in_year(y), crop_map)
-            else
-                call populate_crop_pars_matrices(pheno, info_pheno, info_spat%irandom%mat, day_idx, dir_phenofases,         &
-                                               & info_spat%domain, info_spat%soil_use_id, pars%sim%days_in_year(y), crop_map)
-            end if
+            call populate_crop_pars_matrices(pheno, info_pheno, info_spat%irandom%mat, doy, dir_phenofases,    &
+                                           & info_spat%domain, info_spat%soil_use_id, days_in_year(y), crop_map)
 
             !%PS%: unified flag for flooded rice special behaviour (soil params swap, irrigation)
             is_rice_paddy = info_spat%domain%mat /= info_spat%domain%header%nan .and.                 &! Is in the domain
                             pheno%irrigation_class == 1 .and.                                         &! Is an irrigable crop
                             pheno%cn_class == 7 .and.                                                 &! Is a CN=7 crop (rice)
-                            day_idx >= info_spat%irr_starts%mat .and. day_idx <= info_spat%irr_ends%mat! We are in irrigation season
+                            doy >= info_spat%irr_starts%mat .and. doy <= info_spat%irr_ends%mat! We are in irrigation season
 
             ! Creating cell parameters output on first day of simulation
-            if (day_idx == 1 .and. (pars%sim%f_out_cells .eqv. .true.))then
+            if (dos == 1 .and. (pars%sim%f_out_cells)) then
                 call write_cell_prod(out_tbl_list%prod_info, crop_map, info_spat%irandom%mat)
             end if
 
             ! Inizialization on first day of simulation
-            first_day: if(day_idx==1 .and. y==pars%sim%start%year - info_meteo(1)%start%year + 1) then
+            first_day: if (dos == 1) then
                 day_from_irr=-9999
                 esp_perc=1.
                 wat_bal1 = 0.0D0; wat_bal1_old = 0.0D0
@@ -462,14 +455,14 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             end where
 
             ! read weather daily data and calculate ET0 for each weather stations
-            call read_meteo_data(info_meteo,day_idx,pars%sim%res_canopy(y), pars%sim%forecast_day)
+            call read_meteo_data(info_meteo, doy, pars%sim%res_canopy(year_idx), pars%sim%forecast_day)
 
             ! spread weather data to the entire domain
             call create_meteo_matrices(info_meteo, dir_meteo, meteo_weight, meteo, info_spat%domain, &
-                                     & current%doy, pars%sim%res_canopy(y), pars%sim                 )
+                                     & doy, pars%sim%res_canopy(year_idx), pars%sim                  )
 
             ! calculate average latitude %PS%: switched from "forall" to an equivalent "do-do-if" structure to avoid compile-time warnings
-            if (day_idx == 1) then
+            if (dos == 1) then
                 do i=1,size(meteo%lat,1)
                     do j=1,size(meteo%lat,2)
                         if (meteo%lat(i,j)/=nan_r) then
@@ -482,7 +475,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             end if
 
             ! calculate day length
-            call calculateDLH(current%doy, lat_mean, DLH)
+            call calculateDLH(doy, lat_mean, DLH)
             ! calculate radiation distribution along day and update params
             pars%fet0 = pdf_normal(cost_hrs, 12.5D0, DLH/5)
 
@@ -508,8 +501,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             end do
 
             ! if outside irrigation season restore default, indipendently from methods
-            where (day_idx<info_spat%irr_starts%mat .or. day_idx>info_spat%irr_ends%mat)
-                info_spat%h_maxpond%mat=pars%sim%h_maxpond
+            where (doy < info_spat%irr_starts%mat .or. doy > info_spat%irr_ends%mat)
+                info_spat%h_maxpond%mat = pars%sim%h_maxpond
             end where
 
             ! define irrigation height base on irrigation period and specific condiction
@@ -523,17 +516,17 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                     ! %EAC%: as the irrigation season can change with the irrigation methods,
                     ! q_surplus is updated at the beginning of the year
                     ! TODO: manage condition when irrigation season is in winter
-                    if (day_idx==1) irr_units(:)%q_rem = 0
+                    if (doy==1) irr_units(:)%q_rem = 0
 
                     ! calculate the daily water duty for each irrigation unit, considering the water distribution efficiency
-                    call calc_daily_duty(day_idx, irr_units, info_sources, wat_src_tbl, info_spat%irr_unit_id,       &
+                    call calc_daily_duty(doy, irr_units, info_sources, wat_src_tbl, info_spat%irr_unit_id,           &
                                        & info_spat%domain, pars, pheno%irrigation_class,                         &
                                        & info_spat%irr_meth_id%mat, (wat_bal1_old%h_soil + wat_bal2_old%h_soil), &
                                        & (wat_bal1_old%h_transp_pot + wat_bal2_old%h_transp_pot),                &
                                        & wat_bal2%h_raw, (wat%layer(1)%h_fc + wat%layer(2)%h_fc)                 )
 
                     ! %EAC%: save irrigation units results
-                    call save_irr_unit_debug_data(day_idx, out_tbl_list, irr_units)
+                    call save_irr_unit_debug_data(doy, out_tbl_list, irr_units)
 
                     !%PS%: precompute tentative irrigation depth for rice so that USE mode can treat it as a fixed height
                     !      (whether irrigation can actually be supplied is decided in irrigation_use).
@@ -550,11 +543,11 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                                       & irr_units, (wat_bal1_old%h_transp_pot+wat_bal2_old%h_transp_pot),                       &
                                       & (wat_bal1_old%h_soil + wat_bal2_old%h_soil),                                            &
                                       & wat_bal2%h_raw_sup, wat_bal2%h_raw_inf, wat_bal2%h_raw, wat_bal2%h_raw_priv,            &
-                                      & h_irr, day_idx, priv_irr, coll_irr, pars%sim%f_shapearea, info_spat%cell_area%mat,          &
+                                      & h_irr, doy, priv_irr, coll_irr, pars%sim%f_shapearea, info_spat%cell_area%mat,          &
                                       & h_met_use, info_spat%irr_starts%mat, info_spat%irr_ends%mat, pheno%cn_class             )
 
                     ! %EAC%: save irrigation units results
-                    call save_irr_unit_data(day_idx, out_tbl_list, irr_units, pars%cr%n_withdrawals)
+                    call save_irr_unit_data(doy, out_tbl_list, irr_units, pars%cr%n_withdrawals)
 
                     ! update irrigation losses
                     call calc_irrigation_losses(a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min), irr_loss)
@@ -572,7 +565,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                                           & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, is_rice_paddy, pars%sim%fc_ratio)
                     ! if outside the irrigation period, set irrigation height to zero
                     do z=1, pars%sim%n_irr_meth
-                        where(day_idx<info_spat%irr_starts%mat .or. day_idx>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
+                        where(doy<info_spat%irr_starts%mat .or. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
                     end do
                     irr_loss = 0. ! not consider irrigation losses
 
@@ -584,19 +577,19 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                     ! if outside the irrigation period, set irrigation height to zero
                     ! and calculate net irrigation
                     do z=1, pars%sim%n_irr_meth
-                        where(day_idx<info_spat%irr_starts%mat .or. day_idx>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
+                        where(doy<info_spat%irr_starts%mat .or. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
                         h_irr(:,:,z) = h_irr(:,:,z) * (1.0-irr_loss/100.0)
                     end do
 
                 case (4)! SCHEDULED mode
-                    call irrigation_scheduled(info_spat, current%doy, current%year, irr_sch, pheno, &
+                    call irrigation_scheduled(info_spat, doy, y, irr_sch, pheno, &
                         & h_irr, debug, wat_bal1_old, wat_bal2, wat_bal2_old, &
                         & a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min),irr_loss,&
                         wat_bal1%h_eff_rain, theta2_rice%k_sat_2, is_rice_paddy, wat%layer(2)%h_sat)
                     ! if outside the irrigation period, set irrigation height to zero
                     ! and calculate net irrigation
                     do z=1, pars%sim%n_irr_meth
-                        where(day_idx<info_spat%irr_starts%mat .or. day_idx>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
+                        where(doy<info_spat%irr_starts%mat .or. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
                         h_irr(:,:,z) = h_irr(:,:,z) * (1.0-irr_loss/100.0)
                     end do
 
@@ -700,7 +693,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                                 & wat%wat1_rew(i,j), wat%layer(1)%h_sat(i,j), wat%layer(1)%h_fc(i,j), &
                                 & wat%layer(1)%h_wp(i,j), wat%layer(1)%h_r(i,j), &
                                 & info_spat%k_sat(1)%mat(i,j), info_spat%fact_n(1)%mat(i,j), &
-                                & wat_bal_hour%n_iter1(i,j), esp_perc(i,j,1), wat_bal_hour%n_max1(i,j),day_idx)
+                                & wat_bal_hour%n_iter1(i,j), esp_perc(i,j,1), wat_bal_hour%n_max1(i,j), doy)
 
                             ! water balance for the transpirative layer
                             call water_balance_transp_lay(wat_bal_hour%inten%h_soil2(i,j), wat_bal_hour%esten%h_transp_act2(i,j), &
@@ -718,7 +711,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                                 & info_spat%b1%mat(i,j), info_spat%b2%mat(i,j), &
                                 & info_spat%b3%mat(i,j), info_spat%b4%mat(i,j), &
                                 & wat_bal2%depth_under_rz(i,j), wat_bal_hour%n_iter2(i,j), &
-                                & esp_perc(i,j,2),pars%sim%f_cap_rise, wat_bal_hour%n_max2(i,j),day_idx)
+                                & esp_perc(i,j,2),pars%sim%f_cap_rise, wat_bal_hour%n_max2(i,j), doy)
 
                         end if
 
@@ -769,7 +762,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                         do i=1,size(out_tbl_list%cell_conv)
                             xx=out_tbl_list%cell_conv(i)%coord%row
                             yy=out_tbl_list%cell_conv(i)%coord%col
-                            write(out_tbl_list%cell_conv(i)%file%unit,'(i3,a1,i2,a1,(2(i2,a1,i4,a1)))')day_idx,'; ',hour,'; ',&
+                            write(out_tbl_list%cell_conv(i)%file%unit,'(i3,a1,i2,a1,(2(i2,a1,i4,a1)))')doy,'; ',hour,'; ',&
                                 & wat_bal_hour%n_max1(xx,yy), '; ', wat_bal_hour%n_iter1(xx,yy), '; ',&
                                 & wat_bal_hour%n_max2(xx,yy), '; ',wat_bal_hour%n_iter2(xx,yy)
                         end do
@@ -778,7 +771,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             end do hr_loop
 
             ! update the soil water content (dimensionless)
-            if(day_idx == pars%sim%days_in_year(y)) then
+            if (doy == last_simulated_doy) then
                 where(info_spat%domain%mat /= info_spat%domain%header%nan)
                     info_spat%theta(1)%old%mat = wat_bal1%h_soil/(1000.*wat_bal1%d_e)
                     info_spat%theta(2)%old%mat = wat_bal2%h_soil/(1000.*wat_bal2%d_t)
@@ -795,17 +788,20 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             wat_bal1%h_pond = min(wat_bal_hour%esten%h_pond,info_spat%h_maxpond%mat)
             !wat_bal1%h_pond = wat_bal_hour%esten%h_pond
 
-            call accumulate_daily_yield(yield, pheno, crop_map, meteo, wat_bal1, wat_bal2, info_spat%domain, day_idx)
+            call accumulate_daily_yield(yield, pheno, crop_map, meteo, wat_bal1, wat_bal2, info_spat%domain, doy)
 
             ! calculate transpiration deficit index
             if (trim(pars_TDx%mode)/="none") then
-                call sum_TD(wat_bal1%h_transp_act+wat_bal2%h_transp_act,wat_bal1%h_transp_pot+wat_bal2%h_transp_pot,pheno%k_cb,dos,y,TD)
+                call sum_TD(wat_bal1%h_transp_act+wat_bal2%h_transp_act, wat_bal1%h_transp_pot+wat_bal2%h_transp_pot, &
+                          & pheno%k_cb, dos, TD)
                 do cont_td=1,pars_TDx%temp%n_ind     ! update TD values
-                    call calc_TDx(info_spat%domain, dos, y, tot_deficit(:,:,cont_td), pheno%k_cb,pars%sim%days_in_year(y), sim_years, &
-                        & pars_TDx%temp%x(cont_td), TD,unit_Dxi(cont_td)%dxi)
+                    call calc_TDx(info_spat%domain, dos,                                                 &
+                                & simulation_year_idx == n_simulation_years .and. doy == last_simulated_doy, &
+                                & tot_deficit(:,:,cont_td), pheno%k_cb, pars_TDx%temp%x(cont_td), TD,    &
+                                & unit_Dxi(cont_td)%dxi)
                 end do
                 ! TODO: check if the following is necessary in "report" mode
-                if(mod((day_idx - pars_TDx%temp%delay),pars_TDx%temp%td)==0)then
+                if(mod((year_day_idx - pars_TDx%temp%delay),pars_TDx%temp%td)==0)then
                     n_week = n_week +1
                     do cont_td=1,pars_TDx%temp%n_ind ! calculate the sum over the integration period
                         write(str_td,*)pars_TDx%temp%x(cont_td)
@@ -816,13 +812,13 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 end if
             end if
 
-            call write_daily_output (day_idx, meteo, info_meteo, pheno, h_irr_sum, wat_bal1, wat_bal2, wat_bal2_old, &
-                & info_spat, pars, wat, wat_bal_hour, fw_day, fw_old, esp_perc, out_cn, out_cn_day, h_bypass, coll_irr, priv_irr, out_tbl_list, &
-                & pars%sim%mode,pars%sim%f_out_cells,pars%sim) !! %RR% fw_old
+            call write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal1, wat_bal2, wat_bal2_old, info_spat, &
+                                   & pars, wat, wat_bal_hour, fw_day, fw_old, esp_perc, out_cn, out_cn_day, h_bypass,       &
+                                   & coll_irr, priv_irr, out_tbl_list, pars%sim%mode, pars%sim%f_out_cells, pars%sim        )
 
             ! save output files by step
-            call write_outputs_by_step(day_idx, meteo, h_irr_sum, wat_bal1, wat_bal2, info_spat, coll_irr, priv_irr, &
-                                     & stp_map, deb_map, h_bypass, out_steps, days_before_1st_interval, summary      )
+            call write_outputs_by_step(doy, meteo, h_irr_sum, wat_bal1, wat_bal2, info_spat, coll_irr, priv_irr, stp_map, &
+                                     & deb_map, h_bypass, out_steps, days_before_1st_interval, last_simulated_doy, summary)
 
             ! save to file the output bu year
             yr_map%rain%mat = yr_map%rain%mat + meteo%p
@@ -932,44 +928,19 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
 end subroutine simulation_manager
 
-! Return month lengths in simulation-period order, beginning with period_start_month
-function monthly_interval_days(year, period_start_month) result(interval_days)
-    integer, intent(in) :: year, period_start_month
-    integer, dimension(12) :: interval_days, calendar_month_days
-    integer :: february_year
-
-    february_year = year
-    if (period_start_month > 2) february_year = february_year + 1
-
-    calendar_month_days = month_lengths(february_year)
-    interval_days = cshift(calendar_month_days, period_start_month - 1)
-end function monthly_interval_days
-
-function weekly_interval_days(weekly_output_weekday, period_start_day, period_start_month, year, skipped_days, simulated_days) &
-                                                                                                       & result(interval_days)
-    integer, intent(in) :: weekly_output_weekday
-    integer, intent(in) :: period_start_day, period_start_month, year
-    integer, intent(in) :: skipped_days, simulated_days
+! Divide a calendar year into intervals ending on weekly_output_weekday.
+function weekly_interval_days(weekly_output_weekday, year) result(interval_days)
+    integer, intent(in) :: weekly_output_weekday, year
     integer, allocatable :: interval_days(:)
     integer, parameter :: days_per_week = 7
-    integer :: period_start_weekday, simulation_start_weekday
-    integer :: first_interval_days, remaining_days, n_intervals, interval_idx
+    integer :: first_interval_days, remaining_days, n_intervals, interval_idx, year_days
 
-    if (simulated_days <= 0) then
-        allocate(interval_days(0))
-        return
-    end if
-
-    period_start_weekday = day_of_week(period_start_day, period_start_month, year)
-    simulation_start_weekday = modulo(period_start_weekday - 1 + skipped_days, days_per_week) + 1
-
-    ! Include both the first simulated day and the requested closing weekday.
-    first_interval_days = modulo(weekly_output_weekday - simulation_start_weekday, days_per_week) + 1
-    first_interval_days = min(first_interval_days, simulated_days)
-    n_intervals = 1 + (simulated_days - first_interval_days + days_per_week - 1) / days_per_week
+    year_days = days_in_year(year)
+    first_interval_days = modulo(weekly_output_weekday - day_of_week(1, 1, year), days_per_week) + 1
+    n_intervals = 1 + (year_days - first_interval_days + days_per_week - 1) / days_per_week
     allocate(interval_days(n_intervals))
 
-    remaining_days = simulated_days
+    remaining_days = year_days
     do interval_idx = 1, n_intervals
         if (interval_idx == 1) then
             interval_days(interval_idx) = first_interval_days
@@ -978,7 +949,6 @@ function weekly_interval_days(weekly_output_weekday, period_start_day, period_st
         end if
         remaining_days = remaining_days - interval_days(interval_idx)
     end do
-
 end function weekly_interval_days
 
 function periodic_interval_days(period_start_doy, period_end_doy, period_days) result(interval_days)
@@ -994,7 +964,6 @@ function periodic_interval_days(period_start_doy, period_end_doy, period_days) r
     allocate(interval_days(n_intervals))
     interval_days = period_days
     interval_days(n_intervals) = n_output_days - period_days * (n_intervals - 1)
-
 end function periodic_interval_days
 
 subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, year, alpha_ms_map, &
@@ -1124,7 +1093,7 @@ subroutine initialize_yearly_crop_state(pars, year_idx, year, info_pheno, info_m
     integer :: i, j, z, crop_slot
 
     ! Allocate and fill info_pheno
-    call read_all_crop_pars(pars%sim%days_in_year(year_idx), pars%sim%n_lus, info_pheno)
+    call read_all_crop_pars(days_in_year(year), pars%sim%n_lus, info_pheno)
     call check_pheno_parameters(info_pheno, info_meteo)
 
     ! Randomization and spatial distribution of crop emergence
@@ -1132,8 +1101,8 @@ subroutine initialize_yearly_crop_state(pars, year_idx, year, info_pheno, info_m
         call get_uniform_sample(info_spat%irandom%mat, pars%sim%sowing_range, pars%sim%rand_symmetry, pars%sim%repeatable)
     end if
     call allocate_crop_map(crop_map, info_spat%domain%mat, pars%sim%n_crops, info_spat%domain%header%nan)
-    call make_random_emergence(info_pheno,meteo_weight,dir_meteo,info_spat%domain,info_spat%soil_use_id%mat, &
-                             & crop_map, info_spat%irandom%mat, pars%sim%days_in_year(year_idx)              )
+    call make_random_emergence(info_pheno, meteo_weight, dir_meteo, info_spat%domain, info_spat%soil_use_id%mat, &
+                             & crop_map, info_spat%irandom%mat, days_in_year(year)                               )
 
     ! Spread crop yield parameters across the domain
     call populate_crop_yield_matrices(info_pheno, dir_phenofases, info_spat%domain, info_spat%soil_use_id%mat, crop_map, year_idx)
@@ -1391,10 +1360,10 @@ subroutine write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal
     end if
 end subroutine write_daily_output
 
-subroutine write_outputs_by_step(day_idx, meteo, irrigation_sum, bil1, bil2, info_spat, coll_irr, priv_irr, &
-                               & asc, deb_asc, hbypass, interval_days, days_before_1st_interval, summary)
+subroutine write_outputs_by_step(doy, meteo, irrigation_sum, bil1, bil2, info_spat, coll_irr, priv_irr, asc,           &
+                               & deb_asc, hbypass, interval_days, days_before_1st_interval, last_simulated_doy, summary)
     ! writes periodic (monthly/weekly/custom) output in *.asc files
-    integer, intent(in) :: day_idx
+    integer, intent(in) :: doy
     type(meteo_mat), intent(in):: meteo
     real(dp), dimension(:,:), intent(in):: irrigation_sum
     real(dp), dimension(:,:), intent(in):: hbypass
@@ -1406,6 +1375,7 @@ subroutine write_outputs_by_step(day_idx, meteo, irrigation_sum, bil1, bil2, inf
     type(step_debug_map), intent(inout):: deb_asc
     integer, dimension(:), intent(in) :: interval_days
     integer, intent(in) :: days_before_1st_interval
+    integer, intent(in) :: last_simulated_doy
     logical, intent(in)::summary
 
     asc%runoff%mat = asc%runoff%mat + bil1%h_runoff
@@ -1429,12 +1399,12 @@ subroutine write_outputs_by_step(day_idx, meteo, irrigation_sum, bil1, bil2, inf
     deb_asc%h_soil2%mat = bil2%h_soil
 
     if (summary .eqv. .false.) then
-        call save_step_data(asc, day_idx, info_spat%domain, interval_days, days_before_1st_interval)
+        call save_step_data(asc, doy, info_spat%domain, interval_days, days_before_1st_interval, last_simulated_doy)
     else
-        call save_step_irrigation(asc, day_idx, info_spat%domain, interval_days, days_before_1st_interval)
+        call save_step_irrigation(asc, doy, info_spat%domain, interval_days, days_before_1st_interval, last_simulated_doy)
     end if
 
-    call save_debug_step_data(deb_asc, day_idx, info_spat%domain, interval_days, days_before_1st_interval)
+    call save_debug_step_data(deb_asc, doy, info_spat%domain, interval_days, days_before_1st_interval, last_simulated_doy)
 
 end subroutine write_outputs_by_step
 

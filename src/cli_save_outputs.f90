@@ -749,12 +749,14 @@ subroutine destroy_annual_debug_output(dbg_yr_map)
 end subroutine destroy_annual_debug_output
 
 ! TODO: update name of the output file
-subroutine init_step_output_file(a_step_map, path, yr, day_idx, interval_days, days_before_1st_interval, string, sim)
+subroutine init_step_output_file(a_step_map, path, yr, doy, interval_days, days_before_1st_interval, &
+                               & first_simulated_doy, string, sim)
     character(len=*),intent(in)::path
-    integer, intent(in) :: day_idx
+    integer, intent(in) :: doy
     character(len=*),intent(in)::yr
     integer, dimension(:), intent(in) :: interval_days
     integer, intent(in) :: days_before_1st_interval
+    integer, intent(in) :: first_simulated_doy
     character(len=*),intent(in)::string
     type(step_map),intent(inout)::a_step_map
     integer :: interval_idx, interval_start_day, interval_end_day
@@ -767,7 +769,7 @@ subroutine init_step_output_file(a_step_map, path, yr, day_idx, interval_days, d
         interval_end_day = interval_end_day + interval_days(interval_idx)
         interval_start_day = interval_end_day - interval_days(interval_idx) + 1
 
-        if (day_idx == interval_start_day) then
+        if (doy == max(interval_start_day, first_simulated_doy) .and. interval_end_day >= first_simulated_doy) then
             write(step,*) interval_idx
             step=trim(adjustl(string))//trim(adjustl(step))//'_'
             year=trim(adjustl(yr))//'_'
@@ -785,7 +787,7 @@ subroutine init_step_output_file(a_step_map, path, yr, day_idx, interval_days, d
             if (sim%prt_stp_et_act=='y') a_step_map%et_act%fn=trim(adjustl(trim(path)//trim(adjustl(year))//trim(adjustl(step))//'et_act.asc'))
             a_step_map = 0.0D0    ! init to zero
             exit
-        else if (day_idx < interval_start_day) then
+        else if (doy < interval_start_day) then
             exit
         else
             cycle
@@ -793,12 +795,14 @@ subroutine init_step_output_file(a_step_map, path, yr, day_idx, interval_days, d
     end do
 end subroutine init_step_output_file
 
-subroutine init_step_debug_output_file(a_dbg_map, path, yr, day_idx, interval_days, days_before_1st_interval, string, sim)
+subroutine init_step_debug_output_file(a_dbg_map, path, yr, doy, interval_days, days_before_1st_interval, &
+                                     & first_simulated_doy, string, sim)
     character(len=*),intent(in)::path
-    integer, intent(in) :: day_idx
+    integer, intent(in) :: doy
     character(len=*),intent(in)::yr
     integer, dimension(:), intent(in) :: interval_days
     integer, intent(in) :: days_before_1st_interval
+    integer, intent(in) :: first_simulated_doy
     character(len=*),intent(in)::string
     type(step_debug_map),intent(inout)::a_dbg_map
     integer :: interval_idx, interval_start_day, interval_end_day
@@ -811,7 +815,7 @@ subroutine init_step_debug_output_file(a_dbg_map, path, yr, day_idx, interval_da
         interval_end_day = interval_end_day + interval_days(interval_idx)
         interval_start_day = interval_end_day - interval_days(interval_idx) + 1
 
-        if (day_idx == interval_start_day) then
+        if (doy == max(interval_start_day, first_simulated_doy) .and. interval_end_day >= first_simulated_doy) then
             write(step,*) interval_idx
             step=trim(adjustl(string))//trim(adjustl(step))//'_'
             year=trim(adjustl(yr))//'_'
@@ -823,7 +827,7 @@ subroutine init_step_debug_output_file(a_dbg_map, path, yr, day_idx, interval_da
             if (sim%prt_dbg_h_soil2=='y') a_dbg_map%h_soil2%fn=trim(adjustl(trim(path)//trim(adjustl(year))//trim(adjustl(step))//'theta2.asc'))
             a_dbg_map = 0.0D0 ! set to zero after
             exit
-        else if (day_idx < interval_start_day) then
+        else if (doy < interval_start_day) then
             exit
         else
             cycle
@@ -889,19 +893,22 @@ subroutine init_debug_yearly_output_file(a_yr_dbg_map,path,year,sim)
     a_yr_dbg_map = 0.0D0    ! set to zero
 end subroutine init_debug_yearly_output_file
 
-subroutine save_step_data(a_step_map, day_idx, domain, interval_days, days_before_1st_interval)
+subroutine save_step_data(a_step_map, doy, domain, interval_days, days_before_1st_interval, last_simulated_doy)
     ! Save the results aggregated by step on the last day of each interval.
     type(step_map),intent(inout)::a_step_map
-    integer, intent(in) :: day_idx
+    integer, intent(in) :: doy
     type(grid_i),intent(in)::domain
     integer, dimension(:), intent(in)::interval_days
     integer, intent(in) :: days_before_1st_interval
+    integer, intent(in) :: last_simulated_doy
     integer :: interval_idx, interval_end_day
     interval_end_day = days_before_1st_interval
 
     do interval_idx = 1, size(interval_days)
         interval_end_day = interval_end_day + interval_days(interval_idx)
-        if (day_idx == interval_end_day) then
+        if (interval_end_day - interval_days(interval_idx) + 1 > last_simulated_doy) exit
+
+        if (doy == min(interval_end_day, last_simulated_doy)) then
             where(domain%mat==domain%header%nan)
                 a_step_map%rain%mat=real(domain%header%nan)
                 a_step_map%transp_act%mat=real(domain%header%nan)
@@ -935,19 +942,22 @@ subroutine save_step_data(a_step_map, day_idx, domain, interval_days, days_befor
     end do
 end subroutine save_step_data
 
-subroutine save_step_irrigation(a_step_map, day_idx, domain, interval_days, days_before_1st_interval)
+subroutine save_step_irrigation(a_step_map, doy, domain, interval_days, days_before_1st_interval, last_simulated_doy)
     ! save only irrigation map
     type(step_map),intent(inout)::a_step_map
-    integer, intent(in) :: day_idx
+    integer, intent(in) :: doy
     type(grid_i),intent(in)::domain
     integer, dimension(:), intent(in) :: interval_days
     integer, intent(in) :: days_before_1st_interval
+    integer, intent(in) :: last_simulated_doy
     integer :: interval_idx, interval_end_day
     interval_end_day = days_before_1st_interval
 
     do interval_idx = 1, size(interval_days)
         interval_end_day = interval_end_day + interval_days(interval_idx)
-        if (day_idx == interval_end_day) then
+        if (interval_end_day - interval_days(interval_idx) + 1 > last_simulated_doy) exit
+
+        if (doy == min(interval_end_day, last_simulated_doy)) then
             where(domain%mat==domain%header%nan)
                 a_step_map%irr%mat=real(domain%header%nan)
             end where
@@ -958,19 +968,22 @@ subroutine save_step_irrigation(a_step_map, day_idx, domain, interval_days, days
     end do
 end subroutine save_step_irrigation
 
-subroutine save_debug_step_data(a_debug_asc, day_idx, domain, interval_days, days_before_1st_interval)
+subroutine save_debug_step_data(a_debug_asc, doy, domain, interval_days, days_before_1st_interval, last_simulated_doy)
     ! Save debug results aggregated by step on the last day of each interval.
     type(step_debug_map),intent(inout)::a_debug_asc
-    integer, intent(in) :: day_idx
+    integer, intent(in) :: doy
     type(grid_i),intent(in)::domain
     integer, dimension(:), intent(in) :: interval_days
     integer, intent(in) :: days_before_1st_interval
+    integer, intent(in) :: last_simulated_doy
     integer :: interval_idx, interval_end_day
     interval_end_day = days_before_1st_interval
 
     do interval_idx = 1, size(interval_days)
         interval_end_day = interval_end_day + interval_days(interval_idx)
-        if (day_idx == interval_end_day) then
+        if (interval_end_day - interval_days(interval_idx) + 1 > last_simulated_doy) exit
+
+        if (doy == min(interval_end_day, last_simulated_doy)) then
             where(domain%mat==domain%header%nan)
                 a_debug_asc%eva_act%mat=real(domain%header%nan)
                 a_debug_asc%eff_rain%mat=real(domain%header%nan)

@@ -1,6 +1,6 @@
 module mod_meteo
 use mod_constants, only: dp
-use mod_date, only: date, month_lengths, split_date, days_between_dates, dates_are_equal, date_is_before
+use mod_date, only: date, days_in_year, split_date, days_between_dates, dates_are_equal, date_is_before
 use mod_utility, only: lower_case
 use mod_parameters, only: simulation, par_method
 use mod_evapotranspiration, only: ET_reference
@@ -57,7 +57,6 @@ subroutine meteo_series_length(sim, verbose)
     integer::k
     real(dp)::value
     integer::count,gg_count,gg_in_yy, gg_diff
-    integer, dimension(12) :: days_in_month
 
     call read_meteo_parameters(sim,info_meteo,verbose)
 
@@ -111,8 +110,7 @@ subroutine meteo_series_length(sim, verbose)
     sim%start_year = info_meteo(1)%start%year ! first year
     do
         sim%meteo_years=sim%meteo_years+1
-        days_in_month = month_lengths(sim%start_year + sim%meteo_years - 1)
-        gg_in_yy = gg_in_yy + sum(days_in_month)
+        gg_in_yy = gg_in_yy + days_in_year(sim%start_year + sim%meteo_years - 1)
         if(gg_in_yy>=gg_count) exit
     end do
     sim%sim_years=sim%meteo_years
@@ -125,8 +123,7 @@ subroutine meteo_series_length(sim, verbose)
         sim%start_year = info_meteo(1)%start%year ! first year
         do
             sim%sim_years=sim%sim_years+1
-            days_in_month = month_lengths(sim%start_year + sim%sim_years - 1)
-            gg_in_yy = gg_in_yy + sum(days_in_month)
+            gg_in_yy = gg_in_yy + days_in_year(sim%start_year + sim%sim_years - 1)
             if(gg_in_yy>=gg_count) exit
         end do
     end if
@@ -139,11 +136,10 @@ subroutine meteo_series_length(sim, verbose)
     do k=1,sim%sim_years
         if(k/=sim%sim_years)then
             if (info_meteo(1)%start%month > 2) then
-                days_in_month = month_lengths(sim%start_year + k)
+                sim%days_in_year(k) = days_in_year(sim%start_year + k)
             else
-                days_in_month = month_lengths(sim%start_year + k - 1)
+                sim%days_in_year(k) = days_in_year(sim%start_year + k - 1)
             end if
-            sim%days_in_year(k) = sum(days_in_month)
         else ! the last year fo the dataset could be uncompleted
             sim%days_in_year(k)=gg_count-sum(sim%days_in_year)
         end if

@@ -30,6 +30,14 @@ pure function month_lengths(year) result(days_in_month)
     end if
 end function month_lengths
 
+! Return the number of days in the supplied calendar year.
+pure function days_in_year(year) result(n_days)
+    integer, intent(in) :: year
+    integer :: n_days
+
+    n_days = sum(month_lengths(year))
+end function days_in_year
+
 ! Return the calendar day of year [1, 365/366].
 pure function get_doy(day, month, year) result(doy)
     integer, intent(in) :: day, month, year

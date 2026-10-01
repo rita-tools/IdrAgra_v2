@@ -21,11 +21,11 @@ end type TDx_index
 
 contains
 
-subroutine calc_TDx(domain,gg,year,DxiTOT,kcb,gg_max,max_year,x,TD,unit_Dxi)
+subroutine calc_TDx(domain, gg, is_last_simulation_day, DxiTOT, kcb, x, TD, unit_Dxi)
    type(grid_i),intent(in)::domain
-    integer,intent(in)::gg,year
+    integer,intent(in)::gg
+    logical, intent(in) :: is_last_simulation_day
     real(dp),dimension(:,:),intent(in)::kcb
-    integer,intent(in)::gg_max,max_year
     real(dp),dimension(size(domain%mat,1),size(domain%mat,2)),intent(out)::DxiTOT
     integer,intent(in)::x
     integer,dimension(:),intent(inout)::unit_Dxi
@@ -36,7 +36,7 @@ subroutine calc_TDx(domain,gg,year,DxiTOT,kcb,gg_max,max_year,x,TD,unit_Dxi)
     real(dp),parameter::nan=-9999.
 
     Dxi_temp = 0.
-    if(gg==1 .and. year==1)then
+    if(gg==1)then
         do i=1,size(unit_Dxi)
             open(newunit=unit_Dxi(i), status='scratch', form='unformatted', &
                 & action = 'readwrite', iostat = ios)
@@ -97,7 +97,7 @@ subroutine calc_TDx(domain,gg,year,DxiTOT,kcb,gg_max,max_year,x,TD,unit_Dxi)
         stop
     end if
     !deallocates Dxi files on last day of simulation
-    if(year==max_year .and. gg==gg_max)then
+    if (is_last_simulation_day) then
         do i=1,size(unit_Dxi)
             close(unit_Dxi(i),iostat=ios)
             if(ios/=0)then
@@ -447,15 +447,15 @@ subroutine make_TDx_report(domain,path,n_week,TDx)
     call print_mat_as_grid(filename,domain%header,mat)
 end subroutine make_TDx_report
 
-subroutine sum_TD(transp_act,transp_pot,k_cb,doy,year,TD)
+subroutine sum_TD(transp_act, transp_pot, k_cb, dos, TD)
    real(dp),dimension(:,:),intent(in)::transp_act,transp_pot
-    integer,intent(in)::doy,year
+    integer,intent(in)::dos
     real(dp),dimension(:,:),intent(in)::k_cb
     real(dp),dimension(:,:),intent(inout)::TD
     real(dp),parameter::nan = -nan_r
 
     ! TD is NaN outside the growing period (k_cb /= 0)
-    if(doy==1 .and. year==1) TD=0.
+    if(dos==1) TD=0.
     where(k_cb/=0.)
         where(TD==nan)TD=0.
         TD = TD+(transp_pot-transp_act)
