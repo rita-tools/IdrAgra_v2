@@ -65,7 +65,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     type(scheduled_irrigation),dimension(:),allocatable::irr_sch ! Allocated in 'open_scheduled_irrigation' function
     type(crop_matrices)::crop_map
 
-    integer :: i, j, k, y, period_start_year, day_idx, hour, z ! for cycles
+    integer :: i, j, k, y, day_idx, hour, z ! for cycles
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::dir_phenofases
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::dir_meteo
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,size(info_spat%weight_ws))::meteo_weight
@@ -96,7 +96,6 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     integer::cont_td    ! cycles
     character(len=33)::str_td
     character(len=255) :: str_delete
-    character(len=:), allocatable :: period_label
     !! percolation model
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::day_from_irr ! days past from the latest irrigation event
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,2)::esp_perc  ! exponent of the percolation model
@@ -265,20 +264,12 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 
         n_week = 0
 
-        ! Set the label for this period: input/output files use yyyy suffixes for simulations beginning at january 1, and yyyy-yyyy for all other cases
-        period_start_year = pars%sim%start_year + y - 1
-        if (info_meteo(1)%start%month /= 1 .or. info_meteo(1)%start%day /= 1) then
-            period_label = itoa(period_start_year)//'-'//itoa(period_start_year+1)
-        else
-            period_label = itoa(period_start_year)
-        end if
-
         ! Read irandom, landuse and irrigation method maps for the new period if needed
-        call update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, period_label,         &
+        call update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, current%year,         &
                                       & alpha_ms_map, alpha_unm_map, fw_irr, a_loss, b_loss, c_loss, f_interception)
 
         ! Initialize crop calendar
-        call initialize_yearly_crop_state(pars, y, period_label, info_pheno, info_meteo, info_spat,      &
+        call initialize_yearly_crop_state(pars, y, current%year, info_pheno, info_meteo, info_spat,      &
                                         & meteo_weight, dir_meteo, dir_phenofases, crop_map, yield, pheno)
 
         select case(pars%sim%mode)
@@ -294,18 +285,18 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             case default
         end select
 
-        call initialize_yearly_outputs(pars, period_label, period_start_year, info_meteo, info_spat, &
-            & irr_units, out_tbl_list, yr_map, yield, yr_deb_map)
+        call initialize_yearly_outputs(pars, current%year, info_meteo, info_spat,        &
+                                     & irr_units, out_tbl_list, yr_map, yield, yr_deb_map)
 
         !%PS%: Divide the yearly period into output-accumulation intervals according to output time-step
         select case (pars%sim%step_out)
             case (output_monthly)
-                out_steps = monthly_interval_days(period_start_year, info_meteo(1)%start%month)
+                out_steps = monthly_interval_days(current%year, info_meteo(1)%start%month)
                 days_before_1st_interval = 0
                 step_label = 'month'
             case (output_weekly)
-                out_steps = weekly_interval_days(pars%sim%weekly_output_weekday, info_meteo(1)%start%day,               &
-                                               & info_meteo(1)%start%month, period_start_year, days_to_skip, days_to_run)
+                out_steps = weekly_interval_days(pars%sim%weekly_output_weekday, info_meteo(1)%start%day,          &
+                                               & info_meteo(1)%start%month, current%year, days_to_skip, days_to_run)
                 days_before_1st_interval = 0
                 step_label = 'week'
             case (output_periodic)
@@ -326,15 +317,15 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             iter1 = 0
             iter2 = 0
             h_irr = 0.
-            print*,'Simulation day', achar(9), day_idx, achar(9), 'year', achar(9), period_start_year
+            print*,'Simulation day', achar(9), current%doy, achar(9), 'year', achar(9), current%year
 
             ! Tries importing updated water table data into info_spat%wtab
-            if (pars%sim%f_cap_rise) call update_water_table(pars, info_spat, boundaries, period_start_year, day_idx)
+            if (pars%sim%f_cap_rise) call update_water_table(pars, info_spat, boundaries, current%year, current%doy)
 
-            call init_step_output_file(stp_map, pars%sim%path, period_label, day_idx, out_steps, &
-                                     & days_before_1st_interval, step_label, pars%sim                     )
-            call init_step_debug_output_file(deb_map, pars%sim%path, period_label, day_idx, out_steps, &
-                                           & days_before_1st_interval, step_label, pars%sim                     )
+            call init_step_output_file(stp_map, pars%sim%path, itoa(current%year), day_idx, out_steps, &
+                                     & days_before_1st_interval, step_label, pars%sim                  )
+            call init_step_debug_output_file(deb_map, pars%sim%path, itoa(current%year), day_idx, out_steps, &
+                                           & days_before_1st_interval, step_label, pars%sim                  )
 
             ! Phenological parameters spatialization
             ! Updating of pheno%kcb_old to the last day value - pheno%cult_switch is not updated
@@ -349,9 +340,9 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             end if
 
             !%PS%: unified flag for flooded rice special behaviour (soil params swap, irrigation)
-            is_rice_paddy = info_spat%domain%mat /= info_spat%domain%header%nan .and.         &! Is in the domain
-                            pheno%irrigation_class == 1 .and.                                 &! Is an irrigable crop
-                            pheno%cn_class == 7 .and.                                         &! Is a CN=7 crop (rice)
+            is_rice_paddy = info_spat%domain%mat /= info_spat%domain%header%nan .and.                 &! Is in the domain
+                            pheno%irrigation_class == 1 .and.                                         &! Is an irrigable crop
+                            pheno%cn_class == 7 .and.                                                 &! Is a CN=7 crop (rice)
                             day_idx >= info_spat%irr_starts%mat .and. day_idx <= info_spat%irr_ends%mat! We are in irrigation season
 
             ! Creating cell parameters output on first day of simulation
@@ -942,22 +933,22 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
 end subroutine simulation_manager
 
 ! Return month lengths in simulation-period order, beginning with period_start_month
-function monthly_interval_days(period_start_year, period_start_month) result(interval_days)
-    integer, intent(in) :: period_start_year, period_start_month
+function monthly_interval_days(year, period_start_month) result(interval_days)
+    integer, intent(in) :: year, period_start_month
     integer, dimension(12) :: interval_days, calendar_month_days
     integer :: february_year
 
-    february_year = period_start_year
+    february_year = year
     if (period_start_month > 2) february_year = february_year + 1
 
     calendar_month_days = month_lengths(february_year)
     interval_days = cshift(calendar_month_days, period_start_month - 1)
 end function monthly_interval_days
 
-function weekly_interval_days(weekly_output_weekday, period_start_day, period_start_month, &
-                            & period_start_year, skipped_days, simulated_days              ) result(interval_days)
+function weekly_interval_days(weekly_output_weekday, period_start_day, period_start_month, year, skipped_days, simulated_days) &
+                                                                                                       & result(interval_days)
     integer, intent(in) :: weekly_output_weekday
-    integer, intent(in) :: period_start_day, period_start_month, period_start_year
+    integer, intent(in) :: period_start_day, period_start_month, year
     integer, intent(in) :: skipped_days, simulated_days
     integer, allocatable :: interval_days(:)
     integer, parameter :: days_per_week = 7
@@ -969,7 +960,7 @@ function weekly_interval_days(weekly_output_weekday, period_start_day, period_st
         return
     end if
 
-    period_start_weekday = day_of_week(period_start_day, period_start_month, period_start_year)
+    period_start_weekday = day_of_week(period_start_day, period_start_month, year)
     simulation_start_weekday = modulo(period_start_weekday - 1 + skipped_days, days_per_week) + 1
 
     ! Include both the first simulated day and the requested closing weekday.
@@ -1006,15 +997,15 @@ function periodic_interval_days(period_start_doy, period_end_doy, period_days) r
 
 end function periodic_interval_days
 
-subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, period_label,         &
-                                    & alpha_ms_map, alpha_unm_map, fw_irr, a_loss, b_loss, c_loss, f_interception)
+subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, year, alpha_ms_map, &
+                                    & alpha_unm_map, fw_irr, a_loss, b_loss, c_loss, f_interception            )
 
     type(parameters), intent(inout) :: pars
     type(spatial_info), intent(inout) :: info_spat
     type(water_sources_table), dimension(:), intent(inout) :: wat_src_tbl
     type(irr_units_table), dimension(:), allocatable, intent(inout) :: irr_units
     type(bound), intent(in) :: boundaries
-    character(len=*), intent(in) :: period_label
+    integer, intent(in) :: year
     real(dp), dimension(:,:), intent(inout) :: alpha_ms_map, alpha_unm_map
     real(dp), dimension(:,:), intent(inout) :: fw_irr
     real(dp), dimension(:,:), intent(inout) :: a_loss, b_loss, c_loss
@@ -1026,7 +1017,7 @@ subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, b
     logical :: file_exists
 
     ! Change the crop-emergence randomization map (if one exists for this period).
-    irandom_file = trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//period_label//'.asc'
+    irandom_file = trim(pars%sim%input_path)//trim(pars%sim%irandom_fn)//'_'//itoa(year)//'.asc'
     inquire(file=trim(irandom_file), exist=pars%sim%f_irandom)
     if (pars%sim%f_irandom) then
         print *, 'Reading irandom values from: ', trim(irandom_file)
@@ -1041,12 +1032,12 @@ subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, b
     info_spat%domain%mat = info_spat%backup_domain%mat
 
     ! %PS%: a missing landuse yearly file is allowed, in that case we reuse last year's
-    landuse_file = trim(pars%sim%input_path)//trim(pars%sim%soiluse_fn)//'_'//period_label//'.asc'
+    landuse_file = trim(pars%sim%input_path)//trim(pars%sim%soiluse_fn)//'_'//itoa(year)//'.asc'
     inquire(file=trim(landuse_file), exist=file_exists)
     if (file_exists) then
         call read_grid(trim(landuse_file), info_spat%soil_use_id, pars%sim, boundaries)
     else
-        print *, 'Landuse file for year ', period_label, ' is missing. Relying on the previous year instead.'
+        print *, 'Landuse file for year ', itoa(year), ' is missing. Relying on the previous year instead.'
     end if
 
     if (minval(info_spat%soil_use_id%mat, info_spat%soil_use_id%mat /= info_spat%soil_use_id%header%nan) < 1 &
@@ -1064,7 +1055,7 @@ subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, b
 
     ! Irrigation method - todo: add indipendent flag; should not follow pars%sim%f_soiluse
     if (pars%sim%mode > 0) then
-        yearly_irr_meth_map = trim(pars%sim%id_irr_meth_fn)//'_'//period_label//'.asc'
+        yearly_irr_meth_map = trim(pars%sim%id_irr_meth_fn)//'_'//itoa(year)//'.asc'
         call read_grid(trim(pars%sim%input_path)//yearly_irr_meth_map, info_spat%irr_meth_id, &
             & pars%sim, boundaries) ! TODO: check if file exists
         call validate_irr_method_map(info_spat%irr_meth_id, info_spat%domain, pars%sim%n_irr_meth, &
@@ -1095,7 +1086,7 @@ subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, b
 
         ! Only read efficiency maps in modes 2 and 4
         if (pars%sim%mode == 2 .or. pars%sim%mode == 4) then
-            yearly_irr_eff_map = trim(pars%sim%eff_irr_fn)//'_'//period_label//'.asc'
+            yearly_irr_eff_map = trim(pars%sim%eff_irr_fn)//'_'//itoa(year)//'.asc'
             call read_grid(trim(pars%sim%input_path)//yearly_irr_eff_map, info_spat%eff_met, pars%sim, boundaries)
             call set_default_par(info_spat%eff_met, info_spat%domain, 1.0D0)
         end if
@@ -1103,7 +1094,7 @@ subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, b
 
     ! Debug output
     if (pars%sim%prt_debug_out == 'y') then
-        call write_grid(trim(pars%sim%path)//'out_'//trim(pars%sim%soiluse_fn)//'_'//period_label//'.asc', info_spat%soil_use_id)
+        call write_grid(trim(pars%sim%path)//'out_'//trim(pars%sim%soiluse_fn)//'_'//itoa(year)//'.asc', info_spat%soil_use_id)
         if (pars%sim%mode > 0) then
             call write_grid(trim(pars%sim%path)//'out_'//yearly_irr_meth_map, info_spat%irr_meth_id)
             if (pars%sim%mode == 2 .or. pars%sim%mode == 4) then
@@ -1114,12 +1105,11 @@ subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, b
 
 end subroutine update_yearly_spatial_data
 
-subroutine initialize_yearly_crop_state(pars, year_idx, period_label, info_pheno, info_meteo, info_spat, &
-                                      & meteo_weight, dir_meteo, dir_phenofases, crop_map, yield, pheno  )
+subroutine initialize_yearly_crop_state(pars, year_idx, year, info_pheno, info_meteo, info_spat,       &
+                                      & meteo_weight, dir_meteo, dir_phenofases, crop_map, yield, pheno)
 
     type(parameters), intent(in) :: pars
-    integer, intent(in) :: year_idx
-    character(len=*), intent(in) :: period_label
+    integer, intent(in) :: year_idx, year
     type(crop_pheno_info), dimension(:), intent(inout) :: info_pheno
     type(meteo_info), dimension(:), intent(in) :: info_meteo
     type(spatial_info), intent(inout) :: info_spat
@@ -1158,10 +1148,10 @@ subroutine initialize_yearly_crop_state(pars, year_idx, period_label, info_pheno
 
     ! Debug output
     if (pars%sim%prt_debug_out == 'y') then
-        call init_cell_output_file(unit_kcb_levels, trim(pars%sim%path)//period_label//'_Kcb_levels.csv', &
-                                 & 'MeteoStat; SoilUse; nCrop; low; mid; high'                            )
-        call init_cell_output_file(unit_pheno_lengths, trim(pars%sim%path)//period_label//'_PhenoLengths.csv', &
-                                 & 'MeteoStat; SoilUse; nCrop; ii0; iie; iid'                                  )
+        call init_cell_output_file(unit_kcb_levels, trim(pars%sim%path)//itoa(year)//'_Kcb_levels.csv', &
+                                 & 'MeteoStat; SoilUse; nCrop; low; mid; high'                          )
+        call init_cell_output_file(unit_pheno_lengths, trim(pars%sim%path)//itoa(year)//'_PhenoLengths.csv', &
+                                 & 'MeteoStat; SoilUse; nCrop; ii0; iie; iid'                                )
         do i = 1, size(info_pheno)
             do j = 1, size(info_pheno(i)%ii0, 1)
                 do z = 1, size(info_pheno(i)%ii0, 2)
@@ -1179,23 +1169,21 @@ subroutine initialize_yearly_crop_state(pars, year_idx, period_label, info_pheno
         close(unit_kcb_levels)
         close(unit_pheno_lengths)
 
-        call print_mat_as_grid(trim(pars%sim%path)//period_label//"_irandom.asc", info_spat%irandom%header,info_spat%irandom%mat)
+        call print_mat_as_grid(trim(pars%sim%path)//itoa(year)//"_irandom.asc", info_spat%irandom%header,info_spat%irandom%mat)
         do i=1,size(crop_map%ii0,3)
-            call print_mat_as_grid(trim(pars%sim%path)//period_label//"_ii0_"//itoa(i)//".asc", info_spat%domain%header, crop_map%ii0(:,:,i))
-            call print_mat_as_grid(trim(pars%sim%path)//period_label//"_iie_"//itoa(i)//".asc", info_spat%domain%header, crop_map%iie(:,:,i))
-            call print_mat_as_grid(trim(pars%sim%path)//period_label//"_dij_"//itoa(i)//".asc", info_spat%domain%header, crop_map%dij(:,:,i))
+            call print_mat_as_grid(trim(pars%sim%path)//itoa(year)//"_ii0_"//itoa(i)//".asc", info_spat%domain%header, crop_map%ii0(:,:,i))
+            call print_mat_as_grid(trim(pars%sim%path)//itoa(year)//"_iie_"//itoa(i)//".asc", info_spat%domain%header, crop_map%iie(:,:,i))
+            call print_mat_as_grid(trim(pars%sim%path)//itoa(year)//"_dij_"//itoa(i)//".asc", info_spat%domain%header, crop_map%dij(:,:,i))
         end do
     end if
 
 end subroutine initialize_yearly_crop_state
 
 ! Initialization of yearly *.csv output files
-subroutine initialize_yearly_outputs(pars, period_label, period_start_year, info_meteo, info_spat, &
-                                   & irr_units, out_tbl_list, yr_map, yield, yr_deb_map            )
+subroutine initialize_yearly_outputs(pars, year, info_meteo, info_spat, irr_units, out_tbl_list, yr_map, yield, yr_deb_map)
 
     type(parameters), intent(in) :: pars
-    character(len=*), intent(in) :: period_label
-    integer, intent(in) :: period_start_year
+    integer, intent(in) :: year
     type(meteo_info), dimension(:), intent(in) :: info_meteo
     type(spatial_info), intent(in) :: info_spat
     type(irr_units_table), dimension(:), allocatable, intent(in) :: irr_units
@@ -1205,21 +1193,21 @@ subroutine initialize_yearly_outputs(pars, period_label, period_start_year, info
     type(annual_debug_map), intent(inout) :: yr_deb_map
 
     if (pars%sim%mode == 1) then
-        call init_cell_output_by_year(out_tbl_list, pars%sim%path, period_label, info_meteo%filename,                   &
+        call init_cell_output_by_year(out_tbl_list, pars%sim%path, itoa(year), info_meteo%filename,                     &
                                     & pars%sim%mode, pars%sim%f_out_cells, pars%sim, irr_units%id, pars%cr%n_withdrawals)
     else
-        call init_cell_output_by_year(out_tbl_list, pars%sim%path, period_label, info_meteo%filename, &
-                                    & pars%sim%mode, pars%sim%f_out_cells, pars%sim                   )
+        call init_cell_output_by_year(out_tbl_list, pars%sim%path, itoa(year), info_meteo%filename, &
+                                    & pars%sim%mode, pars%sim%f_out_cells, pars%sim                 )
     end if
 
     if(pars%sim%f_out_cells)then
         call write_cell_info(info_spat, out_tbl_list%cell_info, pars%sim%mode, pars%sim%f_cap_rise, &
-                           & pars%depth%ze_fix, pars%depth%zr_fix, period_start_year                )
+                           & pars%depth%ze_fix, pars%depth%zr_fix, year                )
     end if
 
-    call init_yearly_output_file(yr_map, pars%sim%path, period_label, pars%sim)
-    call init_yield_output_file(yield, pars%sim%path, period_label, pars%sim)
-    call init_debug_yearly_output_file(yr_deb_map, pars%sim%path, period_label, pars%sim)
+    call init_yearly_output_file(yr_map, pars%sim%path, itoa(year), pars%sim)
+    call init_yield_output_file(yield, pars%sim%path, itoa(year), pars%sim)
+    call init_debug_yearly_output_file(yr_deb_map, pars%sim%path, itoa(year), pars%sim)
 
 end subroutine initialize_yearly_outputs
 
