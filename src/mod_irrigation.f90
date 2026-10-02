@@ -356,7 +356,7 @@ subroutine irrigate_rice(h_irr, pheno, eff_rain, k_sat, is_rice_paddy)
         !where(h_irr<=h_irr_min) h_irr = h_irr_min       ! irrigation height at least equal to the minimum irrigation height
         !where(eff_rain>=h_irr) h_irr = 0.               ! if effective precipitation > irrigation height -> zero irrigation height
         ! adjust start and end of the season
-        where(pheno%k_cb<pheno%k_cb_old) h_irr = 0       ! %CG%: if last crop period don't irrigate
+        where(pheno%k_cb < pheno%k_cb_old .or. pheno%pheno_idx == 4) h_irr = 0 ! %CG%: if last crop period don't irrigate
     end where
 end subroutine irrigate_rice
 
