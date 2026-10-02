@@ -337,6 +337,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                     ! Comparing root zone to evaporative layer depth
                     where(pheno%d_r > pars%depth%ze_fix)
                         wat_bal2%d_t =  pheno%d_r - pars%depth%ze_fix
+                    else where(pheno%pheno_idx > 0)
+                        wat_bal2%d_t = 0._dp !%PS%: 2nd layer is now 0-thickness when the root doesn't extend below the 1st layer
                     else where
                         wat_bal2%d_t = pars%depth%zr_fix  ! If Sr < Ze, Zr_fix = 1 - Ze
                     end where
@@ -354,7 +356,6 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 lat_mean = lat_sum / real(lat_num, dp)
             end if first_day
 
-            ! Saving bil* values of (gg-1)-th iteration on bil*_old variables
             wat_bal1_old = wat_bal1
             wat_bal2_old = wat_bal2
 
@@ -368,8 +369,10 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 ! Layer depths update as a function of d_r (phenological parameter - root depth)
                 where(pheno%d_r > pars%depth%ze_fix)
                     wat_bal2%d_t = pheno%d_r - wat_bal1%d_e
+                else where(pheno%pheno_idx > 0)
+                    wat_bal2%d_t = 0._dp !%PS%: 2nd layer is now 0-thickness when the root doesn't extend below the 1st layer
                 else where
-                    wat_bal2%d_t = pars%depth%zr_fix
+                    wat_bal2%d_t = pars%depth%zr_fix !%PS%, todo: a cell with no crop growing still gets full-thickness 2nd layer regardless of water table
                 end where
 
                 ! Distance (mm) between rootzone and water table (influences capillary uptake)
@@ -641,22 +644,33 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                                 & wat_bal_hour%n_iter1(i,j), esp_perc(i,j,1), wat_bal_hour%n_max1(i,j), doy)
 
                             ! water balance for the transpirative layer
-                            call water_balance_transp_lay(wat_bal_hour%inten%h_soil2(i,j), wat_bal_hour%esten%h_transp_act2(i,j), &
-                                & wat_bal_hour%esten%h_transp_pot2(i,j), wat_bal_hour%esten%h_perc2(i,j), &
-                                & wat_bal_hour%esten%h_perc1(i,j), &
-                                & wat_bal_hour%inten%k_s_dry(i,j),wat_bal_hour%inten%k_s_sat(i,j), wat_bal_hour%inten%k_s(i,j), &
-                                & wat_bal_hour%esten%h_eva_pot(i,j), wat_bal_hour%esten%h_caprise(i,j), &
-                                & wat_bal_hour%esten%h_rise(i,j), &
-                                & pheno%d_r(i,j), wat_bal2%d_t(i,j), pheno%RF_t(i,j), &
-                                & pheno%k_cb(i,j), pheno%p_day(i,j), &
-                                & meteo%et0(i,j)*pars%fet0(hour), wat%layer(2)%h_sat(i,j), &
-                                & wat%layer(2)%h_fc(i,j), wat%layer(2)%h_wp(i,j), wat%layer(2)%h_r(i,j), &
-                                & k_sat2_use(i,j), fact_n2_use(i,j), &
-                                & info_spat%a3%mat(i,j), info_spat%a4%mat(i,j), &
-                                & info_spat%b1%mat(i,j), info_spat%b2%mat(i,j), &
-                                & info_spat%b3%mat(i,j), info_spat%b4%mat(i,j), &
-                                & wat_bal2%depth_under_rz(i,j), wat_bal_hour%n_iter2(i,j), &
-                                & esp_perc(i,j,2),pars%sim%f_cap_rise, wat_bal_hour%n_max2(i,j), doy)
+                            if (wat_bal2%d_t(i,j) > 0.0D0) then
+                                call water_balance_transp_lay(wat_bal_hour%inten%h_soil2(i,j), wat_bal_hour%esten%h_transp_act2(i,j), &
+                                    & wat_bal_hour%esten%h_transp_pot2(i,j), wat_bal_hour%esten%h_perc2(i,j), &
+                                    & wat_bal_hour%esten%h_perc1(i,j), &
+                                    & wat_bal_hour%inten%k_s_dry(i,j),wat_bal_hour%inten%k_s_sat(i,j), wat_bal_hour%inten%k_s(i,j), &
+                                    & wat_bal_hour%esten%h_eva_pot(i,j), wat_bal_hour%esten%h_caprise(i,j), &
+                                    & wat_bal_hour%esten%h_rise(i,j), &
+                                    & pheno%d_r(i,j), wat_bal2%d_t(i,j), pheno%RF_t(i,j), &
+                                    & pheno%k_cb(i,j), pheno%p_day(i,j), &
+                                    & meteo%et0(i,j)*pars%fet0(hour), wat%layer(2)%h_sat(i,j), &
+                                    & wat%layer(2)%h_fc(i,j), wat%layer(2)%h_wp(i,j), wat%layer(2)%h_r(i,j), &
+                                    & k_sat2_use(i,j), fact_n2_use(i,j), &
+                                    & info_spat%a3%mat(i,j), info_spat%a4%mat(i,j), &
+                                    & info_spat%b1%mat(i,j), info_spat%b2%mat(i,j), &
+                                    & info_spat%b3%mat(i,j), info_spat%b4%mat(i,j), &
+                                    & wat_bal2%depth_under_rz(i,j), wat_bal_hour%n_iter2(i,j), &
+                                    & esp_perc(i,j,2),pars%sim%f_cap_rise, wat_bal_hour%n_max2(i,j), doy)
+                            else
+                                !%PS%: No 2nd layer is allowed if root is very shallow; drainage from layer 1 leaves the profile directly
+                                wat_bal_hour%inten%h_soil2(i,j) = 0.0D0
+                                wat_bal_hour%esten%h_transp_act2(i,j) = 0.0D0
+                                wat_bal_hour%esten%h_transp_pot2(i,j) = 0.0D0
+                                wat_bal_hour%esten%h_perc2(i,j) = wat_bal_hour%esten%h_perc1(i,j)
+                                wat_bal_hour%esten%h_caprise(i,j) = 0.0D0
+                                wat_bal_hour%esten%h_rise(i,j) = 0.0D0
+                                wat_bal_hour%n_iter2(i,j) = 0
+                            end if
 
                         end if
 
@@ -715,18 +729,21 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 end if
             end do hr_loop
 
-            ! update the soil water content (dimensionless)
+            ! update volumetric water content
+            where(info_spat%domain%mat /= info_spat%domain%header%nan)
+                wat_bal1%t_soil = wat_bal1%h_soil / (1000._dp * wat_bal1%d_e)
+                where (wat_bal2%d_t > 0._dp)
+                    wat_bal2%t_soil = wat_bal2%h_soil / (1000._dp * wat_bal2%d_t)
+                elsewhere !%PS%: assume layer 2 is at field capacity if unexplored
+                    wat_bal2%t_soil = info_spat%theta(2)%fc%mat
+                end where
+            end where
             if (doy == last_simulated_doy) then
                 where(info_spat%domain%mat /= info_spat%domain%header%nan)
-                    info_spat%theta(1)%old%mat = wat_bal1%h_soil/(1000.*wat_bal1%d_e)
-                    info_spat%theta(2)%old%mat = wat_bal2%h_soil/(1000.*wat_bal2%d_t)
+                    info_spat%theta(1)%old%mat = wat_bal1%t_soil
+                    info_spat%theta(2)%old%mat = wat_bal2%t_soil
                 end where
             end if
-
-            where(info_spat%domain%mat /= info_spat%domain%header%nan)
-                    wat_bal1%t_soil = wat_bal1%h_soil/(1000.*wat_bal1%d_e)
-                    wat_bal2%t_soil = wat_bal2%h_soil/(1000.*wat_bal2%d_t)
-            end where
 
             ! update the ponding variable for each day
             wat_bal1%h_runoff = wat_bal1%h_runoff+ max(wat_bal_hour%esten%h_pond-info_spat%h_maxpond%mat,0.0D0)
