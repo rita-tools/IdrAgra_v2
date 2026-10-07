@@ -101,6 +101,38 @@ subroutine advance_calendar_date(calendar_date)
     end if
 end subroutine advance_calendar_date
 
+! Return the last day of the annual period beginning on start_date.
+function annual_period_end(start_date) result(end_date)
+    type(date), intent(in) :: start_date
+    type(date) :: end_date
+    integer, dimension(12) :: days_in_month
+
+    end_date = start_date
+    end_date%year = start_date%year + 1
+    end_date%day = start_date%day - 1
+
+    if (end_date%day == 0) then
+        end_date%month = start_date%month - 1
+        if (end_date%month == 0) then
+            end_date%month = 12
+            end_date%year = end_date%year - 1
+        end if
+        days_in_month = month_lengths(end_date%year)
+        end_date%day = days_in_month(end_date%month)
+    end if
+
+    end_date%doy = get_doy(end_date%day, end_date%month, end_date%year)
+    end_date%weekday = day_of_week(end_date%day, end_date%month, end_date%year)
+end function annual_period_end
+
+! Format a calendar date as dd/mm/yyyy.
+function date_to_string(calendar_date) result(string)
+    type(date), intent(in) :: calendar_date
+    character(len=10) :: string
+
+    write(string, '(I2.2,"/",I2.2,"/",I4.4)') calendar_date%day, calendar_date%month, calendar_date%year
+end function date_to_string
+
 ! Count elapsed Gregorian calendar days before and within the supplied date.
 pure function calendar_day_number(day, month, year) result(day_number)
     integer, intent(in) :: day, month, year

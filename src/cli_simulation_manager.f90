@@ -32,12 +32,12 @@ end interface
 contains
 
 subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, info_meteo, info_pheno, tab_CN2, tab_CN3,&
-    & theta2_rice, sim_years,boundaries, debug, summary)
+    & theta2_rice, simulation_end, boundaries, debug, summary)
 
     type(parameters),intent(inout)::pars
     type(TDx_index),intent(in)::pars_TDx
     real(dp),dimension(:,:,:),intent(in):: tab_CN2, tab_CN3
-    integer,intent(in)::sim_years
+    type(date), intent(in) :: simulation_end
     type(bound),intent(in)::boundaries
     logical,intent(in)::debug,summary
     type(soil2_rice),intent(in)::theta2_rice
@@ -236,14 +236,14 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     days_before_simulation = days_between_dates(info_meteo(1)%start, pars%sim%start)
     if (days_before_simulation > 0) call skip_meteo_days(info_meteo, days_before_simulation)
 
-    n_simulation_years = min(sim_years, pars%sim%end%year - pars%sim%start%year + 1)
+    n_simulation_years = simulation_end%year - pars%sim%start%year + 1
 
     year_cycle: do simulation_year_idx = 1, n_simulation_years
 
         y = pars%sim%start%year + simulation_year_idx - 1
         year_idx = y - pars%sim%start_year + 1
         first_simulated_doy = merge(pars%sim%start%doy, 1, y == pars%sim%start%year)
-        last_simulated_doy = merge(pars%sim%end%doy, days_in_year(y), y == pars%sim%end%year)
+        last_simulated_doy = merge(simulation_end%doy, days_in_year(y), y == simulation_end%year)
 
         n_week = 0
 

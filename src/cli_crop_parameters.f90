@@ -387,22 +387,25 @@ subroutine read_crop_pars_i(file_pars,n_days,n_crop)
 
 end subroutine read_crop_pars_i
 
-subroutine init_crop_phenology_pars(sim, info_pheno, info_meteo, ze_fix, verbose)
+subroutine init_crop_phenology_pars(sim, info_pheno, info_meteo, ze_fix, verbose, last_year)
     ! init crop parameters and file references for daily parameters
     type(simulation),intent(inout)::sim
     type(meteo_info),dimension(:),intent(in)::info_meteo
     real(dp),intent(in) :: ze_fix
     logical,intent(in)::verbose
+    integer, optional, intent(in) :: last_year
 
     type(crop_pheno_info),dimension(:),allocatable::info_pheno
     character(len=255)::dir,froot,dir_name
-    integer :: i, string_elements
+    integer :: i, string_elements, parameter_end_year
     integer, dimension(sim%n_lus) :: n_crops_by_year
     real(dp), parameter :: nan = -9999.0D0
     integer, parameter :: phases = 4
 
     dir= trim(sim%pheno_path)
     froot = sim%pheno_root
+    parameter_end_year = sim%end%year
+    if (present(last_year)) parameter_end_year = max(parameter_end_year, last_year)
 
     allocate(info_pheno(sim%n_weather_stations)) ! init to the number of weather stations
 
@@ -413,7 +416,7 @@ subroutine init_crop_phenology_pars(sim, info_pheno, info_meteo, ze_fix, verbose
     call init_crop_par_from_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropParam.dat", &
         & sim%n_lus, sim%n_crops, string_elements, n_crops_by_year)
 
-    call read_canopy_resistance_file(trim(dir)//delimiter//'CanopyRes.dat', sim%res_canopy, sim%end%year, sim%start_year)
+    call read_canopy_resistance_file(trim(dir)//delimiter//'CanopyRes.dat', sim%res_canopy, parameter_end_year, sim%start_year)
 
     do i=1,size(info_pheno)
         dir_name = info_meteo(i)%filename(1:(index(trim(info_meteo(i)%filename),"."))-1)
@@ -472,7 +475,7 @@ subroutine init_crop_phenology_pars(sim, info_pheno, info_meteo, ze_fix, verbose
         info_pheno(i)%cycle_crop_slot = 0
         call read_water_prod_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"WPadj.dat",  &
                                 & string_elements, n_crops_by_year, info_pheno(i)%wp_adj,          &
-                                & sim%end%year, sim%start_year)
+                                & parameter_end_year, sim%start_year)
         call read_crop_par_file(trim(dir)//trim(froot)//trim(dir_name)//delimiter//"CropParam.dat", &
                               & string_elements, ze_fix, info_pheno(i))
 

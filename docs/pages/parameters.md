@@ -138,7 +138,7 @@ Irrigation simulation mode:\
 :::
 
 If true, the initial soil-moisture condition is read from the `InitialConditionPath\\InitialCondition.asc` file.\
-If false, IdrAgra begins the simulation with all soils at field capacity but runs a warmup year reusing the first year of data.
+If false, IdrAgra begins with all soils at field capacity and runs a complete 365- or 366-day warmup period beginning on the simulation start date. The warmup reuses the corresponding first year of input data before the actual simulation starts.
 
 (parameter-initialconditionpath)=
 {.parameter-dependent}
