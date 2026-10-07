@@ -243,8 +243,7 @@ subroutine populate_crop_yield_matrices(info_pheno,dir_phenofases,domain,soil_us
 
 end subroutine populate_crop_yield_matrices
 
-subroutine populate_crop_pars_matrices(crop_pars_mat, info_pheno, irandom, doy, ws_idx, domain, &
-                                     & soil_use, year_length, crop_mat)
+subroutine update_crops_daily(crop_pars_mat, info_pheno, irandom, doy, ws_idx, domain, soil_use, year_length, crop_mat)
     integer,intent(in) :: doy, year_length
     type(grid_i),intent(in) :: domain, soil_use
     integer,dimension(:,:),intent(in) :: ws_idx, irandom
@@ -253,6 +252,7 @@ subroutine populate_crop_pars_matrices(crop_pars_mat, info_pheno, irandom, doy, 
     type(crop_matrices),intent(in) :: crop_mat
     integer :: i, j
 
+    crop_pars_mat%k_cb_old = crop_pars_mat%k_cb
     do j=1,size(domain%mat,2)
         do i=1,size(domain%mat,1)
             if(domain%mat(i,j) /= domain%header%nan) then
@@ -261,7 +261,7 @@ subroutine populate_crop_pars_matrices(crop_pars_mat, info_pheno, irandom, doy, 
             end if
         end do
     end do
-end subroutine populate_crop_pars_matrices
+end subroutine update_crops_daily
 
 subroutine populate_crop_cell(i, j, crop_pars_mat, info_pheno, irandom, doy, ws_idx, &
                             & soil_use, year_length, crop_mat)

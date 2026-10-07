@@ -7,7 +7,7 @@ use mod_evapotranspiration, only: ET_reference, calculateDLH
 use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data, create_meteo_matrices, skip_meteo_days
 use mod_runoff
 use mod_crop_soil_water
-use mod_crop_phenology, only: crop_pheno_info, crop_matrices, populate_crop_pars_matrices, populate_crop_yield_matrices, &
+use mod_crop_phenology, only: crop_pheno_info, crop_matrices, update_crops_daily, populate_crop_yield_matrices, &
                             & make_random_emergence
 use mod_TDx_index
 use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva
@@ -302,11 +302,9 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
             call init_step_debug_output_file(deb_map, pars%sim%path, itoa(y), doy, out_steps,                   &
                                            & days_before_1st_interval, first_simulated_doy, step_label, pars%sim)
 
-            ! Phenological parameters spatialization
-            ! Updating of pheno%kcb_old to the last day value
-            pheno%k_cb_old = pheno%k_cb
-            call populate_crop_pars_matrices(pheno, info_pheno, info_spat%irandom%mat, doy, dir_phenofases,    &
-                                           & info_spat%domain, info_spat%soil_use_id, days_in_year(y), crop_map)
+            ! Update crop phenology for all the cells in the domain
+            call update_crops_daily(pheno, info_pheno, info_spat%irandom%mat, doy, dir_phenofases,    &
+                                  & info_spat%domain, info_spat%soil_use_id, days_in_year(y), crop_map)
 
             !%PS%: unified flag for flooded rice special behaviour (soil params swap, irrigation)
             is_rice_paddy = info_spat%domain%mat /= info_spat%domain%header%nan .and.         &! Is in the domain
