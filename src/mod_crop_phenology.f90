@@ -23,6 +23,12 @@ type k_cb_matrices
     real(dp), dimension(:,:), pointer::mid  ! kcb between the 1st and 2nd stage
 end type k_cb_matrices
 
+! --------------- Work in progress: needed for cropcoef integration ---------------
+type crop_definition
+    integer :: crop_id = 0
+end type crop_definition
+! ---------------------------------------------------------------------------------
+
 type crop_pheno_info
     ! include all crop parameters for each calculation cell
     integer,dimension(:,:),pointer::ii0                 ! start growing day of the crop [doy]
@@ -57,30 +63,40 @@ end type crop_pheno_info   !es: valday(:)%kcb%unit; valday(:)%kcb%tab(:,:)
 type crop_pars_matrices
     ! store the crop parameters for each calculation cells
     ! see crop_pheno_info for details
-    real(dp),dimension(:,:),pointer::k_cb
-    real(dp),dimension(:,:),pointer::h
-    real(dp),dimension(:,:),pointer::d_r
-    real(dp),dimension(:,:),pointer::lai
-    integer,dimension(:,:),pointer::cn_day
-    real(dp),dimension(:,:),pointer::f_c
-    integer,dimension(:,:),pointer::irrigation_class
-    integer,dimension(:,:),pointer::cn_class
-    real(dp),dimension(:,:),pointer::p
-    real(dp),dimension(:,:),pointer::a
-    real(dp),dimension(:,:),pointer::d_t_max
-    real(dp),dimension(:,:),pointer::RF_t_max
-    real(dp),dimension(:,:),pointer::RF_e
-    real(dp),dimension(:,:),pointer::RF_t
-    real(dp),dimension(:,:),pointer::T_lim
-    real(dp),dimension(:,:),pointer::T_crit
-    real(dp),dimension(:,:),pointer::k_cb_low
-    real(dp),dimension(:,:),pointer::k_cb_mid
-    real(dp),dimension(:,:),pointer::k_cb_high
-    real(dp),dimension(:,:),pointer::p_day
-    real(dp),dimension(:,:),pointer::k_cb_old           ! k_cb of previous day
-    integer,dimension(:,:),pointer::n_crop_in_year
-    integer,dimension(:,:),pointer::pheno_idx           ! phenological stage index
-    real(dp),dimension(:,:),pointer::r_stress           ! plant resistance to (water) stress
+
+! --------------- Work in progress: needed for cropcoef integration ---------------
+    integer, dimension(:,:), allocatable :: crop_id
+    integer, dimension(:,:), allocatable :: sowing_year
+    integer, dimension(:,:), allocatable :: sowing_doy
+    integer, dimension(:,:), allocatable :: cuts_completed
+    real(dp), dimension(:,:), allocatable :: gdd
+    real(dp), dimension(:,:), allocatable :: vernalization_days
+! ---------------------------------------------------------------------------------
+
+    real(dp), dimension(:,:), allocatable :: k_cb
+    real(dp), dimension(:,:), allocatable :: h
+    real(dp), dimension(:,:), allocatable :: d_r
+    real(dp), dimension(:,:), allocatable :: lai
+    integer, dimension(:,:), allocatable :: cn_day
+    real(dp), dimension(:,:), allocatable :: f_c
+    integer, dimension(:,:), allocatable :: irrigation_class
+    integer, dimension(:,:), allocatable :: cn_class
+    real(dp), dimension(:,:), allocatable :: p
+    real(dp), dimension(:,:), allocatable :: a
+    real(dp), dimension(:,:), allocatable :: d_t_max
+    real(dp), dimension(:,:), allocatable :: RF_t_max
+    real(dp), dimension(:,:), allocatable :: RF_e
+    real(dp), dimension(:,:), allocatable :: RF_t
+    real(dp), dimension(:,:), allocatable :: T_lim
+    real(dp), dimension(:,:), allocatable :: T_crit
+    real(dp), dimension(:,:), allocatable :: k_cb_low
+    real(dp), dimension(:,:), allocatable :: k_cb_mid
+    real(dp), dimension(:,:), allocatable :: k_cb_high
+    real(dp), dimension(:,:), allocatable :: p_day
+    real(dp), dimension(:,:), allocatable :: k_cb_old       ! k_cb of previous day
+    integer, dimension(:,:), allocatable :: n_crop_in_year
+    integer, dimension(:,:), allocatable :: pheno_idx       ! phenological stage index
+    real(dp), dimension(:,:), allocatable :: r_stress       ! plant resistance to (water) stress
 end type crop_pars_matrices
 
 type crop_matrices

@@ -10,7 +10,7 @@ use mod_crop_soil_water
 use mod_crop_phenology, only: crop_pheno_info, crop_matrices, update_crops_daily, populate_crop_yield_matrices, &
                             & make_random_emergence
 use mod_TDx_index
-use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva
+use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva, nan_i, nan_r
 use mod_common, only: wat_matrix, soil2_rice, hourly, unit_file_scratch
 use mod_irrigation
 use cli_watsources
@@ -1649,7 +1649,7 @@ subroutine b1_no_iter_eva(pheno, meteo, h_rain_lim, wat, fw_day, fw_irr, fw_rain
     ! calculate the elements of the evaporative model that change daily
    type(grid_i),intent(in)::domain
     type(balance1_matrices),intent(in):: balance1_mat
-    type(crop_pars_matrices),intent(in)::pheno
+    type(crop_pars_matrices),intent(inout)::pheno
     type(meteo_mat),intent(in)::meteo
     type(wat_matrix),intent(inout)::wat
     real(dp),dimension(:,:),intent(in)::h_irr_sum
@@ -1996,32 +1996,75 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
     character (len=*),parameter:: errormessage = "pheno has been wrongly allocated"
 
     if(f_allocate)then
-        allocate(pheno%k_cb_old        (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%k_cb            (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%h              (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%d_r             (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%lai            (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%cn_day         (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-         allocate(pheno%f_c            (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%irrigation_class (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%cn_class             (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%p              (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%a              (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%d_t_max          (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%RF_t_max         (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%RF_e            (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%RF_t            (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%T_lim           (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%T_crit          (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%k_cb_low        (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%k_cb_mid        (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%k_cb_high       (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%p_day           (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%n_crop_in_year    (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%pheno_idx   (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
-        allocate(pheno%r_stress           (imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,errormessage
+        allocate(pheno%crop_id           (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%sowing_year       (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%sowing_doy        (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%cuts_completed    (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%gdd               (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%vernalization_days(imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%k_cb_old          (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%k_cb              (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%h                 (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%d_r               (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%lai               (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%cn_day            (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+         allocate(pheno%f_c              (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%irrigation_class  (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%cn_class          (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%p                 (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%a                 (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%d_t_max           (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%RF_t_max          (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%RF_e              (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%RF_t              (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%T_lim             (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%T_crit            (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%k_cb_low          (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%k_cb_mid          (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%k_cb_high         (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%p_day             (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%n_crop_in_year    (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%pheno_idx         (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%r_stress          (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+
+        pheno%crop_id = 0
+        pheno%sowing_year = nan_i
+        pheno%sowing_doy = nan_i
+        pheno%cuts_completed = 0
+        pheno%gdd = 0._dp
+        pheno%vernalization_days = 0._dp
+        pheno%k_cb_old = 0._dp
+        pheno%k_cb = 0._dp
+        pheno%h = 0._dp
+        pheno%d_r = 0._dp
+        pheno%lai = 0._dp
+        pheno%cn_day = 0
+        pheno%f_c = 0._dp
+        pheno%irrigation_class = 0
+        pheno%cn_class = 1
+        pheno%p = 0._dp
+        pheno%a = 0._dp
+        pheno%d_t_max = 0._dp
+        pheno%RF_t_max = 0._dp
+        pheno%RF_e = 0._dp
+        pheno%RF_t = 0._dp
+        pheno%T_lim = 0._dp
+        pheno%T_crit = 0._dp
+        pheno%k_cb_low = 0._dp
+        pheno%k_cb_mid = 0._dp
+        pheno%k_cb_high = 0._dp
+        pheno%p_day = 0._dp
+        pheno%n_crop_in_year = 0
+        pheno%pheno_idx = 0
+        pheno%r_stress = 0._dp
 
     else
+        deallocate(pheno%crop_id)
+        deallocate(pheno%sowing_year)
+        deallocate(pheno%sowing_doy)
+        deallocate(pheno%cuts_completed)
+        deallocate(pheno%gdd)
+        deallocate(pheno%vernalization_days)
         deallocate(pheno%k_cb_old        )
         deallocate(pheno%k_cb            )
         deallocate(pheno%h              )
