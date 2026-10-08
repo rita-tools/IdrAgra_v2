@@ -68,24 +68,6 @@ Folder containing meteorological station data.
 
 Root-level file listing the meteorological input files.
 
-(parameter-phenopath)=
-### `PhenoPath`
-
-:::{container} parameter-summary
-**Type:** String  ·  **Default:** `.\\crop_series\\`
-:::
-
-Folder containing crop phenology parameter files.
-
-(parameter-phenofileroot)=
-### `PhenoFileRoot`
-
-:::{container} parameter-summary
-**Type:** String  ·  **Default:** `pheno_`
-:::
-
-Common prefix used by phenology files associated with meteorological stations.
-
 (parameter-cropinputsfolder)=
 ### `CropInputsFolder`
 
@@ -103,6 +85,15 @@ Folder containing the CropCoef land-use rotation database.
 :::
 
 CropCoef rotation table within {ref}`CropInputsFolder <parameter-cropinputsfolder>`.
+
+(parameter-co2filename)=
+### `CO2Filename`
+
+:::{container} parameter-summary
+**Type:** String · **Default:** `CO2_conc.dat`
+:::
+
+Annual atmospheric CO2 concentrations file. It has a `Year CO2` header followed by one `year concentration` row for each meteorological calendar year. IdrAgra uses it to calculate canopy resistance and crop water productivity. Concentration is expressed in ppm.
 
 (parameter-cropfolder)=
 ### `CropFolder`
@@ -211,7 +202,7 @@ If true, the final soil_moisture_condition is stored in the `FinalConditionPath\
 ### `StartSimulation`
 
 :::{container} parameter-summary
-**Type:** Date  ·  **Default:** `date(29, 2, 1600, 2305507, 0)`
+**Type:** Date  ·  **Default:** none
 :::
 
 First day of the simulation [dd/mm/yyyy].
@@ -219,7 +210,7 @@ First day of the simulation [dd/mm/yyyy].
 ### `EndSimulation`
 
 :::{container} parameter-summary
-**Type:** Date  ·  **Default:** `date(29, 2, 1600, 2305507, 0)`
+**Type:** Date  ·  **Default:** none
 :::
 
 Last day of the simulation [dd/mm/yyyy].

@@ -12,9 +12,8 @@ type simulation
     character(len=200) :: path = '.\\sim_results\\'                     ! path of output
     character(len=200) :: meteo_path = '.\\meteo_data\\'                ! path of meteo tables
     character(len=200) :: ws_list_fn = 'weather_stations.dat'           ! filename (incl. path) of the weather station list
-    character(len=200) :: pheno_path = '.\\crop_series\\'               ! Path to the crop timeseries directory
-    character(len=200) :: pheno_root = 'pheno_'                         ! prefix shared by all folders in pheno_path
     character(len=200) :: crop_inputs_path = '.\\landuses\\'            ! Path to CropCoef soil-use inputs
+    character(len=200) :: co2_conc_fn = 'CO2_conc.dat'                  ! filename (incl. path) of the CO2 concentration series
     character(len=200) :: soil_uses_fn = 'soil_uses.txt'                ! Crop rotation table
     character(len=200) :: crop_parameters_path = '.\\landuses\\crop_parameters\\' ! Path to crop definition files
     character(len=200) :: irr_met_path = '.\\irrmeth_data\\'            ! Path to irrigation methods folder
@@ -108,7 +107,8 @@ type simulation
     integer :: end_irr_season = 304             ! end irrigation season [doy]
     integer :: n_irr_meth                       ! number of irrigation methods
     logical :: f_out_cells = .false.            ! if true, print outputs file for control points (aka cells)
-    real(dp),dimension(:),pointer :: res_canopy ! plant resistance
+    real(dp),dimension(:),allocatable :: res_canopy ! annual canopy resistance derived from CO2
+    real(dp),dimension(:),allocatable :: co2_concentration ! annual atmospheric CO2 [ppm]
     real(dp), dimension(2,2) :: quantiles = reshape([0.575118, 0.472116, 8.026400, 7.706101], [2,2])
     real(dp) :: lambda_cn = 0.2                 ! lambda parameters for curve number [-]
     real(dp) :: h_prec_lim = 5.0                ! minimum meaningful precipitation [mm]

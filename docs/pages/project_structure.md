@@ -10,8 +10,7 @@ Input files make up the majority of the project's data. By default, they are org
 
 - **{ref}`spatial_data <parameter-inputpath>`**, containing .asc maps, i.e. anything that is spatialized at the {ref}`field <simulation-unit>` level;
 - **{ref}`meteo_data <parameter-meteopath>`**, containing weather time series (one file per station);
-- **{ref}`landuses <parameter-cropinputsfolder>`**, containing the CropCoef rotation table and crop-definition files;
-- **{ref}`crop_series <parameter-phenopath>`**, containing crop parameters & time series, spatialized at the station level;
+- **{ref}`landuses <parameter-cropinputsfolder>`**, containing the rotation table and crop-definition files;
 - **{ref}`irrmeth_data <parameter-irrmethpath>`**, containing each irrigation method's parameters;
 - **{ref}`watsour_data <parameter-watsourpath>`**, containing water-source and scheduled-irrigation files;
 - **{ref}`sim_results <parameter-outputpath>`**, containing generated outputs.
@@ -43,17 +42,17 @@ IdrAgra locates each group of files through the path settings in `idragra_parame
 ```text
 project/
 ├── idragra_parameters.txt
+├── CO2_conc.dat        # annual atmospheric CO2 concentrations
 ├── weather_stations.dat
 ├── spatial_data/       # ESRI ASCII grids and rice_soilparam.txt
 ├── meteo_data/         # one daily weather file per station
-├── landuses/           # CropCoef rotations and static crop definitions
-├── crop_series/        # CanopyRes.dat and one phenology folder per station
+├── landuses/           # rotations and crop definitions
 ├── irrmeth_data/       # irrigation-method list and method files
 ├── watsour_data/       # source, district, diversion, and schedule files
 └── sim_results/        # generated outputs
 ```
 
-Alternative names work when {ref}`InputPath <parameter-inputpath>`, {ref}`MeteoPath <parameter-meteopath>`, {ref}`CropInputsFolder <parameter-cropinputsfolder>`, {ref}`CropFolder <parameter-cropfolder>`, {ref}`PhenoPath <parameter-phenopath>`, {ref}`IrrMethPath <parameter-irrmethpath>`, {ref}`WatSourPath <parameter-watsourpath>`, and {ref}`OutputPath <parameter-outputpath>` point to the matching folders. When copying a parameter file between projects, copy the associated folder structure or update these paths.
+Alternative names work when {ref}`InputPath <parameter-inputpath>`, {ref}`MeteoPath <parameter-meteopath>`, {ref}`CropInputsFolder <parameter-cropinputsfolder>`, {ref}`CropFolder <parameter-cropfolder>`, {ref}`IrrMethPath <parameter-irrmethpath>`, {ref}`WatSourPath <parameter-watsourpath>`, and {ref}`OutputPath <parameter-outputpath>` point to the matching folders. When copying a parameter file between projects, copy the associated folder structure or update these paths.
 
 (spatial-ascii-grids)=
 ## Spatial ASCII grids
@@ -173,31 +172,17 @@ EndTable =
 (crop-input-files)=
 ## Crop and phenology inputs
 
-The CropCoef source database is read from {ref}`CropInputsFolder <parameter-cropinputsfolder>` and {ref}`CropFolder <parameter-cropfolder>`. The rotation table selected by {ref}`SoilUsesFilename <parameter-soilusesfilename>` associates each land-use ID with one or two crop parameter files. Crop filenames beginning with a positive integer and an underscore, such as `13_maize.tab`, use that prefix as the stable crop ID. Files without the prefix receive deterministic generated IDs.
+IdrAgra reads the rotation table selected by {ref}`SoilUsesFilename <parameter-soilusesfilename>` from {ref}`CropInputsFolder <parameter-cropinputsfolder>`, and reads the referenced crop parameter files from {ref}`CropFolder <parameter-cropfolder>`. A positive integer prefix such as `13_maize.tab` supplies a stable crop ID; files without one receive deterministic generated IDs.
 
-IdrAgra currently validates and retains this source database while continuing to run from the generated phenology files described below.
+The {ref}`CO2Filename <parameter-co2filename>` file supplies one atmospheric CO2 concentration for each required calendar year. Its path is relative to the working folder unless an absolute path is supplied. For example:
 
-The folder selected by {ref}`PhenoPath <parameter-phenopath>` contains `CanopyRes.dat` plus one subfolder per station. Each station folder name is {ref}`PhenoFileRoot <parameter-phenofileroot>` followed by the weather filename without its extension. Include these case-sensitive filenames:
+```text
+Year CO2
+2021 415.0
+2022 418.0
+```
 
-| File | Daily or static content used by IdrAgra |
-|---|---|
-| `CropId.dat` | crop slot active on each day |
-| `Kcb.dat` | basal crop coefficient |
-| `H.dat` | crop height |
-| `Sr.dat` | root depth |
-| `LAI.dat` | leaf-area index |
-| `CNvalue.dat` | seasonal Curve Number state |
-| `fc.dat` | vegetation cover fraction |
-| `r_stress.dat` | stress-related crop parameter |
-| `WPadj.dat` | yearly adjusted water productivity |
-| `CropParam.dat` | crop classes and static yield, stress, interception, and root parameters |
-
-`CanopyRes.dat` supplies a yearly canopy resistance. These files are normally generated by CropCoef rather than edited manually. The first header in the daily files determines the crop IDs and crop-cycle layout; those IDs must be compatible with {ref}`SoilUsesNum <parameter-soilusesnum>` and {ref}`SimulatedSoilUses <parameter-simulatedsoiluses>`.
-
-:::{container} manual-code-divergence
-**Manual/code divergence to review.** The installation manual lists `CropId.dat` as a debug output, but IdrAgra requires it for every station. The manual also lists `Ky.dat`; IdrAgra instead reads `kyT` and `ky1` through `ky4` from `CropParam.dat`.
-:::
-
+IdrAgra computes crop development, canopy resistance, and CO2-adjusted water productivity internally. Yield accumulates for the crop in each cell through warmup and across calendar years, then appears in the year of harvest. Output suffixes (`_1`, `_2`) count harvested crops in each cell for that year; a crop not harvested has no yield result.
 (soil-moisture-inputs)=
 ## Initial and final soil moisture
 

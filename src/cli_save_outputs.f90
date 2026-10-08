@@ -8,6 +8,7 @@ use mod_parameters
 use cli_watsources
 use mod_crop_phenology
 use mod_crop_yield, only: yield_t
+use mod_cropcoef, only: adjust_water_productivity
 implicit none
 
 type output
@@ -594,43 +595,40 @@ subroutine write_cell_info(info_spat, cell_info, mode, f_caprise, ze_fix, zr_fix
     end do
 end subroutine write_cell_info
 
-subroutine write_cell_prod(info_prod, crop, irandom)
-    ! write parameters related to productivity of each cells
-    type(cell_output),dimension(:),intent(in)::info_prod
-    type(crop_matrices), intent(in)::crop
-    integer, dimension(:,:), intent(in)::irandom
-    integer::x,y,z
-    integer::zmax
-    integer::i
-    integer::nan=-9999.
+subroutine write_cell_prod(info_prod, definitions, rotations, co2, soil_use, irandom)
+    ! Print parameters of the rotation defined for each sampled cell.
+    ! Actual sowing and harvest dates are decided by daily phenology.
+    type(cell_output), dimension(:), intent(in) :: info_prod
+    type(crop_definition), intent(in) :: definitions(:)
+    type(crop_rotation), intent(in) :: rotations(:)
+    real(dp), intent(in) :: co2
+    integer, intent(in) :: soil_use(:,:), irandom(:,:)
+    integer :: output_idx, row, col, land_use, slot, crop_id, unit
 
+    do output_idx = 1, size(info_prod)
+        row = info_prod(output_idx)%coord%row
+        col = info_prod(output_idx)%coord%col
+        unit = info_prod(output_idx)%file%unit
+        land_use = soil_use(row,col)
+        if (land_use < 1 .or. land_use > size(rotations)) cycle
+        if (.not. allocated(rotations(land_use)%crop_ids)) cycle
 
-    do i=1,size(info_prod)
-        x=info_prod(i)%coord%row
-        y=info_prod(i)%coord%col
-        zmax = 1
-        do z=1,size(crop%wp_adj,3)
-            if (crop%wp_adj(x,y,z) /= nan) then
-                zmax = z
-            end if
+        do slot = 1, size(rotations(land_use)%crop_ids)
+            crop_id = rotations(land_use)%crop_ids(slot)
+            write(unit,*) 'CropId; ', slot, '; ', crop_id
+            write(unit,*) 'WPadj; ', slot, '; ', adjust_water_productivity( &
+                & definitions(crop_id)%water_productivity, co2, definitions(crop_id)%sink_strength)
+            write(unit,*) 'HI; ', slot, '; ', definitions(crop_id)%harvest_index
+            write(unit,*) 'KyT; ', slot, '; ', definitions(crop_id)%yield_response_total
+            write(unit,*) 'Ky1-Ky4; ', slot, '; ', definitions(crop_id)%yield_response_stage
+            write(unit,*) 'Tcrit/Tlim; ', slot, '; ', definitions(crop_id)%heat_stress_temp_crit, &
+                & definitions(crop_id)%heat_stress_temp_lim
+            write(unit,*) 'Kcbmin/Kcbmax; ', slot, '; ', minval(definitions(crop_id)%k_cb), &
+                & maxval(definitions(crop_id)%k_cb)
+            write(unit,*) 'SowingDOYmin/Delay; ', slot, '; ', definitions(crop_id)%sowing_doy_min, &
+                & definitions(crop_id)%sowing_delay_max
         end do
-        write(info_prod(i)%file%unit,*)'WPadj; ', (crop%wp_adj(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'HI; ', (crop%HI(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'KyT; ', (crop%Ky_tot(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Ky1; ', (crop%Ky_pheno(x,y,z,1), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Ky2; ', (crop%Ky_pheno(x,y,z,2), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Ky3; ', (crop%Ky_pheno(x,y,z,3), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Ky4; ', (crop%Ky_pheno(x,y,z,4), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Tcrit; ', (crop%T_crit(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Tlim; ', (crop%T_lim(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Kcbmin; ', (crop%k_cb_min(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Kcbini; ', (crop%k_cb_mid(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'Kcbmax; ', (crop%k_cb_max(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'ii0; ', (crop%ii0(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'iie; ', (crop%iie(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'iid; ', (crop%iid(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'dij; ', (crop%dij(x,y,z), '; ', z=1,zmax)
-        write(info_prod(i)%file%unit,*)'irandom; ', irandom(x,y)
+        write(unit,*) 'irandom; ', irandom(row,col)
     end do
 end subroutine write_cell_prod
 
@@ -1050,14 +1048,13 @@ subroutine save_yield_data(yield,domain)
 
 
     do j=1, size(yield%yield_pot%mat,3)
-        yield%yield_pot%mat(:,:,j) = merge(yield%yield_pot%mat(:,:,j),dble(domain%header%nan),domain%mat/=domain%header%nan)
-        yield%yield_pot%mat(:,:,j) = merge(yield%yield_pot%mat(:,:,j),dble(domain%header%nan),yield%yield_pot%mat(:,:,j)/=0)
-        yield%yield_act%mat(:,:,j) = merge(yield%yield_act%mat(:,:,j),dble(domain%header%nan),domain%mat/=domain%header%nan)
-        yield%yield_act%mat(:,:,j) = merge(yield%yield_act%mat(:,:,j),dble(domain%header%nan),yield%yield_act%mat(:,:,j)/=0)
-        yield%biomass_pot%mat(:,:,j) = merge(yield%biomass_pot%mat(:,:,j), &
-            & dble(domain%header%nan),domain%mat/=domain%header%nan)
-        yield%biomass_pot%mat(:,:,j) = merge(yield%biomass_pot%mat(:,:,j), &
-            & dble(domain%header%nan),yield%biomass_pot%mat(:,:,j)/=0)
+        ! A harvested crop may have zero yield. Only cells without this
+        ! completed occurrence are missing from the output slot.
+        where (domain%mat == domain%header%nan .or. yield%completed_crops < j)
+            yield%yield_pot%mat(:,:,j) = dble(domain%header%nan)
+            yield%yield_act%mat(:,:,j) = dble(domain%header%nan)
+            yield%biomass_pot%mat(:,:,j) = dble(domain%header%nan)
+        end where
     end do
 
     do j=1, size(yield%yield_pot%mat,3)

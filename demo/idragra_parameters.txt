@@ -41,18 +41,14 @@ MeteoPath = meteodata\\
 # MeteoFileName: root-level file listing the meteorological input files.
 MeteoFileName = weather_stations.dat
 
-# PhenoPath: folder containing crop phenology parameter files.
-PhenoPath = pheno\\
-
-# PhenoFileRoot: common prefix used by phenology files associated with
-# meteorological stations.
-PhenoFileRoot = pheno_
-
 # CropInputsFolder: folder containing the CropCoef land-use rotation database.
 CropInputsFolder = landuses\\
 
 # SoilUsesFilename: crop-rotation table within CropInputsFolder.
 SoilUsesFilename = soil_uses.txt
+
+# CO2Filename: annual CO2 concentrations (path relative to the working folder).
+CO2Filename = CO2_conc.dat
 
 # CropFolder: folder containing the CropCoef crop parameter files.
 CropFolder = landuses\\crop_parameters\\

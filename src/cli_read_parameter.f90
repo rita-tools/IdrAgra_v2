@@ -155,19 +155,13 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
                                             )
                     case ('meteofilename') ! name of the file with the list of weather station
                         read(buffer, *, iostat=ios) xml%sim%ws_list_fn
-                    case ('phenopath') ! path to the phenophase files
-                        read(buffer, *, iostat=ios) xml%sim%pheno_path
-                        xml%sim%pheno_path = replace_str( string = xml%sim%pheno_path &
-                                            , search = "\\" &
-                                            , substitute = delimiter &
-                                            )
-                    case ('phenofileroot') ! the sub string to use as root of phenophase subfolder
-                        read(buffer, *, iostat=ios) xml%sim%pheno_root
                     case ('cropinputsfolder')
                         read(buffer, *, iostat=ios) xml%sim%crop_inputs_path
                         xml%sim%crop_inputs_path = replace_str(xml%sim%crop_inputs_path, "\\", delimiter)
                     case ('soilusesfilename')
                         read(buffer, *, iostat=ios) xml%sim%soil_uses_fn
+                    case ('co2filename')
+                        read(buffer, *, iostat=ios) xml%sim%co2_conc_fn
                     case ('cropfolder')
                         read(buffer, *, iostat=ios) xml%sim%crop_parameters_path
                         xml%sim%crop_parameters_path = replace_str(xml%sim%crop_parameters_path, "\\", delimiter)

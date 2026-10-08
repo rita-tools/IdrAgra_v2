@@ -16,6 +16,7 @@ pages/need_modes
 pages/scheduled_mode
 pages/command_line_args
 pages/outputs
+pages/yield
 pages/rice
 pages/idragratools_workflow
 :::

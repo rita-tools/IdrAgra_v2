@@ -10,9 +10,8 @@ IdrAgra represents the flooded conditions, ponding, and different soil propertie
 
 Paddy behavior applies to {ref}`cells <simulation-unit>` where:
 
-- `CNclass = 7` identifies the crop as rice in `CropParam.dat`;
-- the daily `Kcb` value is positive;
-- `irrig = 1` allows the crop to be irrigated; and
+- `CL_CN = 7` identifies the crop as rice in its crop parameter `.tab` file;
+- `Irrigation = 1` allows the crop to be irrigated; and
 - `irr_meth.asc`, or its yearly variant, assigns a valid irrigation method.
 
 IdrAgra does not identify rice from the crop name, land-use label, or the presence of standing water alone.
@@ -47,10 +46,9 @@ The active {ref}`irrigation method <irrigation-method-files>` supplies the maxim
 
 Before running an irrigated rice scenario, check that:
 
-1. `CropParam.dat` contains `CNclass = 7` and `irrig = 1` for the rice crop.
-2. The daily phenology files contain the intended positive `Kcb` period.
-3. The irrigation-method map assigns a valid positive method.
-4. The method's season, application depth, hourly distribution, and maximum ponding depth represent the intended practice.
-5. `rice_soilparam.txt` contains reviewed Layer II values when paddy-specific soil properties are required.
+1. The rice crop's `.tab` file contains `CL_CN = 7`, `Irrigation = 1`.
+2. The irrigation-method map assigns a valid positive method.
+3. The method's season, application depth, hourly distribution, and maximum ponding depth represent the intended practice.
+4. `rice_soilparam.txt` contains reviewed Layer II values when paddy-specific soil properties are required.
 
 See [Irrigation modes and inputs](irrigation.md) for mode selection and common method settings.

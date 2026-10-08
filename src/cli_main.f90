@@ -5,9 +5,9 @@ use mod_parameters, only: parameters, water_sources_table, source_info
 use mod_grid, only: write_grid, min_domain, bound      ! variables and methods to handle spatial input
 use mod_meteo
 use mod_TDx_index
-use mod_crop_phenology, only: crop_definition, crop_rotation
-use cli_crop_parameters, only: init_crop_phenology_pars, destroy_info_pheno, import_crop_definitions, &
-                             & crop_pheno_info
+use mod_crop_phenology, only: crop_definition, crop_rotation, crop_pars_matrices
+use mod_crop_yield, only: yield_accumulator
+use cli_crop_parameters, only: import_crop_definitions, initialize_co2_parameters
 use cli_watsources                                                          ! variables and methods to handle irrigation units water supply
 use cli_simulation_manager                                                  ! simulation manager: control IO and daily cycle
 use cli_read_parameter
@@ -23,9 +23,10 @@ type(water_sources_table),dimension(:),allocatable::watsour ! stores parameters 
 real(dp), dimension(10,3,4):: tab_CN2, tab_CN3               ! CN implementation
 type(source_info)::info_sources                             ! stores water sources series
 type(meteo_info),dimension(:),allocatable::info_meteo       ! stores meteorological series data
-type(crop_pheno_info),dimension(:),allocatable::info_pheno  ! stores phenological parameters series
 type(crop_definition), dimension(:), allocatable :: crop_definitions ! shared static crop parameters
 type(crop_rotation), dimension(:), allocatable :: crop_rotations     ! crop IDs ordered by land use
+type(crop_pars_matrices) :: crop_state                      ! per-cell state carried through warmup
+type(yield_accumulator) :: crop_yield_state                 ! crop sums carried through warmup and calendar years
 type(soil2_rice)::theta2_rice                               ! stores soil parameters data for paddy rice fields
 type(date) :: warmup_end                                    ! last day of the full warmup period
 real(dp), allocatable :: warmup_theta(:, :, :)              ! passes soil theta from warmup to the actual simulation
@@ -86,10 +87,8 @@ call date_and_time(values=t_start)
 ! Reads simulation input parameters
 call read_all_parameters(filename, xml, xml_TDx, verbose, reckless)
 
-! --------------- Work in progress: needed for cropcoef integration ---------------
-! Import crop .dat files, preparing for cropcoef integration. CURRENTLY UNUSED
+! Import crop .dat files and the list of landuses (rotations)
 call import_crop_definitions(xml%sim, crop_definitions, crop_rotations)
-! ---------------------------------------------------------------------------------
 
 if (showpreview .eqv. .true.) then
     print *, '=== PREVIEW ==='
@@ -100,6 +99,7 @@ print*,'Simulation parameters have been set'
 
 ! Evaluates simulation length [days] by counting meteorological files' lines
 call meteo_series_length(xml%sim, verbose)
+call initialize_co2_parameters(xml%sim)
 
 ! Defines simulation domain boundaries
 call min_domain(trim(xml%sim%input_path)//trim(xml%sim%domain_fn)//'.asc',boundaries,xml%sim)
@@ -133,10 +133,6 @@ if(xml%sim%f_init_wc .eqv. .false.)then ! Generates soil initial condition
         stop
     end if
 
-    ! Initializes info_pheno matrices (by associating file units to files)
-    call init_crop_phenology_pars(xml%sim, info_pheno, info_meteo, xml%depth%ze_fix, verbose, warmup_end%year)
-    print*, 'Variable "info_pheno" has been initialized'
-
     ! Initializes watsources and info_sources matrices
     if (xml%sim%mode == 1) then                 ! USE mode
         call init_water_sources_duty(xml,watsour,info_sources,info_meteo)
@@ -144,8 +140,11 @@ if(xml%sim%f_init_wc .eqv. .false.)then ! Generates soil initial condition
     end if
 
     ! Soil-crop water balance algorithm
-    call simulation_manager(xml, xml_TDx, info_spat, watsour, info_sources, info_meteo, info_pheno, &
-                          & tab_CN2, tab_CN3, theta2_rice, warmup_end, boundaries, verbose, summary )
+    call simulation_manager(xml, xml_TDx, info_spat, watsour, info_sources, info_meteo, crop_definitions, crop_rotations,        &
+                          & crop_state, crop_yield_state, tab_CN2, tab_CN3, theta2_rice, warmup_end, boundaries, verbose, summary)
+
+    where (crop_state%sowing_year > 0) crop_state%sowing_year = crop_state%sowing_year - 1
+    where (crop_yield_state%sowing_year > 0) crop_yield_state%sowing_year = crop_yield_state%sowing_year - 1
 
     !%PS%: save soil moisture at the end of warmup explicitly (info_spat gets overwritten by read_spatial_info)
     allocate(warmup_theta(size(info_spat%theta(1)%old%mat, 1), size(info_spat%theta(1)%old%mat, 2), 2))
@@ -161,7 +160,6 @@ if(xml%sim%f_init_wc .eqv. .false.)then ! Generates soil initial condition
     ! Closes input files
     if (xml%sim%mode == 1) call close_water_sources_dudy(info_sources,xml)        ! USE mode
     call close_meteo_file(info_meteo)
-    call destroy_info_pheno(info_pheno)
     print *, '=== INITIAL CONDITION SET ==='
 end if
 
@@ -192,10 +190,6 @@ end where
 call read_meteo_parameters(xml%sim,info_meteo,verbose)
 print*, 'Variable "info_meteo" has been initialized'
 
-! Initializes info_pheno matrices (by associating file units to files)
-call init_crop_phenology_pars(xml%sim, info_pheno, info_meteo, xml%depth%ze_fix, verbose)
-print*, 'Variable "info_pheno" has been initialized'
-
 ! Initializes watsources and info_sources matrices
 if (xml%sim%mode == 1) then         ! %AB% USE mode
     call init_water_sources_duty(xml,watsour,info_sources, info_meteo)
@@ -204,13 +198,12 @@ end if
 
 ! Soil-crop water balance algorithm
 print*,"=== SIMULATION ==="
-call simulation_manager(xml, xml_TDx, info_spat, watsour, info_sources, info_meteo, info_pheno, &
-                      & tab_CN2, tab_CN3, theta2_rice, xml%sim%end, boundaries, verbose, summary)
+call simulation_manager(xml, xml_TDx, info_spat, watsour, info_sources, info_meteo, crop_definitions, crop_rotations,         &
+                      & crop_state, crop_yield_state, tab_CN2, tab_CN3, theta2_rice, xml%sim%end, boundaries, verbose, summary)
 
 ! Closes input files
 if (xml%sim%mode == 1) call close_water_sources_dudy(info_sources,xml)        ! USE mode
 call close_meteo_file(info_meteo)
-call destroy_info_pheno(info_pheno)
 
 ! Memorization of time in which simulation ends
 call date_and_time(values=t_stop)
@@ -253,8 +246,6 @@ type(TDx_index), intent(in) :: xml_dtx
 print *,'OutputPath = ',  xml%sim%path
 print *,'MeteoPath = ', xml%sim%meteo_path
 print *,'MeteoFileName = ', xml%sim%ws_list_fn
-print *,'PhenoPath = ', xml%sim%pheno_path
-print *,'PhenoFileRoot = ', xml%sim%pheno_root
 print *,'CropInputsFolder = ', xml%sim%crop_inputs_path
 print *,'SoilUsesFilename = ', xml%sim%soil_uses_fn
 print *,'CropFolder = ', xml%sim%crop_parameters_path
