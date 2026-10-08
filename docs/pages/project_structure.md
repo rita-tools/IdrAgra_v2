@@ -10,6 +10,7 @@ Input files make up the majority of the project's data. By default, they are org
 
 - **{ref}`spatial_data <parameter-inputpath>`**, containing .asc maps, i.e. anything that is spatialized at the {ref}`field <simulation-unit>` level;
 - **{ref}`meteo_data <parameter-meteopath>`**, containing weather time series (one file per station);
+- **{ref}`landuses <parameter-cropinputsfolder>`**, containing the CropCoef rotation table and crop-definition files;
 - **{ref}`crop_series <parameter-phenopath>`**, containing crop parameters & time series, spatialized at the station level;
 - **{ref}`irrmeth_data <parameter-irrmethpath>`**, containing each irrigation method's parameters;
 - **{ref}`watsour_data <parameter-watsourpath>`**, containing water-source and scheduled-irrigation files;
@@ -45,13 +46,14 @@ project/
 ├── weather_stations.dat
 ├── spatial_data/       # ESRI ASCII grids and rice_soilparam.txt
 ├── meteo_data/         # one daily weather file per station
+├── landuses/           # CropCoef rotations and static crop definitions
 ├── crop_series/        # CanopyRes.dat and one phenology folder per station
 ├── irrmeth_data/       # irrigation-method list and method files
 ├── watsour_data/       # source, district, diversion, and schedule files
 └── sim_results/        # generated outputs
 ```
 
-Alternative names work when {ref}`InputPath <parameter-inputpath>`, {ref}`MeteoPath <parameter-meteopath>`, {ref}`PhenoPath <parameter-phenopath>`, {ref}`IrrMethPath <parameter-irrmethpath>`, {ref}`WatSourPath <parameter-watsourpath>`, and {ref}`OutputPath <parameter-outputpath>` point to the matching folders. When copying a parameter file between projects, copy the associated folder structure or update these paths.
+Alternative names work when {ref}`InputPath <parameter-inputpath>`, {ref}`MeteoPath <parameter-meteopath>`, {ref}`CropInputsFolder <parameter-cropinputsfolder>`, {ref}`CropFolder <parameter-cropfolder>`, {ref}`PhenoPath <parameter-phenopath>`, {ref}`IrrMethPath <parameter-irrmethpath>`, {ref}`WatSourPath <parameter-watsourpath>`, and {ref}`OutputPath <parameter-outputpath>` point to the matching folders. When copying a parameter file between projects, copy the associated folder structure or update these paths.
 
 (spatial-ascii-grids)=
 ## Spatial ASCII grids
@@ -170,6 +172,10 @@ EndTable =
 
 (crop-input-files)=
 ## Crop and phenology inputs
+
+The CropCoef source database is read from {ref}`CropInputsFolder <parameter-cropinputsfolder>` and {ref}`CropFolder <parameter-cropfolder>`. The rotation table selected by {ref}`SoilUsesFilename <parameter-soilusesfilename>` associates each land-use ID with one or two crop parameter files. Crop filenames beginning with a positive integer and an underscore, such as `13_maize.tab`, use that prefix as the stable crop ID. Files without the prefix receive deterministic generated IDs.
+
+IdrAgra currently validates and retains this source database while continuing to run from the generated phenology files described below.
 
 The folder selected by {ref}`PhenoPath <parameter-phenopath>` contains `CanopyRes.dat` plus one subfolder per station. Each station folder name is {ref}`PhenoFileRoot <parameter-phenofileroot>` followed by the weather filename without its extension. Include these case-sensitive filenames:
 

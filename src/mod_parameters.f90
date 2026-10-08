@@ -14,6 +14,9 @@ type simulation
     character(len=200) :: ws_list_fn = 'weather_stations.dat'           ! filename (incl. path) of the weather station list
     character(len=200) :: pheno_path = '.\\crop_series\\'               ! Path to the crop timeseries directory
     character(len=200) :: pheno_root = 'pheno_'                         ! prefix shared by all folders in pheno_path
+    character(len=200) :: crop_inputs_path = '.\\landuses\\'            ! Path to CropCoef soil-use inputs
+    character(len=200) :: soil_uses_fn = 'soil_uses.txt'                ! Crop rotation table
+    character(len=200) :: crop_parameters_path = '.\\landuses\\crop_parameters\\' ! Path to crop definition files
     character(len=200) :: irr_met_path = '.\\irrmeth_data\\'            ! Path to irrigation methods folder
     character(len=200) :: irr_met_list_fn = 'irrmethods.txt'            ! Filename of the list of irrigation methods
     character(len=200) :: watsour_path = '.\\watsour_data\\'            ! Path to the water sources folder

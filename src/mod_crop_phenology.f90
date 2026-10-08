@@ -25,8 +25,76 @@ end type k_cb_matrices
 
 ! --------------- Work in progress: needed for cropcoef integration ---------------
 type crop_definition
+    character(len=255) :: crop_name = ''
+    character(len=255) :: parameter_file = ''
     integer :: crop_id = 0
+
+    ! Sowing, harvest and rotation constraints
+    integer :: sowing_doy_min = 0
+    integer :: sowing_delay_max = 0
+    integer :: harvest_doy_max = 0
+    integer :: max_cuts = 1
+    integer :: crop_overlap_days = 0
+
+    ! Thermal-time parameters
+    real(dp) :: sowing_temp = 0._dp
+    real(dp) :: base_temp = 0._dp
+    real(dp) :: cutoff_temp = 0._dp
+
+    ! Vernalization parameters
+    logical :: requires_vernalization = .false.
+    real(dp) :: vern_temp_min = 0._dp
+    real(dp) :: vern_temp_max = 0._dp
+    real(dp) :: vern_fact_min = 0._dp
+    integer :: vern_days_start = 0
+    integer :: vern_days_end = 0
+    real(dp) :: vern_curve_slope = 0._dp
+
+    ! Photoperiod response: 0 = day-neutral, 1 = long-day, 2 = short-day
+    integer :: photoperiod_response = 0
+    real(dp) :: daylength_if = 0._dp
+    real(dp) :: daylength_ins = 0._dp
+
+    ! Yield and water-stress parameters
+    real(dp) :: water_productivity = 0._dp
+    real(dp) :: sink_strength = 0._dp
+    real(dp) :: heat_stress_temp_crit = 0._dp
+    real(dp) :: heat_stress_temp_lim = 0._dp
+    real(dp) :: harvest_index = 0._dp
+    real(dp) :: yield_response_total = 0._dp
+    real(dp), dimension(4) :: yield_response_stage = 0._dp
+    real(dp) :: raw_fraction = 0._dp
+    real(dp) :: interception_coef = 0._dp
+
+    ! Runoff and irrigation parameters
+    integer :: cn_class = 0
+    logical :: is_irrigated = .false.
+    logical :: adjust_k_cb = .true.
+
+    ! Root fractions retained for compatibility with CropCoef. The first two
+    ! are obsolete there; the daily IdrAgra implementation will decide whether
+    ! any of them remain necessary.
+    real(dp) :: evaporative_layer_root_fraction = 0._dp
+    real(dp) :: transpirative_layer_root_fraction = 1._dp
+    real(dp) :: maximum_transpirative_root_fraction = 1._dp
+
+    ! Crop development curves indexed by accumulated growing degree days.
+    real(dp), dimension(:), allocatable :: gdd
+    real(dp), dimension(:), allocatable :: k_cb
+    real(dp), dimension(:), allocatable :: lai
+    real(dp), dimension(:), allocatable :: height
+    real(dp), dimension(:), allocatable :: root_depth
+    real(dp), dimension(:), allocatable :: yield_response
+    real(dp), dimension(:), allocatable :: cn_value
+    real(dp), dimension(:), allocatable :: cover_fraction
+    real(dp), dimension(:), allocatable :: stress_resistance
 end type crop_definition
+
+type crop_rotation
+    ! Ordered crop-definition IDs associated with one land-use class.
+    integer :: land_use_id = 0
+    integer, dimension(:), allocatable :: crop_ids
+end type crop_rotation
 ! ---------------------------------------------------------------------------------
 
 type crop_pheno_info

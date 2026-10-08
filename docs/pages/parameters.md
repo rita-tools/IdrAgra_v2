@@ -86,6 +86,33 @@ Folder containing crop phenology parameter files.
 
 Common prefix used by phenology files associated with meteorological stations.
 
+(parameter-cropinputsfolder)=
+### `CropInputsFolder`
+
+:::{container} parameter-summary
+**Type:** String  ·  **Default:** `.\\landuses\\`
+:::
+
+Folder containing the CropCoef land-use rotation database.
+
+(parameter-soilusesfilename)=
+### `SoilUsesFilename`
+
+:::{container} parameter-summary
+**Type:** String  ·  **Default:** `soil_uses.txt`
+:::
+
+CropCoef rotation table within {ref}`CropInputsFolder <parameter-cropinputsfolder>`.
+
+(parameter-cropfolder)=
+### `CropFolder`
+
+:::{container} parameter-summary
+**Type:** String  ·  **Default:** `.\\landuses\\crop_parameters\\`
+:::
+
+Folder containing CropCoef crop parameter files. A leading positive integer followed by an underscore in a filename is treated as the crop's stable ID. IdrAgra assigns deterministic IDs after the largest explicit ID to files without such a prefix.
+
 (parameter-irrmethpath)=
 ### `IrrMethPath`
 

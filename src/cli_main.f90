@@ -5,7 +5,9 @@ use mod_parameters, only: parameters, water_sources_table, source_info
 use mod_grid, only: write_grid, min_domain, bound      ! variables and methods to handle spatial input
 use mod_meteo
 use mod_TDx_index
-use cli_crop_parameters, only: init_crop_phenology_pars, destroy_info_pheno, crop_pheno_info ! variables and methods to handle crop parameters
+use mod_crop_phenology, only: crop_definition, crop_rotation
+use cli_crop_parameters, only: init_crop_phenology_pars, destroy_info_pheno, import_crop_definitions, &
+                             & crop_pheno_info
 use cli_watsources                                                          ! variables and methods to handle irrigation units water supply
 use cli_simulation_manager                                                  ! simulation manager: control IO and daily cycle
 use cli_read_parameter
@@ -22,6 +24,8 @@ real(dp), dimension(10,3,4):: tab_CN2, tab_CN3               ! CN implementation
 type(source_info)::info_sources                             ! stores water sources series
 type(meteo_info),dimension(:),allocatable::info_meteo       ! stores meteorological series data
 type(crop_pheno_info),dimension(:),allocatable::info_pheno  ! stores phenological parameters series
+type(crop_definition), dimension(:), allocatable :: crop_definitions ! shared static crop parameters
+type(crop_rotation), dimension(:), allocatable :: crop_rotations     ! crop IDs ordered by land use
 type(soil2_rice)::theta2_rice                               ! stores soil parameters data for paddy rice fields
 type(date) :: warmup_end                                    ! last day of the full warmup period
 real(dp), allocatable :: warmup_theta(:, :, :)              ! passes soil theta from warmup to the actual simulation
@@ -81,6 +85,11 @@ call date_and_time(values=t_start)
 
 ! Reads simulation input parameters
 call read_all_parameters(filename, xml, xml_TDx, verbose, reckless)
+
+! --------------- Work in progress: needed for cropcoef integration ---------------
+! Import crop .dat files, preparing for cropcoef integration. CURRENTLY UNUSED
+call import_crop_definitions(xml%sim, crop_definitions, crop_rotations)
+! ---------------------------------------------------------------------------------
 
 if (showpreview .eqv. .true.) then
     print *, '=== PREVIEW ==='
@@ -246,6 +255,9 @@ print *,'MeteoPath = ', xml%sim%meteo_path
 print *,'MeteoFileName = ', xml%sim%ws_list_fn
 print *,'PhenoPath = ', xml%sim%pheno_path
 print *,'PhenoFileRoot = ', xml%sim%pheno_root
+print *,'CropInputsFolder = ', xml%sim%crop_inputs_path
+print *,'SoilUsesFilename = ', xml%sim%soil_uses_fn
+print *,'CropFolder = ', xml%sim%crop_parameters_path
 print *,'IrrMethPath = ', xml%sim%irr_met_path
 print *,'IrrMethFileName = ', xml%sim%irr_met_list_fn
 print *,'WatSourpath = ', xml%sim%watsour_path

@@ -11,6 +11,40 @@ end interface
 
 contains
 
+! Remove comments and normalize whitespace in a text line
+pure function clean_input_line(line) result(cleaned)
+    character(len=*), intent(in) :: line
+    character(len=len(line)) :: cleaned
+    integer :: comment_idx, idx
+
+    cleaned = line
+    comment_idx = scan(cleaned, '#')
+    if (comment_idx > 0) cleaned(comment_idx:) = ' '
+
+    do idx = 1, len_trim(cleaned)
+        if (cleaned(idx:idx) == achar(9)) cleaned(idx:idx) = ' '
+    end do
+
+    cleaned = adjustl(cleaned)
+end function clean_input_line
+
+pure function join_path(folder, file_name, separator) result(path)
+    character(len=*), intent(in) :: folder, file_name
+    character, intent(in) :: separator
+    character(len=:), allocatable :: path
+    integer :: folder_length
+
+    folder_length = len_trim(folder)
+    if (folder_length == 0) then
+        path = trim(file_name)
+    else if (folder(folder_length:folder_length) == '/' .or. &
+           & folder(folder_length:folder_length) == achar(92)) then
+        path = trim(folder)//trim(file_name)
+    else
+        path = trim(folder)//separator//trim(file_name)
+    end if
+end function join_path
+
 ! Integer-to-string conversion without leading or trailing spaces.
 pure function itoa(value) result(string)
     integer, intent(in) :: value

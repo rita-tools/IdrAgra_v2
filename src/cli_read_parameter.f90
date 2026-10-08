@@ -89,7 +89,7 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
     type(parameters), intent(inout) :: xml
     integer :: unit_txt
     ! Input related variables used in parsing loop
-    character(len=300) :: comment,buffer, label
+    character(len=300) :: buffer, label
     integer :: p
     integer :: ios          ! state variable (0 = ok)
     integer :: line
@@ -119,14 +119,7 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
         read(unit_txt, '(A)', iostat=ios) buffer
         if (ios == 0) then
             line = line + 1
-            ! remove white spaces before and after string sequences
-            buffer = trim(buffer)
-            ! check if there are comment and get only left side of the row
-            p = scan(buffer, '#')
-            if (p /= 0) then
-                comment = buffer(p+1:)
-                buffer = buffer(1:p-1)
-            end if
+            buffer = clean_input_line(buffer)
             ! if buffer is different from blank string, parse it
             if (buffer /= '') then
                 call lower_case(buffer)
@@ -170,6 +163,14 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
                                             )
                     case ('phenofileroot') ! the sub string to use as root of phenophase subfolder
                         read(buffer, *, iostat=ios) xml%sim%pheno_root
+                    case ('cropinputsfolder')
+                        read(buffer, *, iostat=ios) xml%sim%crop_inputs_path
+                        xml%sim%crop_inputs_path = replace_str(xml%sim%crop_inputs_path, "\\", delimiter)
+                    case ('soilusesfilename')
+                        read(buffer, *, iostat=ios) xml%sim%soil_uses_fn
+                    case ('cropfolder')
+                        read(buffer, *, iostat=ios) xml%sim%crop_parameters_path
+                        xml%sim%crop_parameters_path = replace_str(xml%sim%crop_parameters_path, "\\", delimiter)
                     case ('irrmethpath') ! path to meteo files
                         read(buffer, *, iostat=ios) xml%sim%irr_met_path
                         xml%sim%irr_met_path = replace_str( string = xml%sim%irr_met_path &

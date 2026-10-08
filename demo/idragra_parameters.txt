@@ -48,6 +48,15 @@ PhenoPath = pheno\\
 # meteorological stations.
 PhenoFileRoot = pheno_
 
+# CropInputsFolder: folder containing the CropCoef land-use rotation database.
+CropInputsFolder = landuses\\
+
+# SoilUsesFilename: crop-rotation table within CropInputsFolder.
+SoilUsesFilename = soil_uses.txt
+
+# CropFolder: folder containing the CropCoef crop parameter files.
+CropFolder = landuses\\crop_parameters\\
+
 # IrrMethPath: folder containing irrigation-method files.
 IrrMethPath = irrmethods\\
 
