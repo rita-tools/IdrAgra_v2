@@ -174,6 +174,17 @@ EndTable =
 
 IdrAgra reads the rotation table selected by {ref}`SoilUsesFilename <parameter-soilusesfilename>` from {ref}`CropInputsFolder <parameter-cropinputsfolder>`, and reads the referenced crop parameter files from {ref}`CropFolder <parameter-cropfolder>`. A positive integer prefix such as `13_maize.tab` supplies a stable crop ID; files without one receive deterministic generated IDs.
 
+For crops with `Adj_flag = 1` (the default), IdrAgra calculates a Kcb correction from the nearest weather station's average climate. The crop file can specify an inclusive day/month interval for the weather average:
+
+```text
+KcbCorrectionStart = 01/07
+KcbCorrectionEnd = 31/08
+```
+
+The interval may cross New Year. Both dates must be supplied together. If neither is present, IdrAgra warns once for the crop and uses 70–95% of the estimated sowing-to-harvest period: sowing is estimated halfway through the allowed window, and harvest uses `HarvestDate_max`. Complete occurrences of the interval in the station series are averaged. If none is complete, IdrAgra warns and uses the available days within incomplete occurrences; if no occurrence overlaps the weather series, it warns and uses the entire series. One additive correction per crop–station pair is calculated using the crop's peak tabulated height and reused each year; daily crop development still follows local weather. `Adj_flag = 0` retains the input Kcb curve.
+
+The correction applies on days from the input curve's start of mid-season when the uncorrected Kcb is greater than 0.45. Crops without a positive-length maximum-Kcb plateau or with peak Kcb at or below 0.45 are not corrected. The phase check uses accumulated GDD and the uncorrected curve, so climate correction cannot move its own eligibility thresholds.
+
 The {ref}`CO2Filename <parameter-co2filename>` file supplies one atmospheric CO2 concentration for each required calendar year. Its path is relative to the working folder unless an absolute path is supplied. For example:
 
 ```text

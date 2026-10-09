@@ -8,7 +8,7 @@ use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data, create_meteo_matric
 use mod_runoff
 use mod_crop_soil_water
 use mod_crop_phenology, only: crop_definition, crop_rotation, crop_pars_matrices
-use mod_cropcoef, only: advance_crops_daily, crop_weather_cache, load_crop_weather_cache
+use mod_cropcoef, only: advance_crops_daily
 use mod_TDx_index
 use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva, nan_i, nan_r
 use mod_common, only: wat_matrix, soil2_rice, hourly, unit_file_scratch
@@ -31,8 +31,9 @@ end interface
 
 contains
 
-subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, info_meteo, crop_definitions, crop_rotations, &
-                     & crop_state, crop_yield_state, tab_CN2, tab_CN3, theta2_rice, simulation_end, boundaries, debug, summary)
+subroutine simulation_manager(pars, pars_TDx, info_spat, wat_src_tbl, info_sources, info_meteo,              &
+                            & crop_definitions, crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, &
+                            & tab_CN2, tab_CN3, theta2_rice, simulation_end, boundaries, debug, summary      )
 
     type(parameters),intent(inout)::pars
     type(TDx_index),intent(in)::pars_TDx
@@ -47,13 +48,13 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     type(meteo_info),dimension(:),intent(inout)::info_meteo
     type(crop_definition), dimension(:), intent(in) :: crop_definitions
     type(crop_rotation), dimension(:), intent(inout) :: crop_rotations
+    real(dp), dimension(:,:), intent(in) :: kcb_corr_fact
     type(crop_pars_matrices), intent(inout) :: crop_state
     type(yield_accumulator), intent(inout) :: crop_yield_state
 
     type(balance1_matrices)::wat_bal1,wat_bal1_old
     type(balance2_matrices)::wat_bal2,wat_bal2_old
     type(crop_pars_matrices)::pheno
-    type(crop_weather_cache) :: crop_weather
     type(meteo_mat)::meteo
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::out_cn_day
     type(output_CN),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::out_cn
@@ -75,7 +76,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::priv_irr
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::coll_irr
     integer, dimension(:), allocatable :: out_steps
-    integer :: days_before_1st_interval, first_simulated_doy, last_simulated_doy, n_simulation_years, max_curve_points
+    integer :: days_before_1st_interval, first_simulated_doy, last_simulated_doy, n_simulation_years
     character(len=5) :: step_label
     integer::xx,yy ! Test cells coordinates
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::iter1,iter2
@@ -128,15 +129,7 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
         & info_spat%domain%header%imax,info_spat%domain%header%jmax, info_spat%domain%mat)
 
     if (allocated(crop_state%crop_id)) pheno = crop_state
-    if (.not. allocated(pheno%corrected_k_cb)) then
-        max_curve_points = 1
-        do k = 1, size(crop_definitions)
-            if (allocated(crop_definitions(k)%k_cb)) max_curve_points = max(max_curve_points, size(crop_definitions(k)%k_cb))
-        end do
-        allocate(pheno%corrected_k_cb(size(pheno%crop_id,1),size(pheno%crop_id,2),max_curve_points), source=0._dp)
-    end if
     call initialize_yield_accumulator(crop_yield_state, info_spat%domain%mat)
-    if (any(crop_definitions%adjust_k_cb)) call load_crop_weather_cache(crop_weather, info_meteo, pars%sim)
 
     ! Make sure that RF-related variables are nan outside the simulation domain
     pheno%d_t_max  = dble(info_spat%domain%header%nan)
@@ -315,8 +308,8 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                                         & pars%sim%co2_concentration(year_idx), info_spat%domain)
 
             ! Advance each cell's crop phenology according to today's GDD accumulation
-            call advance_crops_daily(pheno, crop_definitions, crop_rotations, info_spat%domain, info_spat%soil_use_id,     &
-                                   & info_spat%irandom%mat, meteo, crop_weather, dir_meteo, meteo_weight, pars%sim, current)
+            call advance_crops_daily(pheno, crop_definitions, crop_rotations, info_spat%domain, info_spat%soil_use_id, &
+                                   & info_spat%irandom%mat, meteo, kcb_corr_fact, dir_meteo, current                   )
 
             call start_yield_for_new_crops(crop_yield_state, pheno, info_spat%domain)
 
@@ -1953,7 +1946,6 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
         deallocate(pheno%vernalization_days)
         deallocate(pheno%k_cb_old        )
         deallocate(pheno%k_cb            )
-        if (allocated(pheno%corrected_k_cb)) deallocate(pheno%corrected_k_cb)
         deallocate(pheno%h              )
         deallocate(pheno%d_r             )
         deallocate(pheno%lai            )

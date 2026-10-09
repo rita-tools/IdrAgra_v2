@@ -1,6 +1,6 @@
 module cli_crop_parameters
 use mod_constants, only: dp, nan_r
-use mod_date, only: date, annual_period_end
+use mod_date, only: date, annual_period_end, parse_day_month_date
 use mod_utility, only: clean_input_line, join_path, lower_case, replace_str
 use mod_parameters, only: simulation
 use mod_crop_phenology
@@ -319,6 +319,8 @@ subroutine read_crop_file(file_name, crop)
             case ('cl_cn'); read(value, *, iostat=ios) crop%cn_class
             case ('irrigation'); read(value, *, iostat=ios) binary_flag; if (ios == 0) crop%is_irrigated = binary_flag /= 0
             case ('adj_flag'); read(value, *, iostat=ios) binary_flag; if (ios == 0) crop%adjust_k_cb = binary_flag /= 0
+            case ('kcbcorrectionstart'); call parse_day_month_date(value, crop%kcb_corr_start_day, crop%kcb_corr_start_month,ios)
+            case ('kcbcorrectionend'); call parse_day_month_date(value, crop%kcb_corr_end_day, crop%kcb_corr_end_month, ios)
             case ('rft'); read(value, *, iostat=ios) crop%maximum_transpirative_root_fraction
             case default
                 print *, 'Skipping invalid or obsolete label <',trim(label),'> in ', trim(file_name)
@@ -334,6 +336,7 @@ subroutine read_crop_file(file_name, crop)
     close(unit)
 
     call prepare_crop_definition_curves(crop)
+
 end subroutine read_crop_file
 
 subroutine append_crop_curve_row(crop, row)

@@ -7,6 +7,7 @@ use mod_meteo
 use mod_TDx_index
 use mod_crop_phenology, only: crop_definition, crop_rotation, crop_pars_matrices
 use mod_crop_yield, only: yield_accumulator
+use mod_cropcoef, only: compute_kcb_corrections
 use cli_crop_parameters, only: import_crop_definitions, initialize_co2_parameters
 use cli_watsources                                                          ! variables and methods to handle irrigation units water supply
 use cli_simulation_manager                                                  ! simulation manager: control IO and daily cycle
@@ -25,6 +26,7 @@ type(source_info)::info_sources                             ! stores water sourc
 type(meteo_info),dimension(:),allocatable::info_meteo       ! stores meteorological series data
 type(crop_definition), dimension(:), allocatable :: crop_definitions ! shared static crop parameters
 type(crop_rotation), dimension(:), allocatable :: crop_rotations     ! crop IDs ordered by land use
+real(dp), allocatable :: kcb_corr_fact(:,:)                 ! Additive kcb correction factor, indexed by crop ID and weather station.
 type(crop_pars_matrices) :: crop_state                      ! per-cell state carried through warmup
 type(yield_accumulator) :: crop_yield_state                 ! crop sums carried through warmup and calendar years
 type(soil2_rice)::theta2_rice                               ! stores soil parameters data for paddy rice fields
@@ -125,6 +127,8 @@ if(xml%sim%f_init_wc .eqv. .false.)then ! Generates soil initial condition
     call read_meteo_parameters(xml%sim,info_meteo,verbose)
     print*, 'Variable "info_meteo" has been initialized'
 
+    call compute_kcb_corrections(kcb_corr_fact, crop_definitions, info_meteo, xml%sim)
+
     if (any(date_is_before(info_meteo(:)%finish, warmup_end))) then
         print *, 'A complete warmup requires meteorological data from '//date_to_string(xml%sim%start)// &
                & ' through '//date_to_string(warmup_end)//'.'
@@ -140,8 +144,9 @@ if(xml%sim%f_init_wc .eqv. .false.)then ! Generates soil initial condition
     end if
 
     ! Soil-crop water balance algorithm
-    call simulation_manager(xml, xml_TDx, info_spat, watsour, info_sources, info_meteo, crop_definitions, crop_rotations,        &
-                          & crop_state, crop_yield_state, tab_CN2, tab_CN3, theta2_rice, warmup_end, boundaries, verbose, summary)
+    call simulation_manager(xml, xml_TDx, info_spat, watsour, info_sources, info_meteo,                    &
+                          & crop_definitions, crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, &
+                          & tab_CN2, tab_CN3, theta2_rice, warmup_end, boundaries, verbose, summary        )
 
     where (crop_state%sowing_year > 0) crop_state%sowing_year = crop_state%sowing_year - 1
     where (crop_yield_state%sowing_year > 0) crop_yield_state%sowing_year = crop_yield_state%sowing_year - 1
@@ -189,6 +194,7 @@ end where
 ! Initializes info_meteo matrices with meteorological data
 call read_meteo_parameters(xml%sim,info_meteo,verbose)
 print*, 'Variable "info_meteo" has been initialized'
+if (.not. allocated(kcb_corr_fact)) call compute_kcb_corrections(kcb_corr_fact, crop_definitions, info_meteo, xml%sim)
 
 ! Initializes watsources and info_sources matrices
 if (xml%sim%mode == 1) then         ! %AB% USE mode
@@ -198,8 +204,9 @@ end if
 
 ! Soil-crop water balance algorithm
 print*,"=== SIMULATION ==="
-call simulation_manager(xml, xml_TDx, info_spat, watsour, info_sources, info_meteo, crop_definitions, crop_rotations,         &
-                      & crop_state, crop_yield_state, tab_CN2, tab_CN3, theta2_rice, xml%sim%end, boundaries, verbose, summary)
+call simulation_manager(xml, xml_TDx, info_spat, watsour, info_sources, info_meteo,                    &
+                      & crop_definitions, crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, &
+                      & tab_CN2, tab_CN3, theta2_rice, xml%sim%end, boundaries, verbose, summary       )
 
 ! Closes input files
 if (xml%sim%mode == 1) call close_water_sources_dudy(info_sources,xml)        ! USE mode

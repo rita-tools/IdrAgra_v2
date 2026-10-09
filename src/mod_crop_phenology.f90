@@ -49,14 +49,19 @@ type crop_definition
     real(dp) :: harvest_index = 0._dp
     real(dp) :: yield_response_total = 0._dp
     real(dp), dimension(4) :: yield_response_stage = 0._dp
+
     real(dp) :: raw_fraction = 0._dp
     real(dp) :: maximum_transpirative_root_fraction = 1._dp
     real(dp) :: interception_coef = 0._dp
-
-    ! Runoff and irrigation parameters
     integer :: cn_class = 0
     logical :: is_irrigated = .false.
+
+    ! Kcb correction parameters
     logical :: adjust_k_cb = .true.
+    integer :: kcb_corr_start_day = 0
+    integer :: kcb_corr_start_month = 0
+    integer :: kcb_corr_end_day = 0
+    integer :: kcb_corr_end_month = 0
 
     ! Crop development curves indexed by accumulated growing degree days.
     real(dp), dimension(:), allocatable :: gdd
@@ -93,7 +98,6 @@ type crop_pars_matrices
     real(dp), dimension(:,:), allocatable :: vernalization_days
 
     real(dp), dimension(:,:), allocatable :: k_cb
-    real(dp), dimension(:,:,:), allocatable :: corrected_k_cb   ! Per-cell curve points; retained through warm-up
     real(dp), dimension(:,:), allocatable :: h
     real(dp), dimension(:,:), allocatable :: d_r
     real(dp), dimension(:,:), allocatable :: lai

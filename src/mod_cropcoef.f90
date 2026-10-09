@@ -7,176 +7,182 @@ use mod_grid, only: grid_i
 use mod_meteo, only: meteo_mat
 use mod_meteo, only: meteo_info
 use mod_parameters, only: simulation
-use mod_date, only: date, days_between_dates, advance_calendar_date
+use mod_date, only: date, days_between_dates, days_in_year, month_lengths, calendar_date_from_doy
 
 implicit none
 private
-public :: advance_crops_daily, adjust_water_productivity, compute_canopy_resistance, prepare_crop_stage_boundaries
-public :: crop_weather_cache, load_crop_weather_cache
-
-! Station data are cached once so a newly sown crop can look ahead to the
-! complete weather interval used by CropCoef to correct a Kcb plateau.
-type crop_weather_cache
-    type(date) :: first
-    real(dp), allocatable :: tmax(:,:), tmin(:,:), rhmin(:,:), wind(:,:)
-end type crop_weather_cache
+public :: advance_crops_daily, adjust_water_productivity, compute_canopy_resistance, prepare_crop_stage_boundaries, &
+        & compute_kcb_corrections
 
 contains
 
-subroutine load_crop_weather_cache(cache, stations, sim)
-    type(crop_weather_cache), intent(inout) :: cache
+subroutine compute_kcb_corrections(kcb_corr_fact, crops, stations, sim)
+    real(dp), allocatable :: kcb_corr_fact(:,:)
+    type(crop_definition), intent(in) :: crops(:)
     type(meteo_info), intent(in) :: stations(:)
     type(simulation), intent(in) :: sim
-    integer :: station, day, unit, ios, n_days, header_line
-    real(dp) :: rain, rhmax, radiation
+
+    real(dp), allocatable :: rhmin(:), wind(:)
+    real(dp) :: tmax, tmin, rain, rhmax, radiation, mean_rhmin, mean_wind
+    integer :: crop_idx, station_idx, n_days, day_idx, n_years, partial_days, unit, ios, header_line
     character(len=300) :: header
 
-    cache%first = stations(1)%start
-    n_days = days_between_dates(stations(1)%start, stations(1)%finish) + 1
-    allocate(cache%tmax(n_days,size(stations)), cache%tmin(n_days,size(stations)), &
-             & cache%rhmin(n_days,size(stations)), cache%wind(n_days,size(stations)))
+    allocate(kcb_corr_fact(size(crops),size(stations)), source=0._dp)
 
-    do station = 1, size(stations)
-        open(newunit=unit, file=trim(sim%meteo_path)//trim(stations(station)%filename), &
+    do crop_idx = 1, size(crops)
+        if (.not. needs_kcb_adjustment(crops(crop_idx))) cycle
+        if ((crops(crop_idx)%kcb_corr_start_month == 0) .neqv. (crops(crop_idx)%kcb_corr_end_month == 0)) then
+            print *, 'Both KcbCorrectionStart and KcbCorrectionEnd are required in ', &
+                & trim(crops(crop_idx)%parameter_file), '.'
+            print *, 'Execution will be aborted...'
+            stop
+        end if
+        if (crops(crop_idx)%kcb_corr_start_month == 0) then
+            print *, 'Warning: ', trim(crops(crop_idx)%parameter_file), ' has no Kcb correction interval.'
+            print *, 'Using 70-95% of the estimated sowing-to-harvest period for climate averages.'
+        end if
+    end do
+
+    do station_idx = 1, size(stations)
+        n_days = days_between_dates(stations(station_idx)%start, stations(station_idx)%finish) + 1
+        allocate(rhmin(n_days), wind(n_days))
+        open(newunit=unit, file=trim(sim%meteo_path)//trim(stations(station_idx)%filename), &
              & status='old', action='read', iostat=ios)
         if (ios /= 0) then
-            print *, 'Cannot reopen meteorological series for Kcb correction: ', trim(stations(station)%filename)
+            print *, 'Cannot reopen meteorological series for Kcb correction: ', trim(stations(station_idx)%filename)
+            print *, 'Execution will be aborted...'
             stop
         end if
         do header_line = 1, 4
             read(unit, '(A)', iostat=ios) header
             if (ios /= 0) exit
         end do
-        do day = 1, n_days
+        do day_idx = 1, n_days
             if (ios /= 0) exit
-            read(unit, *, iostat=ios) cache%tmax(day,station), cache%tmin(day,station), &
-                & rain, rhmax, cache%rhmin(day,station), cache%wind(day,station), radiation
+            read(unit, *, iostat=ios) tmax, tmin, rain, rhmax, rhmin(day_idx), wind(day_idx), radiation ! Only store rhmin and wind
         end do
         close(unit)
         if (ios /= 0) then
-            print *, 'Incomplete meteorological series for Kcb correction: ', trim(stations(station)%filename)
+            print *, 'Incomplete meteorological series for Kcb correction: ', trim(stations(station_idx)%filename)
+            print *, 'Execution will be aborted...'
             stop
         end if
-    end do
-end subroutine load_crop_weather_cache
 
-subroutine project_corrected_kcb(corrected, crop, cache, stations, weights, sim, sowing_date, latitude)
-    ! CropCoef corrects declining control points and whole Kcb plateaus with
-    ! mean weather from the interval between the corresponding GDD points.
-    ! Project the crop once at sowing, then interpolate its corrected points
-    ! during the daily water balance. The projection uses this cell's weather.
-    real(dp), intent(out) :: corrected(:)
-    type(crop_definition), intent(in) :: crop
-    type(crop_weather_cache), intent(in) :: cache
-    integer, intent(in) :: stations(:)
-    real(dp), intent(in) :: weights(:)
-    type(simulation), intent(in) :: sim
-    type(date), intent(in) :: sowing_date
-    real(dp), intent(in) :: latitude
+        do crop_idx = 1, size(crops)
+            if (.not. needs_kcb_adjustment(crops(crop_idx))) cycle
 
-    real(dp), allocatable :: rh(:), wind(:), height(:)
-    integer, allocatable :: crossing(:)
-    type(date) :: projected_date
-    real(dp) :: tmax, tmin, gdd, vern_days, daylength, temperature, correction
-    integer :: first_day, n_days, day, point, plateau_end, s, e
-
-    corrected = crop%k_cb
-    if (.not. allocated(cache%tmax)) return
-    first_day = days_between_dates(cache%first, sowing_date) + 1
-    if (first_day < 1 .or. first_day > size(cache%tmax,1)) return
-
-    n_days = min(size(cache%tmax,1) - first_day + 1, 3*366)
-    allocate(rh(n_days), wind(n_days), height(n_days), crossing(size(crop%gdd)))
-    crossing = 0
-    projected_date = sowing_date
-    gdd = 0._dp
-    vern_days = 0._dp
-
-    do day = 1, n_days
-        call cell_projection_weather(cache, first_day + day - 1, stations, weights, sim, &
-                                     & tmax, tmin, rh(day), wind(day))
-        temperature = (tmax + tmin)/2._dp
-        call calculateDLH(projected_date%doy, latitude, daylength)
-        gdd = gdd + calculate_daily_gdd(tmax, tmin, crop%base_temp, crop%cutoff_temp) * &
-            & min(vernalization_factor(crop, temperature, vern_days), photoperiod_factor(crop, daylength))
-        height(day) = curve_at_gdd(crop%gdd, crop%height, gdd)
-        do point = 1, size(crossing)
-            if (crossing(point) == 0 .and. gdd >= crop%gdd(point)) crossing(point) = day
-        end do
-        if (gdd >= maxval(crop%gdd)) exit
-        call advance_calendar_date(projected_date)
-    end do
-
-    point = 1
-    do while (point < size(corrected))
-        if (crop%k_cb(point) == crop%k_cb(point+1) .and. crop%k_cb(point) > 0.45_dp) then
-            plateau_end = point + 1
-            do while (plateau_end < size(corrected))
-                if (crop%k_cb(plateau_end+1) /= crop%k_cb(point)) exit
-                plateau_end = plateau_end + 1
-            end do
-            s = crossing(point)
-            e = crossing(plateau_end)
-            if (s > 0 .and. e >= s) then
-                correction = k_cb_weather_correction(sum(rh(s:e))/real(e-s+1,dp), &
-                    & sum(wind(s:e))/real(e-s+1,dp), sum(height(s:e))/real(e-s+1,dp))
-                corrected(point:plateau_end) = crop%k_cb(point:plateau_end) + correction
+            ! Get average RHmin and wind speed over the crop's Kcb correction interval
+            call mean_correction_weather(crops(crop_idx), stations(station_idx), rhmin, wind, &
+                                       & mean_rhmin, mean_wind, n_years, partial_days         )
+            if (n_years == 0) then
+                if (partial_days > 0) then
+                    print *, 'Warning: no complete Kcb correction interval for ', trim(crops(crop_idx)%crop_name), &
+                        & ' at weather station ', trim(stations(station_idx)%filename), '.'
+                    print *, 'Used ', partial_days, ' available day(s) within incomplete interval(s).'
+                else
+                    print *, 'Warning: no Kcb correction interval overlaps weather station ', &
+                        & trim(stations(station_idx)%filename), ' for ', trim(crops(crop_idx)%crop_name), '.'
+                    print *, 'Used the entire available weather series instead.'
+                end if
             end if
-            point = plateau_end
+
+            ! Calculate the correction factor
+            !%PS%, note: FAO56 prescribe using the mean plant height during mid-late season; here we use max height for simplicity
+            kcb_corr_fact(crop_idx,station_idx) = k_cb_weather_correction(mean_rhmin, mean_wind, maxval(crops(crop_idx)%height))
+        end do
+        deallocate(rhmin, wind)
+    end do
+end subroutine compute_kcb_corrections
+
+function needs_kcb_adjustment(crop) result(is_eligible)
+    type(crop_definition), intent(in) :: crop
+    logical :: is_eligible
+
+    is_eligible = .false.
+    if (.not. crop%adjust_k_cb) return
+    if (.not. allocated(crop%k_cb)) return
+    if (size(crop%k_cb) == 0) return
+    is_eligible = crop%mid_start_gdd < huge(0._dp) .and. crop%mid_end_gdd > crop%mid_start_gdd .and. maxval(crop%k_cb) > 0.45_dp
+end function needs_kcb_adjustment
+
+! Calculate mean RHmin and wind speed over the crop's Kcb correction interval
+subroutine mean_correction_weather(crop, station, rhmin, wind, mean_rhmin, mean_wind, n_years, partial_days)
+    type(crop_definition), intent(in) :: crop
+    type(meteo_info), intent(in) :: station
+    real(dp), intent(in) :: rhmin(:), wind(:)
+    real(dp), intent(out) :: mean_rhmin, mean_wind
+    integer, intent(out) :: n_years, partial_days
+
+    type(date) :: first_day, last_day
+    real(dp) :: partial_rhmin, partial_wind
+    integer :: year, first_idx, last_idx, n_days, start_key, end_key, days_in_month(12)
+    integer :: sowing_idx, harvest_idx, harvest_year, estimated_sowing_doy, growing_days
+
+    mean_rhmin = 0._dp
+    mean_wind = 0._dp
+    n_years = 0
+    partial_rhmin = 0._dp
+    partial_wind = 0._dp
+    partial_days = 0
+    start_key = 100*crop%kcb_corr_start_month + crop%kcb_corr_start_day
+    end_key = 100*crop%kcb_corr_end_month + crop%kcb_corr_end_day
+
+    do year = station%start%year - 1, station%finish%year
+        if (crop%kcb_corr_start_month == 0) then
+            ! Crop file does not specify a Kcb correction interval; use 70-95% of the estimated sowing-to-harvest period
+            estimated_sowing_doy = max(1, crop%sowing_doy_min + max(0, crop%sowing_delay_max)/2)
+            sowing_idx = days_between_dates(station%start, calendar_date_from_doy(year, 1)) + estimated_sowing_doy
+            harvest_year = year + merge(1, 0, crop%harvest_doy_max <= estimated_sowing_doy)
+            harvest_idx = days_between_dates(station%start, calendar_date_from_doy(harvest_year, 1)) + &
+                & min(days_in_year(harvest_year), max(1, crop%harvest_doy_max))
+            growing_days = harvest_idx - sowing_idx
+            if (growing_days <= 0) cycle
+            first_idx = sowing_idx + nint(0.70_dp*real(growing_days,dp))
+            last_idx = sowing_idx + nint(0.95_dp*real(growing_days,dp))
         else
-            point = point + 1
+            first_day%day = crop%kcb_corr_start_day
+            first_day%month = crop%kcb_corr_start_month
+            first_day%year = year
+            last_day%day = crop%kcb_corr_end_day
+            last_day%month = crop%kcb_corr_end_month
+            last_day%year = year + merge(1, 0, start_key > end_key)
+            days_in_month = month_lengths(first_day%year)
+            if (first_day%day > days_in_month(first_day%month)) cycle
+            days_in_month = month_lengths(last_day%year)
+            if (last_day%day > days_in_month(last_day%month)) cycle
+            first_idx = days_between_dates(station%start, first_day) + 1
+            last_idx = days_between_dates(station%start, last_day) + 1
         end if
+        if (last_idx < first_idx) cycle
+        if (first_idx < 1 .or. last_idx > size(rhmin)) then
+            first_idx = max(1, first_idx)
+            last_idx = min(size(rhmin), last_idx)
+            if (last_idx >= first_idx) then
+                partial_rhmin = partial_rhmin + sum(rhmin(first_idx:last_idx))
+                partial_wind = partial_wind + sum(wind(first_idx:last_idx))
+                partial_days = partial_days + last_idx - first_idx + 1
+            end if
+            cycle
+        end if
+        n_days = last_idx - first_idx + 1
+        mean_rhmin = mean_rhmin + sum(rhmin(first_idx:last_idx))/real(n_days,dp)
+        mean_wind = mean_wind + sum(wind(first_idx:last_idx))/real(n_days,dp)
+        n_years = n_years + 1
     end do
-
-    do point = 2, size(corrected)
-        if (crop%k_cb(point) >= crop%k_cb(point-1)) cycle
-        if (crop%k_cb(point) <= 0.45_dp .or. crop%k_cb(point-1) <= 0.45_dp) cycle
-        s = crossing(point-1)
-        e = crossing(point)
-        if (s == 0 .or. e < s) cycle
-        correction = k_cb_weather_correction(sum(rh(s:e))/real(e-s+1,dp), &
-            & sum(wind(s:e))/real(e-s+1,dp), sum(height(s:e))/real(e-s+1,dp))
-        corrected(point) = crop%k_cb(point) + correction
-    end do
-end subroutine project_corrected_kcb
-
-subroutine cell_projection_weather(cache, day, stations, weights, sim, tmax, tmin, rhmin, wind)
-    type(crop_weather_cache), intent(in) :: cache
-    integer, intent(in) :: day, stations(:)
-    real(dp), intent(in) :: weights(:)
-    type(simulation), intent(in) :: sim
-    real(dp), intent(out) :: tmax, tmin, rhmin, wind
-    integer :: k, station
-
-    tmax = cache%tmax(day,stations(1))
-    tmin = cache%tmin(day,stations(1))
-    rhmin = cache%rhmin(day,stations(1))
-    wind = cache%wind(day,stations(1))
-    if (sim%interpolate_temp) then
-        tmax = 0._dp
-        tmin = 0._dp
-        do k = 1, size(stations)
-            station = stations(k)
-            tmax = tmax + cache%tmax(day,station)*weights(k)
-            tmin = tmin + cache%tmin(day,station)*weights(k)
-        end do
+    if (n_years > 0) then
+        mean_rhmin = mean_rhmin/real(n_years,dp)
+        mean_wind = mean_wind/real(n_years,dp)
+    else if (partial_days > 0) then
+        mean_rhmin = partial_rhmin/real(partial_days,dp)
+        mean_wind = partial_wind/real(partial_days,dp)
+    else
+        mean_rhmin = sum(rhmin)/real(size(rhmin),dp)
+        mean_wind = sum(wind)/real(size(wind),dp)
     end if
-    if (sim%interpolate_hum) then
-        rhmin = 0._dp
-        do k = 1, size(stations)
-            rhmin = rhmin + cache%rhmin(day,stations(k))*weights(k)
-        end do
-    end if
-    if (sim%interpolate_wind) then
-        wind = 0._dp
-        do k = 1, size(stations)
-            wind = wind + cache%wind(day,stations(k))*weights(k)
-        end do
-    end if
-end subroutine cell_projection_weather
+end subroutine mean_correction_weather
 
+! Same clamped FAO-56 correction used by CropCoef's calcKcbCorrFact().
 real(dp) function k_cb_weather_correction(rhmin, wind, height) result(correction)
-    ! Same clamped FAO-56 correction used by CropCoef's calcKcbCorrFact().
     real(dp), intent(in) :: rhmin, wind, height
 
     correction = (0.04_dp*(min(6._dp,max(1._dp,wind)) - 2._dp) - &
@@ -207,17 +213,15 @@ real(dp) function compute_canopy_resistance(co2) result(resistance)
 end function compute_canopy_resistance
 
 subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, irandom, meteo, &
-                               & cache, station_idx, station_weight, sim, current)
+                               & kcb_corr_fact, station_idx, current)
     type(crop_pars_matrices), intent(inout) :: pheno
     type(crop_definition), intent(in) :: definitions(:)
     type(crop_rotation), intent(inout) :: rotations(:)
     type(grid_i), intent(in) :: domain, soil_use
     integer, intent(in) :: irandom(:,:)
     type(meteo_mat), intent(in) :: meteo
-    type(crop_weather_cache), intent(in) :: cache
+    real(dp), intent(in) :: kcb_corr_fact(:,:)
     integer, intent(in) :: station_idx(:,:,:)
-    real(dp), intent(in) :: station_weight(:,:,:)
-    type(simulation), intent(in) :: sim
     type(date), intent(in) :: current
 
     integer :: i, j, land_use, position, crop_id
@@ -322,13 +326,6 @@ subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, 
                 pheno%cuts_completed(i,j) = 0
                 pheno%pheno_stage(i,j) = 0
                 pheno%is_real_crop(i,j) = maxval(definitions(crop_id)%gdd) > 0._dp
-                if (definitions(crop_id)%adjust_k_cb) then
-                    call project_corrected_kcb(pheno%corrected_k_cb(i,j,1:size(definitions(crop_id)%k_cb)), &
-                        & definitions(crop_id), cache, station_idx(i,j,:), station_weight(i,j,:), &
-                        & sim, current, meteo%lat(i,j))
-                else
-                    pheno%corrected_k_cb(i,j,1:size(definitions(crop_id)%k_cb)) = definitions(crop_id)%k_cb
-                end if
             end if
 
             ! Crop is in field: calculate GDD accumulation
@@ -340,7 +337,7 @@ subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, 
             pheno%gdd(i,j) = pheno%gdd(i,j) + daily_gdd
 
             ! Use the new GDD value to estimate crop state
-            call populate_crop_today(pheno, definitions(crop_id), i, j)
+            call populate_crop_today(pheno, definitions(crop_id), kcb_corr_fact(crop_id,station_idx(i,j,1)), i, j)
 
             ! If harvest GDD has been reached, mark the crop; it will be harvested tomorrow
             if (pheno%gdd(i,j) >= real(max(1, definitions(crop_id)%max_cuts), dp) * maxval(definitions(crop_id)%gdd)) then
@@ -508,15 +505,19 @@ real(dp) function curve_at_gdd(gdd_points, values, accumulated_gdd) result(value
     value = values(size(values))
 end function curve_at_gdd
 
-subroutine populate_crop_today(pheno, crop, i, j)
+subroutine populate_crop_today(pheno, crop, kcb_correction, i, j)
     type(crop_pars_matrices), intent(inout) :: pheno
     type(crop_definition), intent(in) :: crop
+    real(dp), intent(in) :: kcb_correction
     integer, intent(in) :: i, j
     real(dp) :: current_gdd
 
     current_gdd = pheno%gdd(i,j)
     ! Multi-cut crops also need a reset of the within-cut curve at each cut.
-    pheno%k_cb(i,j) = curve_at_gdd(crop%gdd, pheno%corrected_k_cb(i,j,1:size(crop%k_cb)), current_gdd)
+    pheno%k_cb(i,j) = curve_at_gdd(crop%gdd, crop%k_cb, current_gdd)
+    if (current_gdd >= crop%mid_start_gdd .and. pheno%k_cb(i,j) > 0.45_dp) then
+        pheno%k_cb(i,j) = pheno%k_cb(i,j) + kcb_correction
+    end if
     pheno%lai(i,j) = curve_at_gdd(crop%gdd, crop%lai, current_gdd)
     pheno%h(i,j) = curve_at_gdd(crop%gdd, crop%height, current_gdd)
     pheno%d_r(i,j) = curve_at_gdd(crop%gdd, crop%root_depth, current_gdd)
@@ -534,6 +535,7 @@ subroutine populate_crop_today(pheno, crop, i, j)
     pheno%pheno_stage(i,j) = crop_growth_stage(crop, current_gdd)
 end subroutine populate_crop_today
 
+! Calculate GDD thresholds for crop growth stages once per crop and store them for later use
 subroutine prepare_crop_stage_boundaries(crop)
     type(crop_definition), intent(inout) :: crop
 
