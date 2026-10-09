@@ -62,17 +62,15 @@ or potential transpiration is skipped; if the whole crop has no potential
 transpiration, its whole-crop factor is one.
 
 The stage labels are 1 initial, 2 development, 3 mid-season, and 4 late season.
-Annual crops can also have a stage 0 while Kcb is at its minimum; those days
-are excluded from the four stage-specific sums and their duration weights.
-The current code infers stages from daily Kcb and a derived `k_cb_mid` value.
+Crops in pre-emergence (sttage 0) are excluded from the
+four stage-specific sums and their duration weights. The initial stage ends at the last consecutive point with
+the first positive Kcb value; mid-season spans the curve's maximum-Kcb points.
 
 :::{container} manual-code-divergence
-**Stage assignment to review.** If no intermediate Kcb plateau is found,
-`k_cb_mid` defaults to the average of minimum and maximum Kcb. The
-pre-integration fallback used maximum Kcb and could leave an annual crop in
-yield stage 1 throughout its rising Kcb curve. The new average avoids that
-specific outcome, but the Kcb-based stage boundaries still need scientific
-review; they are not explicitly supplied in the crop input.
+**Stage assignment to review.** Crop files do not specify stage boundaries
+explicitly. A curve without an initial plateau leaves stage 1 as soon as GDD
+passes its first positive Kcb point. A curve with only one maximum-Kcb point
+can have no full day in stage 3. These interpretations need scientific review.
 :::
 
 ## Heat-stress reduction

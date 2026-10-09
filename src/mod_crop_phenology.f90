@@ -20,6 +20,13 @@ type crop_definition
     real(dp) :: base_temp = 0._dp
     real(dp) :: cutoff_temp = 0._dp
 
+    ! Yield-stage boundaries in the uncorrected Kcb curve (accumulated GDD).
+    ! Huge values mark stages absent from a crop definition.
+    real(dp) :: emergence_gdd = huge(0._dp)
+    real(dp) :: initial_end_gdd = huge(0._dp)
+    real(dp) :: mid_start_gdd = huge(0._dp)
+    real(dp) :: mid_end_gdd = huge(0._dp)
+
     ! Vernalization parameters
     logical :: requires_vernalization = .false.
     real(dp) :: vern_temp_min = 0._dp
@@ -42,7 +49,6 @@ type crop_definition
     real(dp) :: harvest_index = 0._dp
     real(dp) :: yield_response_total = 0._dp
     real(dp), dimension(4) :: yield_response_stage = 0._dp
-    real(dp) :: k_cb_mid = 0._dp ! Yield-stage threshold: first interior Kcb plateau, or low/high average if none
     real(dp) :: raw_fraction = 0._dp
     real(dp) :: maximum_transpirative_root_fraction = 1._dp
     real(dp) :: interception_coef = 0._dp
@@ -82,11 +88,12 @@ type crop_pars_matrices
     integer, dimension(:,:), allocatable :: rotation_position
     integer, dimension(:,:), allocatable :: bare_soil_days_left
     logical, dimension(:,:), allocatable :: harvest_pending
+    logical, dimension(:,:), allocatable :: is_real_crop        ! Used to distinguish between real crops and bare soil variations. Current discrimination: maxgdd>0
     real(dp), dimension(:,:), allocatable :: gdd
     real(dp), dimension(:,:), allocatable :: vernalization_days
 
     real(dp), dimension(:,:), allocatable :: k_cb
-    real(dp), dimension(:,:,:), allocatable :: corrected_k_cb ! Per-cell curve points; retained through warm-up
+    real(dp), dimension(:,:,:), allocatable :: corrected_k_cb   ! Per-cell curve points; retained through warm-up
     real(dp), dimension(:,:), allocatable :: h
     real(dp), dimension(:,:), allocatable :: d_r
     real(dp), dimension(:,:), allocatable :: lai
@@ -102,13 +109,10 @@ type crop_pars_matrices
     real(dp), dimension(:,:), allocatable :: RF_t
     real(dp), dimension(:,:), allocatable :: T_lim
     real(dp), dimension(:,:), allocatable :: T_crit
-    real(dp), dimension(:,:), allocatable :: k_cb_low
-    real(dp), dimension(:,:), allocatable :: k_cb_mid
-    real(dp), dimension(:,:), allocatable :: k_cb_high
     real(dp), dimension(:,:), allocatable :: p_day
-    real(dp), dimension(:,:), allocatable :: k_cb_old       ! k_cb of previous day
-    integer, dimension(:,:), allocatable :: pheno_idx       ! phenological stage index
-    real(dp), dimension(:,:), allocatable :: r_stress       ! plant resistance to (water) stress
+    real(dp), dimension(:,:), allocatable :: k_cb_old           ! Previous day's Kcb value
+    integer, dimension(:,:), allocatable :: pheno_stage         ! 0 = pre-emergence, 1 = stage, 2 = development, 3 = mid-season, 4 = late season. See FAO56
+    real(dp), dimension(:,:), allocatable :: r_stress           ! Plant resistance to (water) stress
 end type crop_pars_matrices
 
 contains

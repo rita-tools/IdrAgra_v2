@@ -4,7 +4,7 @@ use mod_date, only: date, annual_period_end
 use mod_utility, only: clean_input_line, join_path, lower_case, replace_str
 use mod_parameters, only: simulation
 use mod_crop_phenology
-use mod_cropcoef, only: compute_canopy_resistance
+use mod_cropcoef, only: compute_canopy_resistance, prepare_crop_stage_boundaries
 use mod_system
 implicit none
 
@@ -356,21 +356,11 @@ subroutine prepare_crop_definition_curves(crop)
     ! module can consume complete parameter curves directly.
     type(crop_definition), intent(inout) :: crop
     integer :: idx
-    real(dp) :: k_cb_low, k_cb_high
 
     if (size(crop%gdd) == 0) return
 
     call fill_missing_curve(crop%k_cb, crop%gdd)
-    !%PS%: Estimate k_cb_mid as the early season plateau (if present) or the average between k_cb_low and k_cb_high (fallback)
-    k_cb_low = minval(crop%k_cb)
-    k_cb_high = maxval(crop%k_cb)
-    crop%k_cb_mid = (k_cb_low + k_cb_high)/2._dp
-    do idx = 2, size(crop%k_cb)
-        if (crop%k_cb(idx) == crop%k_cb(idx - 1) .and. crop%k_cb(idx) > k_cb_low .and. crop%k_cb(idx) < k_cb_high) then
-            crop%k_cb_mid = crop%k_cb(idx)
-            exit
-        end if
-    end do
+    call prepare_crop_stage_boundaries(crop)
 
     call fill_missing_curve(crop%lai, crop%gdd)
     call fill_missing_curve(crop%height, crop%gdd)

@@ -11,7 +11,7 @@ use mod_date, only: date, days_between_dates, advance_calendar_date
 
 implicit none
 private
-public :: advance_crops_daily, adjust_water_productivity, compute_canopy_resistance
+public :: advance_crops_daily, adjust_water_productivity, compute_canopy_resistance, prepare_crop_stage_boundaries
 public :: crop_weather_cache, load_crop_weather_cache
 
 ! Station data are cached once so a newly sown crop can look ahead to the
@@ -271,7 +271,7 @@ subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, 
                 pheno%gdd(i,j) = 0._dp
                 pheno%vernalization_days(i,j) = 0._dp
                 pheno%cuts_completed(i,j) = 0
-                pheno%pheno_idx(i,j) = 0
+                pheno%pheno_stage(i,j) = 0
 
                 ! Move to next crop in the rotation
                 position = merge(1, position + 1, position == size(rotations(land_use)%crop_ids))
@@ -320,7 +320,8 @@ subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, 
                 pheno%gdd(i,j) = 0._dp
                 pheno%vernalization_days(i,j) = 0._dp
                 pheno%cuts_completed(i,j) = 0
-                pheno%pheno_idx(i,j) = 0
+                pheno%pheno_stage(i,j) = 0
+                pheno%is_real_crop(i,j) = maxval(definitions(crop_id)%gdd) > 0._dp
                 if (definitions(crop_id)%adjust_k_cb) then
                     call project_corrected_kcb(pheno%corrected_k_cb(i,j,1:size(definitions(crop_id)%k_cb)), &
                         & definitions(crop_id), cache, station_idx(i,j,:), station_weight(i,j,:), &
@@ -511,7 +512,6 @@ subroutine populate_crop_today(pheno, crop, i, j)
     type(crop_pars_matrices), intent(inout) :: pheno
     type(crop_definition), intent(in) :: crop
     integer, intent(in) :: i, j
-    integer :: point
     real(dp) :: current_gdd
 
     current_gdd = pheno%gdd(i,j)
@@ -531,25 +531,90 @@ subroutine populate_crop_today(pheno, crop, i, j)
     pheno%RF_t_max(i,j) = crop%maximum_transpirative_root_fraction
     pheno%T_crit(i,j) = crop%heat_stress_temp_crit
     pheno%T_lim(i,j) = crop%heat_stress_temp_lim
-    pheno%k_cb_low(i,j) = minval(pheno%corrected_k_cb(i,j,1:size(crop%k_cb)))
-    pheno%k_cb_high(i,j) = maxval(pheno%corrected_k_cb(i,j,1:size(crop%k_cb)))
-    pheno%k_cb_mid(i,j) = (pheno%k_cb_low(i,j) + pheno%k_cb_high(i,j))/2._dp
-    do point = 2, size(crop%k_cb)
-        if (crop%k_cb(point) == crop%k_cb(point-1) .and. &
-            & crop%k_cb(point) > minval(crop%k_cb) .and. crop%k_cb(point) < maxval(crop%k_cb)) then
-            pheno%k_cb_mid(i,j) = pheno%corrected_k_cb(i,j,point)
+    pheno%pheno_stage(i,j) = crop_growth_stage(crop, current_gdd)
+end subroutine populate_crop_today
+
+subroutine prepare_crop_stage_boundaries(crop)
+    type(crop_definition), intent(inout) :: crop
+
+    integer :: initial_start, initial_end, mid_start, mid_end, point
+    real(dp) :: k_cb_mid
+
+    crop%emergence_gdd = huge(0._dp)
+    crop%initial_end_gdd = huge(0._dp)
+    crop%mid_start_gdd = huge(0._dp)
+    crop%mid_end_gdd = huge(0._dp)
+
+    initial_start = 0
+    do point = 1, size(crop%k_cb)
+        if (crop%k_cb(point) > 0._dp) then
+            initial_start = point
             exit
         end if
     end do
-    pheno%pheno_idx(i,j) = max(1, pheno%pheno_idx(i,j))
-end subroutine populate_crop_today
+    if (initial_start == 0) return
+
+    crop%emergence_gdd = crop%gdd(initial_start)
+    initial_end = initial_start
+    do point = initial_start + 1, size(crop%k_cb)
+        if (crop%k_cb(point) /= crop%k_cb(initial_start)) exit
+        initial_end = point
+    end do
+    if (initial_end == size(crop%k_cb)) return ! Constant positive Kcb stays in stage 1.
+    crop%initial_end_gdd = crop%gdd(initial_end)
+
+    k_cb_mid = maxval(crop%k_cb)
+    mid_start = 0
+    do point = initial_end + 1, size(crop%k_cb)
+        if (crop%k_cb(point) == k_cb_mid) then
+            mid_start = point
+            exit
+        end if
+    end do
+    if (mid_start == 0) return ! The peak lies within the initial segment.
+
+    crop%mid_start_gdd = crop%gdd(mid_start)
+    mid_end = mid_start
+    do point = mid_start + 1, size(crop%k_cb)
+        if (crop%k_cb(point) /= k_cb_mid) exit
+        mid_end = point
+    end do
+    crop%mid_end_gdd = crop%gdd(mid_end)
+end subroutine prepare_crop_stage_boundaries
+
+! 0 = pre-emergence, 1 = initial, 2 = development, 3 = mid-season, 4 = late-season.
+! Stages 1 and 3 usually correspond to Kcb plateaus - see FAO56
+integer function crop_growth_stage(crop, accumulated_gdd) result(stage)
+    type(crop_definition), intent(in) :: crop
+    real(dp), intent(in) :: accumulated_gdd
+
+    stage = 0
+    if (accumulated_gdd < crop%emergence_gdd) return
+
+    stage = 1
+    if (accumulated_gdd <= crop%initial_end_gdd) return
+
+    if (crop%mid_start_gdd == huge(0._dp)) then
+        stage = 4
+        return
+    end if
+
+    stage = 2
+    if (accumulated_gdd < crop%mid_start_gdd) return
+
+    stage = 3
+    if (accumulated_gdd <= crop%mid_end_gdd) return
+
+    stage = 4
+end function crop_growth_stage
 
 subroutine set_bare_soil_today(pheno, i, j)
     type(crop_pars_matrices), intent(inout) :: pheno
     integer, intent(in) :: i, j
 
     pheno%crop_id(i,j) = 0
-    pheno%pheno_idx(i,j) = 0
+    pheno%pheno_stage(i,j) = 0
+    pheno%is_real_crop(i,j) = .false.
     pheno%k_cb(i,j) = 0._dp
     pheno%h(i,j) = 0._dp
     pheno%d_r(i,j) = 0._dp
@@ -565,9 +630,6 @@ subroutine set_bare_soil_today(pheno, i, j)
     pheno%RF_t_max(i,j) = 0._dp
     pheno%T_lim(i,j) = 0._dp
     pheno%T_crit(i,j) = 0._dp
-    pheno%k_cb_low(i,j) = 0._dp
-    pheno%k_cb_mid(i,j) = 0._dp
-    pheno%k_cb_high(i,j) = 0._dp
 end subroutine set_bare_soil_today
 
 end module mod_cropcoef

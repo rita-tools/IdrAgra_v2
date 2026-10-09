@@ -342,12 +342,9 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 where(info_spat%domain%mat /= info_spat%domain%header%nan)
                     ! Layer depths inizialization - to calculate h_soil and t_soil
                     ! Comparing root zone to evaporative layer depth
-                    where(pheno%d_r > pars%depth%ze_fix)
-                        wat_bal2%d_t =  pheno%d_r - pars%depth%ze_fix
-                    else where(pheno%pheno_idx > 0)
-                        wat_bal2%d_t = 0._dp !%PS%: 2nd layer is now 0-thickness when the root doesn't extend below the 1st layer
-                    else where
-                        wat_bal2%d_t = pars%depth%zr_fix  ! If Sr < Ze, Zr_fix = 1 - Ze
+                    wat_bal2%d_t = pars%depth%zr_fix
+                    where(pheno%is_real_crop)
+                        wat_bal2%d_t = max(0._dp, pheno%d_r - pars%depth%ze_fix)
                     end where
                     ! Soil water content inizialization [mm]
                     wat_bal1%h_soil = info_spat%theta(1)%old%mat*1000.*pars%depth%ze_fix
@@ -374,12 +371,9 @@ subroutine simulation_manager(pars,pars_TDx,info_spat,wat_src_tbl,info_sources, 
                 end where
 
                 ! Layer depths update as a function of d_r (phenological parameter - root depth)
-                where(pheno%d_r > pars%depth%ze_fix)
-                    wat_bal2%d_t = pheno%d_r - wat_bal1%d_e
-                else where(pheno%pheno_idx > 0)
-                    wat_bal2%d_t = 0._dp !%PS%: 2nd layer is now 0-thickness when the root doesn't extend below the 1st layer
-                else where
-                    wat_bal2%d_t = pars%depth%zr_fix !%PS%, todo: a cell with no crop growing still gets full-thickness 2nd layer regardless of water table
+                wat_bal2%d_t = pars%depth%zr_fix
+                where(pheno%is_real_crop)
+                    wat_bal2%d_t = max(0._dp, pheno%d_r - pars%depth%ze_fix)
                 end where
 
                 ! Distance (mm) between rootzone and water table (influences capillary uptake)
@@ -1888,9 +1882,10 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
         allocate(pheno%sowing_year       (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%sowing_doy        (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%cuts_completed    (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
-        allocate(pheno%rotation_position  (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
-        allocate(pheno%bare_soil_days_left(imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
-        allocate(pheno%harvest_pending    (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%rotation_position (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%bare_soil_days_left(imax,jmax),stat=checkstat);if(checkstat/=0)print*,errormessage
+        allocate(pheno%harvest_pending   (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%is_real_crop      (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%gdd               (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%vernalization_days(imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%k_cb_old          (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
@@ -1910,11 +1905,8 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
         allocate(pheno%RF_t              (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%T_lim             (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%T_crit            (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
-        allocate(pheno%k_cb_low          (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
-        allocate(pheno%k_cb_mid          (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
-        allocate(pheno%k_cb_high         (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%p_day             (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
-        allocate(pheno%pheno_idx         (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%pheno_stage       (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%r_stress          (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
 
         pheno%crop_id = 0
@@ -1924,6 +1916,7 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
         pheno%rotation_position = 1
         pheno%bare_soil_days_left = 0
         pheno%harvest_pending = .false.
+        pheno%is_real_crop = .false.
         pheno%gdd = 0._dp
         pheno%vernalization_days = 0._dp
         pheno%k_cb_old = 0._dp
@@ -1943,11 +1936,8 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
         pheno%RF_t = 0._dp
         pheno%T_lim = 0._dp
         pheno%T_crit = 0._dp
-        pheno%k_cb_low = 0._dp
-        pheno%k_cb_mid = 0._dp
-        pheno%k_cb_high = 0._dp
         pheno%p_day = 0._dp
-        pheno%pheno_idx = 0
+        pheno%pheno_stage = 0
         pheno%r_stress = 0._dp
 
     else
@@ -1958,6 +1948,7 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
         deallocate(pheno%rotation_position)
         deallocate(pheno%bare_soil_days_left)
         deallocate(pheno%harvest_pending)
+        deallocate(pheno%is_real_crop)
         deallocate(pheno%gdd)
         deallocate(pheno%vernalization_days)
         deallocate(pheno%k_cb_old        )
@@ -1978,11 +1969,8 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
         deallocate(pheno%RF_t            )
         deallocate(pheno%T_lim           )
         deallocate(pheno%T_crit          )
-        deallocate(pheno%k_cb_low        )
-        deallocate(pheno%k_cb_mid        )
-        deallocate(pheno%k_cb_high       )
         deallocate(pheno%p_day           )
-        deallocate(pheno%pheno_idx   )
+        deallocate(pheno%pheno_stage   )
         deallocate(pheno%r_stress   )
     end if
 end subroutine init_pheno_matrices

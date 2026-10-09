@@ -140,7 +140,7 @@ end subroutine destroy_yield
 
 subroutine accumulate_daily_yield(acc, pheno, definitions, meteo, wat_bal1, wat_bal2, domain)
     type(yield_accumulator), intent(inout) :: acc
-    type(crop_pars_matrices), intent(inout) :: pheno
+    type(crop_pars_matrices), intent(in) :: pheno
     type(crop_definition), intent(in) :: definitions(:)
     type(meteo_mat), intent(in) :: meteo
     type(balance1_matrices), intent(in) :: wat_bal1
@@ -156,7 +156,7 @@ subroutine accumulate_daily_yield(acc, pheno, definitions, meteo, wat_bal1, wat_
                 crop_id = acc%crop_id(i,j)
                 if (crop_id == 0 .or. crop_id /= pheno%crop_id(i,j)) cycle
 
-                stage = pheno%pheno_idx(i,j)
+                stage = pheno%pheno_stage(i,j)
                 h_transp_act = wat_bal1%h_transp_act(i,j) + wat_bal2%h_transp_act(i,j)
                 h_transp_pot = wat_bal1%h_transp_pot(i,j) + wat_bal2%h_transp_pot(i,j)
 
@@ -174,33 +174,6 @@ subroutine accumulate_daily_yield(acc, pheno, definitions, meteo, wat_bal1, wat_
                             & (meteo%T_ave(i,j) - pheno%T_crit(i,j))/(pheno%T_lim(i,j) - pheno%T_crit(i,j))
                     end if
                 end if
-
-                ! Infer the four yield-development stages from the daily Kcb curve
-                if (pheno%k_cb_low(i,j) == 0) then !%PS%, todo: replace this check with an explicit flag ("is_annual")
-                    if (pheno%k_cb(i,j) == pheno%k_cb_low(i,j)) then
-                        stage = 0
-                    else if (pheno%k_cb(i,j) <= pheno%k_cb_mid(i,j) .and. (stage == 0 .or. stage == 1)) then
-                        stage = 1 
-                    else if (pheno%k_cb(i,j) < pheno%k_cb_high(i,j) .and. (stage == 1 .or. stage == 2)) then
-                        stage = 2
-                    else if (pheno%k_cb(i,j) == pheno%k_cb_high(i,j)) then
-                        stage = 3
-                    else
-                        stage = 4
-                    end if
-                else
-                    ! Permanent and pluriannual crops begin at stage one during vernalization and after harvest
-                    if (pheno%k_cb(i,j) == pheno%k_cb_low(i,j)) then
-                        stage = 1
-                    else if (pheno%k_cb(i,j) < pheno%k_cb_high(i,j) .and. (stage == 1 .or. stage == 2)) then
-                        stage = 2
-                    else if (pheno%k_cb(i,j) == pheno%k_cb_high(i,j)) then
-                        stage = 3
-                    else
-                        stage = 4
-                    end if
-                end if
-                pheno%pheno_idx(i,j) = stage
 
                 ! Accumulate water stress
                 if (stage > 0) then
