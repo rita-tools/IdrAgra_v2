@@ -225,7 +225,7 @@ subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, 
     type(date), intent(in) :: current
 
     integer :: i, j, land_use, position, crop_id
-    real(dp) :: daily_gdd, daylength, temperature
+    real(dp) :: daily_gdd, daylength, temperature, cut_gdd
     integer :: year, doy
 
     year = current%year
@@ -336,11 +336,20 @@ subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, 
                                       & photoperiod_factor(definitions(crop_id), daylength))
             pheno%gdd(i,j) = pheno%gdd(i,j) + daily_gdd
 
+            ! For multi-cut crops, increase the cut counter if the accumulated GDD has reached the next cut threshold
+            cut_gdd = maxval(definitions(crop_id)%gdd)
+            if (definitions(crop_id)%max_cuts > 1) then
+                do while (pheno%cuts_completed(i,j) < definitions(crop_id)%max_cuts - 1)
+                    if (pheno%gdd(i,j) <= real(pheno%cuts_completed(i,j) + 1, dp) * cut_gdd) exit
+                    pheno%cuts_completed(i,j) = pheno%cuts_completed(i,j) + 1
+                end do
+            end if
+
             ! Use the new GDD value to estimate crop state
             call populate_crop_today(pheno, definitions(crop_id), kcb_corr_fact(crop_id,station_idx(i,j,1)), i, j)
 
-            ! If harvest GDD has been reached, mark the crop; it will be harvested tomorrow
-            if (pheno%gdd(i,j) >= real(max(1, definitions(crop_id)%max_cuts), dp) * maxval(definitions(crop_id)%gdd)) then
+            ! If harvest/cut GDD has been reached, mark the crop; it will be harvested tomorrow
+            if (pheno%gdd(i,j) >= real(max(1, definitions(crop_id)%max_cuts), dp) * cut_gdd) then
                 pheno%harvest_pending(i,j) = .true.
             end if
         end do
@@ -512,8 +521,9 @@ subroutine populate_crop_today(pheno, crop, kcb_correction, i, j)
     integer, intent(in) :: i, j
     real(dp) :: current_gdd
 
-    current_gdd = pheno%gdd(i,j)
-    ! Multi-cut crops also need a reset of the within-cut curve at each cut.
+    ! Multi-cut crops reset their GDD curve for each cut, even though pheno%gdd continues to accumulate
+    current_gdd = pheno%gdd(i,j) - real(pheno%cuts_completed(i,j), dp) * maxval(crop%gdd)
+
     pheno%k_cb(i,j) = curve_at_gdd(crop%gdd, crop%k_cb, current_gdd)
     if (current_gdd >= crop%mid_start_gdd .and. pheno%k_cb(i,j) > 0.45_dp) then
         pheno%k_cb(i,j) = pheno%k_cb(i,j) + kcb_correction
