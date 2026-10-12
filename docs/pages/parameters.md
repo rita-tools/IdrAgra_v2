@@ -20,7 +20,7 @@ When launching the IdrAgra exe, the model looks for `idragra_parameters.txt` in 
 
 - Blank lines are ignored by the model and skipped.
 - Anything that comes after "#" is a comment and is also ignored.
-- Most variables can appear in any order, but dependency-sensitive settings must precede the values that use them. In particular, place `SoilUsesNum` before `SimulatedSoilUses` and `DTxNumXs` before any `DTx_x` values. Group output switches such as `prt_all` also act where they occur, so a later group switch can replace earlier individual choices.
+- Most variables can appear in any order, but dependency-sensitive settings must precede the values that use them. In particular, place `DTxNumXs` before any `DTx_x` values. Group output switches such as `prt_all` also act where they occur, so a later group switch can replace earlier individual choices.
 - The accepted structure is "VariableName = value".
 - Both the variable name and its value are NOT case-sensitive
 - Any number of spaces and tabs is accepted before and after the "=" symbol.
@@ -288,25 +288,6 @@ Whether simulation cells receive interpolated weather data (T, default&recommend
 :::{container} parameter-summary
 **Type:** Boolean  ·  **Default:** `true`
 :::
-
-(parameter-soilusesnum)=
-### `SoilUsesNum`
-
-:::{container} parameter-summary
-**Type:** Integer  ·  **Default:** `1`
-:::
-
-SoilUsesNum: number of soil-use classes included in each phenological  
-series.
-
-(parameter-simulatedsoiluses)=
-### `SimulatedSoilUses`
-
-:::{container} parameter-summary parameter-summary--required
-**Type:** Integer array  ·  **Required:** no code default
-:::
-
-SimulatedSoilUses: IDs of the soil-use classes to simulate.
 
 ### `RandSowDaysSym`
 

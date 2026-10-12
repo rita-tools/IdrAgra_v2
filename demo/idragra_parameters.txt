@@ -116,13 +116,6 @@ InterpolateHumidity = T
 InterpolateWind = T
 InterpolateRadiation = T
 
-# SoilUsesNum: number of soil-use classes included in each phenological
-# series.
-SoilUsesNum = 7
-
-# SimulatedSoilUses: IDs of the soil-use classes to simulate.
-SimulatedSoilUses = 1 2 3 4 5 6 7
-
 # RandSowDaysSym: shape of the sowing-date randomization window.
 RandSowDaysSym = symmetric
 

@@ -49,7 +49,6 @@ PARAMETER_METADATA_OVERRIDES = {
     "monthlyflag": ("String", "monthly"),
     "weekday": ("String or Integer", "monday"),
     "randsowdayssym": ("String", "symmetric"),
-    "simulatedsoiluses": ("Integer array", "none"),
 }
 
 

@@ -1,6 +1,6 @@
 module cli_simulation_manager
 use mod_date, only: date, month_lengths, days_in_year, days_between_dates, advance_calendar_date, day_of_week
-use mod_utility, only: dp, get_value_index, get_uniform_sample, itoa
+use mod_utility, only: dp, get_value_index, get_uniform_sample, itoa, join_path
 use mod_parameters
 use mod_grid, only: read_grid, write_grid, print_mat_as_grid, overlay_domain, bound, id_to_par, set_default_par
 use mod_evapotranspiration, only: ET_reference, calculateDLH
@@ -933,7 +933,6 @@ subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, b
     real(dp), dimension(:,:), intent(inout) :: a_loss, b_loss, c_loss
     real(dp), dimension(:,:), intent(inout) :: f_interception
 
-    integer :: i
     character(len=255) :: irandom_file, landuse_file
     character(len=255) :: yearly_irr_meth_map, yearly_irr_eff_map
     logical :: file_exists
@@ -962,17 +961,15 @@ subroutine update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, b
         print *, 'Landuse file for year ', itoa(year), ' is missing. Relying on the previous year instead.'
     end if
 
+    !%PS%, todo: this check is duplicated from check_grid; consider merging them
     if (minval(info_spat%soil_use_id%mat, info_spat%soil_use_id%mat /= info_spat%soil_use_id%header%nan) < 1 &
         & .or. maxval(info_spat%soil_use_id%mat) > pars%sim%n_lus) then
         print *, 'Soil use maps have soil uses not defined in crop database'
-        print *, 'Verify the maximum allowed crop uses (SoilUsesNum) and soil maps'
+        print *, 'Verify the landuse list at ', trim(join_path(pars%sim%crop_inputs_path, pars%sim%soil_uses_fn, delimiter))
         print *, 'Execution will be aborted...'
         stop
     end if
 
-    do i = 1, size(pars%sim%no_lu_list)
-        where (info_spat%soil_use_id%mat == pars%sim%no_lu_list(i)) info_spat%soil_use_id%mat = info_spat%soil_use_id%header%nan
-    end do
     call overlay_domain(info_spat%soil_use_id, info_spat%domain, trim(landuse_file)) ! Remove NaNs from the domain
 
     ! Irrigation method - todo: add indipendent flag; should not follow pars%sim%f_soiluse

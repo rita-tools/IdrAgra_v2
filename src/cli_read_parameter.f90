@@ -27,7 +27,7 @@ subroutine read_all_parameters(file_xml, xml, xml_dtx, verbose, reckless)
     line = 0; tablestart = 0
     ios = 0
 
-    call read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
+    call read_sim_parameters(file_xml, xml, xml_dtx, reckless)
 
     inquire(file="cells.txt", exist=xml%sim%f_out_cells) ! update "output_cells"
 
@@ -81,31 +81,19 @@ subroutine read_all_parameters(file_xml, xml, xml_dtx, verbose, reckless)
 end subroutine read_all_parameters
 
 
-subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
+subroutine read_sim_parameters(file_xml, xml, xml_dtx, reckless)
     ! read settings for the simulation
     character(len=*), intent(in) :: file_xml
-    logical, intent(in) :: verbose, reckless
+    logical, intent(in) :: reckless
     type(TDx_index), intent(inout) :: xml_dtx
     type(parameters), intent(inout) :: xml
-    integer :: unit_txt
-    ! Input related variables used in parsing loop
-    character(len=300) :: buffer, label
-    integer :: p
-    integer :: ios          ! state variable (0 = ok)
-    integer :: line
+
+    integer :: unit_txt, p, ios, line
+    character(len=300) :: buffer, label, dir_ic, dir_fc
     logical :: dir_exists
-
-    integer :: i, j, k
-    integer :: actcroplen
-    integer,parameter :: nanvalue=-9999       ! general NaN value
-    integer,dimension(:),allocatable :: dummy
-    character(len=300) :: dir_ic, dir_fc
-
-    !character :: delimiter
 
     line = 0
     ios = 0
-    actcroplen = 0
     dir_ic = xml%sim%initial_condition
     dir_fc = xml%sim%final_condition
     open(newunit=unit_txt, file=trim(file_xml), status="old", action="read", iostat=ios)
@@ -284,16 +272,6 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
                         read(buffer, *, iostat=ios) xml%sim%out_step_end
                     case ('deltadate')
                         read(buffer, *, iostat=ios) xml%sim%out_step_days
-                    case ('soilusesnum') ! number of land uses to be processed
-                        read(buffer, *, iostat=ios)xml%sim%n_lus
-                    !!!! %AB% TODO: to be checked
-                    case ('simulatedsoiluses') ! list of simulated soil uses
-                        read (buffer, *, iostat=ios)
-                        allocate(dummy(xml%sim%n_lus))
-                        dummy = nanvalue
-                        dummy = string_to_integers(buffer(2:len_trim(buffer)), " ")
-                    ! case ('randsowdaysseed')
-                    !           read(buffer, *, iostat=ios) xml%sim%rand_seed
                     case ('randsowdayssym')
                         select case (trim(adjustl(buffer)))
                             case ('symmetric', 's', '1', 't', 'true')
@@ -521,51 +499,6 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
     end if
 
     close(unit_txt)
-
-    if (allocated(dummy)) then
-        actcroplen = size(dummy)
-    else
-        actcroplen = xml%sim%n_lus
-        allocate(dummy(xml%sim%n_lus))
-        dummy(1:xml%sim%n_lus) = (/(i, i=1, xml%sim%n_lus, 1)/)
-    end if
-
-    allocate(xml%sim%lu_list(actcroplen))
-    k = 1
-    do j = 1, actcroplen
-        do i = k, xml%sim%n_lus
-            if (dummy(i) /= nanvalue) then
-                xml%sim%lu_list(j) = dummy(i)
-                k = i + 1
-                exit
-            end if
-        end do
-    end do
-    deallocate(dummy)
-
-    allocate(dummy(xml%sim%n_lus))
-    dummy(1:xml%sim%n_lus) = (/(i, i=1, xml%sim%n_lus, 1)/)
-    do i = 1, actcroplen
-        where (dummy == xml%sim%lu_list(i)) dummy = nanvalue
-    end do
-
-    allocate(xml%sim%no_lu_list(xml%sim%n_lus - actcroplen))
-    k = 1
-
-    do j = 1, size(xml%sim%no_lu_list)
-        do i = k, xml%sim%n_lus
-            if (dummy(i) /= nanvalue) then
-                xml%sim%no_lu_list(j) = dummy(i)
-                k = i + 1
-                exit
-            end if
-        end do
-    end do
-
-    if (verbose .eqv. .true.) then
-        print *, "Simulated land-use classes:", xml%sim%lu_list
-        print *, "Not simulated land-use classes:", xml%sim%no_lu_list
-    end if
 end subroutine read_sim_parameters
 
 ! TODO: %EAC% at the moment the id of the irrigation method define its order in the list
@@ -1039,7 +972,7 @@ subroutine check_grid(info_spat, sim)
     if(minval(info_spat%soil_use_id%mat,info_spat%soil_use_id%mat/=info_spat%soil_use_id%header%nan) < 1 &
             .or. maxval(info_spat%soil_use_id%mat) > sim%n_lus)then
         print *,"Soil use maps have soil uses not defined in crop database"
-        print *,"Verify the maximum allowed crop uses (SoilUsesNum) and soil maps"
+        print *, 'Verify the landuse list at ', trim(join_path(sim%crop_inputs_path, sim%soil_uses_fn, delimiter))
         print *, 'Execution will be aborted...'
         stop
     end if

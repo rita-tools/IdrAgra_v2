@@ -90,10 +90,8 @@ type simulation
     real(dp) :: x0 = 1.0                        ! x coordinate of the reference corner
     real(dp) :: y0 = 1.0                        ! y coordinate of the reference corner
     integer :: n_weather_stations = 1           ! Total number of weather stations
-    integer :: n_lus = 1                        ! total number of land uses
+    integer :: n_lus = 0                        ! Number of land uses in the imported crop rotation table
     integer :: n_crops = 1                      ! max number of crops per year
-    integer,dimension(:),pointer :: lu_list     ! list of ids if the simulated land uses
-    integer,dimension(:),pointer :: no_lu_list  ! list of ids if the NOT simulated land uses
     logical :: f_cap_rise = .false.             ! if true, capillary rise is calculated
     logical :: f_shapearea = .false.            ! if true, use shapes area (for vectorialization)
     logical :: f_irandom                        ! if true, use user defined random values

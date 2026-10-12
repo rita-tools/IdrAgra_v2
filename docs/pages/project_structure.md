@@ -93,7 +93,7 @@ All grids must match the domain's row and column counts, lower-left origin, and 
 **Manual/code divergence to review.** The installation manual describes `0` as the value outside `domain.asc`, but zero is treated as an active value. Use the grid's declared `NODATA_value` outside the domain.
 :::
 
-Enter slope values in `slope.asc` as percentages. Land-use IDs range from `1` to {ref}`SoilUsesNum <parameter-soilusesnum>`. Use irrigation-method ID `0` for no method, or a positive ID listed in the irrigation-method file.
+Enter slope values in `slope.asc` as percentages. Land-use IDs range from `1` to the number of entries in the crop rotation table. Use irrigation-method ID `0` for no method, or a positive ID listed in the irrigation-method file.
 
 ### Time-varying maps
 
