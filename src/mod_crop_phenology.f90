@@ -90,7 +90,8 @@ type crop_pars_matrices
     integer, dimension(:,:), allocatable :: sowing_year
     integer, dimension(:,:), allocatable :: sowing_doy
     integer, dimension(:,:), allocatable :: cuts_completed
-    integer, dimension(:,:), allocatable :: rotation_position
+    integer, dimension(:,:), allocatable :: rotation_position   ! Position of the crop in the rotation (1 = first crop, 2 = second crop, etc.)
+    integer, dimension(:,:), allocatable :: rotation_land_use   ! Land use ID to which rotation_position belongs (can differ from the current ID if a crop survived a land-use change)
     integer, dimension(:,:), allocatable :: bare_soil_days_left
     logical, dimension(:,:), allocatable :: harvest_pending
     logical, dimension(:,:), allocatable :: is_real_crop        ! Used to distinguish between real crops and bare soil variations. Current discrimination: maxgdd>0

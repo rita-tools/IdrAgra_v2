@@ -81,6 +81,11 @@ subroutine import_crop_definitions(sim, crop_definitions, crop_rotations)
 
     rotations_file = join_path(sim%crop_inputs_path, sim%soil_uses_fn, delimiter)
     n_rotations = count_crop_rotations(rotations_file)
+    if (n_rotations < sim%n_lus) then
+        print *, 'Crop rotation file has fewer land uses than SoilUsesNum: ', trim(rotations_file)
+        print *, 'Execution will be aborted...'
+        stop
+    end if
 
     allocate(crop_rotations(n_rotations))
     allocate(rotation_files(n_rotations, 2))

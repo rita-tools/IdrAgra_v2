@@ -1876,6 +1876,7 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
         allocate(pheno%sowing_doy        (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%cuts_completed    (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%rotation_position (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%rotation_land_use (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%bare_soil_days_left(imax,jmax),stat=checkstat);if(checkstat/=0)print*,errormessage
         allocate(pheno%harvest_pending   (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%is_real_crop      (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
@@ -1907,6 +1908,7 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
         pheno%sowing_doy = nan_i
         pheno%cuts_completed = 0
         pheno%rotation_position = 1
+        pheno%rotation_land_use = 0
         pheno%bare_soil_days_left = 0
         pheno%harvest_pending = .false.
         pheno%is_real_crop = .false.
@@ -1939,6 +1941,7 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
         deallocate(pheno%sowing_doy)
         deallocate(pheno%cuts_completed)
         deallocate(pheno%rotation_position)
+        deallocate(pheno%rotation_land_use)
         deallocate(pheno%bare_soil_days_left)
         deallocate(pheno%harvest_pending)
         deallocate(pheno%is_real_crop)
