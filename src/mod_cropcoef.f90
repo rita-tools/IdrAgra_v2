@@ -343,8 +343,11 @@ subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, 
             ! Use the new GDD value to estimate crop state
             call populate_crop_today(pheno, definitions(crop_id), kcb_corr_fact(crop_id,station_idx(i,j,1)), i, j)
 
-            ! If harvest/cut GDD has been reached, mark the crop; it will be harvested tomorrow
-            if (pheno%gdd(i,j) >= real(max(1, definitions(crop_id)%max_cuts), dp) * cut_gdd) then
+            ! If harvest/cut GDD has been reached, or harvest date has passed, mark the cell; it will be set to baresoil tomorrow
+            if (pheno%gdd(i,j) >= real(max(1, definitions(crop_id)%max_cuts), dp) * cut_gdd .or.                    &
+                & (doy >= definitions(crop_id)%harvest_doy_max .and.                                                &
+                & (year > pheno%sowing_year(i,j) .or. definitions(crop_id)%harvest_doy_max > pheno%sowing_doy(i,j)))) then
+
                 pheno%harvest_pending(i,j) = .true.
             end if
         end do
