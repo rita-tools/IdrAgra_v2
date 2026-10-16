@@ -9,9 +9,8 @@ use mod_runoff
 use mod_crop_soil_water
 use mod_crop_phenology, only: crop_definition, crop_rotation, crop_pars_matrices
 use mod_cropcoef, only: advance_crops_daily
-use mod_TDx_index
 use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva, nan_i, nan_r
-use mod_common, only: wat_matrix, soil2_rice, hourly, unit_file_scratch
+use mod_common, only: wat_matrix, soil2_rice, hourly
 use mod_irrigation
 use cli_watsources
 use cli_save_outputs
@@ -31,12 +30,11 @@ end interface
 
 contains
 
-subroutine simulation_manager(pars, pars_TDx, info_spat, wat_src_tbl, info_sources, info_meteo,              &
+subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_meteo,                        &
                             & crop_definitions, crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, &
                             & tab_CN2, tab_CN3, theta2_rice, simulation_end, boundaries, debug, summary      )
 
     type(parameters),intent(inout)::pars
-    type(TDx_index),intent(in)::pars_TDx
     real(dp),dimension(:,:,:),intent(in):: tab_CN2, tab_CN3
     type(date), intent(in) :: simulation_end
     type(bound),intent(in)::boundaries
@@ -89,13 +87,7 @@ subroutine simulation_manager(pars, pars_TDx, info_spat, wat_src_tbl, info_sourc
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::h_irr_sum, h_bypass, h_met_use
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::k_sat2_use, fact_n2_use
     logical, dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax) :: is_rice_paddy
-    real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,pars_TDx%temp%n_ind)::tot_deficit      ! TDx sum
-    integer,dimension(2)::unit_deficit
-    integer :: dos, n_week, cont_td, year_idx, simulation_year_idx, year_day_idx, days_before_simulation
-    real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::TD
-    type(unit_file_scratch),dimension(:),allocatable::unit_Dxi
-    character(len=33)::str_td
-    character(len=255) :: str_delete
+    integer :: dos, year_idx, simulation_year_idx, days_before_simulation
     integer,dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::day_from_irr ! days past from the latest irrigation event
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax,2)::esp_perc  ! exponent of the percolation model
     type(date) :: current ! Current date
@@ -155,18 +147,6 @@ subroutine simulation_manager(pars, pars_TDx, info_spat, wat_src_tbl, info_sourc
             end do
         end do
     end do
-
-    ! Creates scratch files for TDx calculation
-    scratch_td: if(trim(pars_TDx%mode)/="none")then
-        unit_deficit=[(maxval(pars%sim%days_in_year(:))/pars_TDx%temp%td)+1,4]
-        allocate(unit_Dxi(pars_TDx%temp%n_ind))
-        do cont_td=1,pars_TDx%temp%n_ind
-            write(str_td,*)pars_TDx%temp%x(cont_td)
-            str_td="td"//trim(adjustl(str_td))                          ! Creates TDx strings (TD10, TD30, etc.) for scratch files
-            call init_TDx(unit_deficit,info_spat%domain,pars%sim%path,trim(str_td))
-            allocate(unit_Dxi(cont_td)%dxi(pars_TDx%temp%x(cont_td)))    ! Allocation of scratch units
-        end do
-    end if scratch_td
 
     fw_day = cost_fwEva ! Initialization of fw, set to 1
     fw_old = fw_day
@@ -240,8 +220,6 @@ subroutine simulation_manager(pars, pars_TDx, info_spat, wat_src_tbl, info_sourc
         first_simulated_doy = merge(pars%sim%start%doy, 1, y == pars%sim%start%year)
         last_simulated_doy = merge(simulation_end%doy, days_in_year(y), y == simulation_end%year)
 
-        n_week = 0
-
         ! Read irandom, landuse and irrigation method maps for the new period if needed
         call update_yearly_spatial_data(pars, info_spat, wat_src_tbl, irr_units, boundaries, y,                    &
                                       & alpha_ms_map, alpha_unm_map, fw_irr, a_loss, b_loss, c_loss, f_interception)
@@ -285,7 +263,6 @@ subroutine simulation_manager(pars, pars_TDx, info_spat, wat_src_tbl, info_sourc
             print*,'Simulation day', achar(9), doy, achar(9), 'year', achar(9), y
 
             dos = dos + 1 ! Day of Simulation
-            year_day_idx = doy - first_simulated_doy + 1
             coll_irr = 0; priv_irr = 0; iter1 = 0; iter2 = 0; h_irr = 0.
 
             ! Tries importing updated water table data into info_spat%wtab
@@ -761,28 +738,6 @@ subroutine simulation_manager(pars, pars_TDx, info_spat, wat_src_tbl, info_sourc
 
             call accumulate_daily_yield(crop_yield_state, pheno, crop_definitions, meteo, wat_bal1, wat_bal2, info_spat%domain)
 
-            ! calculate transpiration deficit index
-            if (trim(pars_TDx%mode)/="none") then
-                call sum_TD(wat_bal1%h_transp_act+wat_bal2%h_transp_act, wat_bal1%h_transp_pot+wat_bal2%h_transp_pot, &
-                          & pheno%k_cb, dos, TD)
-                do cont_td=1,pars_TDx%temp%n_ind     ! update TD values
-                    call calc_TDx(info_spat%domain, dos,                                                 &
-                                & simulation_year_idx == n_simulation_years .and. doy == last_simulated_doy, &
-                                & tot_deficit(:,:,cont_td), pheno%k_cb, pars_TDx%temp%x(cont_td), TD,    &
-                                & unit_Dxi(cont_td)%dxi)
-                end do
-                ! TODO: check if the following is necessary in "report" mode
-                if(mod((year_day_idx - pars_TDx%temp%delay),pars_TDx%temp%td)==0)then
-                    n_week = n_week +1
-                    do cont_td=1,pars_TDx%temp%n_ind ! calculate the sum over the integration period
-                        write(str_td,*)pars_TDx%temp%x(cont_td)
-                        str_td="td"//trim(adjustl(str_td))
-                        ! Create the temporary files that calculate TDx for each period
-                        call update_TDx_DB(tot_deficit(:,:,cont_td), trim(str_td), n_week, info_spat%domain,pars%sim%path)
-                    end do
-                end if
-            end if
-
             call write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal1, wat_bal2, wat_bal2_old, info_spat, &
                                    & pars, wat, wat_bal_hour, fw_day, fw_old, esp_perc, out_cn, out_cn_day, h_bypass,       &
                                    & coll_irr, priv_irr, out_tbl_list, pars%sim%mode, pars%sim%f_out_cells, pars%sim        )
@@ -862,32 +817,6 @@ subroutine simulation_manager(pars, pars_TDx, info_spat, wat_src_tbl, info_sourc
     if (pars%sim%f_theta_out .eqv. .true.) then
         call write_grid(trim(pars%sim%final_condition)//trim(pars%sim%thetaI_end_fn)//'.asc',info_spat%theta(1)%old)
         call write_grid(trim(pars%sim%final_condition)//trim(pars%sim%thetaII_end_fn)//'.asc',info_spat%theta(2)%old)
-    end if
-
-    ! calculate DTx statistics
-    if(trim(pars_TDx%mode)=="analysis")then
-        print*,"TDx index statistics are calculated"
-        do cont_td=1,pars_TDx%temp%n_ind
-            write(str_td,*)pars_TDx%temp%x(cont_td)
-            str_td="td"//trim(adjustl(str_td))
-            call save_TDx_statistics(unit_deficit,info_spat%domain,pars%sim%path,pars_TDx%n,trim(str_td))
-        end do
-        str_delete="del "//trim(pars%sim%path)//"*.tmp"
-        call system(trim(str_delete))
-    else if(trim(pars_TDx%mode)=="application")then
-        print*, "TDx index is calculated"
-        do cont_td=1,pars_TDx%temp%n_ind
-            write(str_td,*)pars_TDx%temp%x(cont_td)
-            str_td="td"//trim(adjustl(str_td))
-            do n_week = 1,(maxval(pars%sim%days_in_year(:))/pars_TDx%temp%td)+1
-                call make_TDx_report(info_spat%domain,pars%sim%path,n_week,trim(str_td))
-                print *, "TDx index ", trim(adjustl(str_td)), " has been calculated for period ", n_week
-            end do
-        end do
-        str_delete="del "//trim(pars%sim%path)//"*.tmp"
-        call system(trim(str_delete))
-    else
-        print*,"TDx index has not been calculated"
     end if
 
     crop_state = pheno

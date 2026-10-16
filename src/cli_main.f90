@@ -4,7 +4,6 @@ use mod_date, only: date, annual_period_end, date_is_before, date_to_string
 use mod_parameters, only: parameters, water_sources_table, source_info
 use mod_grid, only: write_grid, min_domain, bound      ! variables and methods to handle spatial input
 use mod_meteo
-use mod_TDx_index
 use mod_crop_phenology, only: crop_definition, crop_rotation, crop_pars_matrices
 use mod_crop_yield, only: yield_accumulator
 use mod_cropcoef, only: compute_kcb_corrections
@@ -15,9 +14,7 @@ use cli_read_parameter
 use mod_system
 implicit none
 
-
 type(parameters) :: xml                                     ! stores parameters of input file
-type(TDx_index) :: xml_TDx                                  ! stores parameters of input file for TDX indices
 type(bound)::boundaries                                     ! stores domain extension (rectangle)
 type(spatial_info)::info_spat                               ! stores spatial inputs
 type(water_sources_table),dimension(:),allocatable::watsour ! stores parameters of "<watsources>.txt" file
@@ -65,7 +62,7 @@ do i = 1, iargc()
             case ('-default', '-d')         ! print all default value
                 call print_header()
                 print *, '=== DEFAULT VALUES ==='
-                call print_parameters(xml,xml_TDx)
+                call print_parameters(xml)
                 print *, '=== END DEFAULT ==='
                 stop
             case ('-reckless', '-r')        ! doesn't stop for confirmation before overwriting output folder
@@ -87,14 +84,14 @@ call print_header()
 call date_and_time(values=t_start)
 
 ! Reads simulation input parameters
-call read_all_parameters(filename, xml, xml_TDx, verbose, reckless)
+call read_all_parameters(filename, xml, verbose, reckless)
 
 ! Import crop .dat files and the list of landuses (rotations)
 call import_crop_definitions(xml%sim, crop_definitions, crop_rotations)
 
 if (showpreview .eqv. .true.) then
     print *, '=== PREVIEW ==='
-    call print_parameters(xml, xml_TDx)
+    call print_parameters(xml)
     print *, '=== END PREVIEW ==='
 end if
 print*,'Simulation parameters have been set'
@@ -144,7 +141,7 @@ if(xml%sim%f_init_wc .eqv. .false.)then ! Generates soil initial condition
     end if
 
     ! Soil-crop water balance algorithm
-    call simulation_manager(xml, xml_TDx, info_spat, watsour, info_sources, info_meteo,                    &
+    call simulation_manager(xml, info_spat, watsour, info_sources, info_meteo,                             &
                           & crop_definitions, crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, &
                           & tab_CN2, tab_CN3, theta2_rice, warmup_end, boundaries, verbose, summary        )
 
@@ -204,7 +201,7 @@ end if
 
 ! Soil-crop water balance algorithm
 print*,"=== SIMULATION ==="
-call simulation_manager(xml, xml_TDx, info_spat, watsour, info_sources, info_meteo,                    &
+call simulation_manager(xml, info_spat, watsour, info_sources, info_meteo,                             &
                       & crop_definitions, crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, &
                       & tab_CN2, tab_CN3, theta2_rice, xml%sim%end, boundaries, verbose, summary       )
 
@@ -244,11 +241,9 @@ print *, '============================================================'
 print *, ''
 end subroutine print_header
 
-subroutine print_parameters(xml,xml_dtx)
+subroutine print_parameters(xml)
 use mod_parameters, only: parameters
-use mod_TDx_index, only: TDx_index
 type(parameters), intent(in) :: xml
-type(TDx_index), intent(in) :: xml_dtx
 
 print *,'OutputPath = ',  xml%sim%path
 print *,'MeteoPath = ', xml%sim%meteo_path
@@ -318,10 +313,4 @@ print *, 'LambdaCN = ', xml%sim%lambda_cn
 print *, 'StartIrrSeason = ', xml%sim%start_irr_season
 print *, 'EndIrrSeason = ', xml%sim%end_irr_season
 print *, 'h_maxpond', xml%sim%h_maxpond
-print *, 'DTxMode =',xml_dtx%mode
-print *, 'DTxNumXs=',xml_dtx%temp%n_ind
-print *, 'DTx_X=',xml_dtx%temp%x
-print *, 'DTxDeltaDate=',xml_dtx%temp%td
-print *, 'DTxDelayDays=',xml_dtx%temp%delay
-print *, 'DTxMinCard=',xml_dtx%n
 end subroutine print_parameters

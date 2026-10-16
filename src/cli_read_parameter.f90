@@ -5,7 +5,6 @@ use mod_common
 use mod_grid
 use mod_irrigation, only: calc_perc_booster_pars
 use cli_watsources
-use mod_TDx_index
 use mod_system
 use mod_utility
 
@@ -14,10 +13,9 @@ implicit none
 
 contains
 
-subroutine read_all_parameters(file_xml, xml, xml_dtx, verbose, reckless)
+subroutine read_all_parameters(file_xml, xml, verbose, reckless)
    character(len=*), intent(in) :: file_xml
     logical, intent(in) :: verbose, reckless
-    type(TDx_index), intent(inout) :: xml_dtx
     type(parameters), intent(inout) :: xml
     ! Input related variables used in parsing loop
     integer :: ios          ! State variable (0 = ok)
@@ -27,7 +25,7 @@ subroutine read_all_parameters(file_xml, xml, xml_dtx, verbose, reckless)
     line = 0; tablestart = 0
     ios = 0
 
-    call read_sim_parameters(file_xml, xml, xml_dtx, reckless)
+    call read_sim_parameters(file_xml, xml, reckless)
 
     inquire(file="cells.txt", exist=xml%sim%f_out_cells) ! update "output_cells"
 
@@ -81,11 +79,10 @@ subroutine read_all_parameters(file_xml, xml, xml_dtx, verbose, reckless)
 end subroutine read_all_parameters
 
 
-subroutine read_sim_parameters(file_xml, xml, xml_dtx, reckless)
+subroutine read_sim_parameters(file_xml, xml, reckless)
     ! read settings for the simulation
     character(len=*), intent(in) :: file_xml
     logical, intent(in) :: reckless
-    type(TDx_index), intent(inout) :: xml_dtx
     type(parameters), intent(inout) :: xml
 
     integer :: unit_txt, p, ios, line
@@ -314,20 +311,6 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, reckless)
                         read(buffer, *, iostat=ios)xml%depth%zr_fix
                     case ('lambdacn') ! lambda_CN: coefficient for calculate the initial abstraction
                         read(buffer, *, iostat=ios)xml%sim%lambda_cn
-                    case ('dtxmode') ! DTx mode calculation
-                        read(buffer, *, iostat=ios)xml_dtx%mode
-                    case ('dtxnumxs') ! Number of indicators to calculate
-                        read(buffer, *, iostat=ios)xml_dtx%temp%n_ind
-                    case ('dtx_x') ! number of days to use to calculate the dtx indicators
-                        allocate(xml_dtx%temp%x(xml_dtx%temp%n_ind))
-                        read(buffer, *, iostat=ios) xml_dtx%temp%x
-                    case ('dtxdeltadate') ! validity of the report
-                        read(buffer, *, iostat=ios)xml_dtx%temp%td
-                    case ('dtxdelaydays') ! Shift di report delivering
-                        read(buffer, *, iostat=ios)xml_dtx%temp%delay
-                    case ('dtxmincard') ! Number of values to obtain meaningfull statistics
-                        read(buffer, *, iostat=ios)xml_dtx%n
-
                     ! add new case to edit input files for irrigation
                     case ('watsources_fn') ! list of water sources for each irrigation units
                         read(buffer, *, iostat=ios) xml%sim%watsources_fn

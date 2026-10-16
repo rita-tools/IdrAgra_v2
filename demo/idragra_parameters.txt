@@ -207,36 +207,3 @@ int_reuse_div_fn = int_reuse.txt
 cr_sources_list_fn = cr_sources.txt
 IrrDistr_list_fn = irr_districts.txt
 sched_irr_fn = scheduled_irrigation.txt
-
-
-### 7. DTx settings (experimental; inactive in this demo) ############
-
-# DTx support is incomplete. Keep all values in this block even when the mode
-# is "none", because the current code does not provide safe defaults for every
-# internal DTx dimension.
-#
-# DTxMode: experimental DTx calculation mode [none/analysis/application].
-#   none        = disable DTx calculations
-#   analysis    = accumulate samples and fit gamma-distribution parameters
-#   application = export current-run accumulated deficit maps; despite its
-#                 name, it does NOT load or apply relationships from analysis
-DTxMode = none
-
-# DTxNumXs: number of DTx integration periods listed in DTx_x.
-DTxNumXs = 3
-
-# DTx_x: integration periods in days. For example, DT10 represents the
-# transpirative deficit accumulated over 10 days.
-DTx_x = 10 20 30
-
-# DTxDeltaDate: interval, in days, between DTx calculations.
-DTxDeltaDate = 10
-
-# DTxDelayDays: delay, in days from the start of the year, before DTx
-# calculations begin.
-DTxDelayDays = 1
-
-# DTxMinCard: minimum sample cardinality required for a valid estimate in
-# analysis mode. This two-year demo cannot normally satisfy a value of 3;
-# the value is retained because DTx is disabled.
-DTxMinCard = 3
