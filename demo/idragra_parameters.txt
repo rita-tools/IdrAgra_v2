@@ -75,7 +75,7 @@ Mode = 3
 
 # InitialThetaFlag: read the initial soil-moisture state from an external
 # file [T/F]. When F, IdrAgra generates the initial condition internally.
-InitialThetaFlag = T
+InitialThetaFlag = F
 
 # FinalThetaFlag: save the final soil-moisture state for possible reuse as
 # an initial condition in a subsequent simulation [T/F].
