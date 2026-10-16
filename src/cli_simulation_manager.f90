@@ -335,10 +335,18 @@ subroutine simulation_manager(pars, pars_TDx, info_spat, wat_src_tbl, info_sourc
                 where(info_spat%domain%mat /= info_spat%domain%header%nan)
                     ! Layer depths inizialization - to calculate h_soil and t_soil
                     ! Comparing root zone to evaporative layer depth
-                    wat_bal2%d_t = pars%depth%zr_fix
-                    where(pheno%is_real_crop)
-                        wat_bal2%d_t = max(0._dp, pheno%d_r - pars%depth%ze_fix)
+                    where(pheno%d_r > pars%depth%ze_fix)
+                        wat_bal2%d_t = pheno%d_r - pars%depth%ze_fix
+                    else where
+                        wat_bal2%d_t = pars%depth%zr_fix
                     end where
+                    ! ###################################### %PS%, todo: this is the correct way. #######################################
+                    ! ## However, using this leads to a spike in early season irrigation events, rising total irrigation amount by 10% ##
+                    !wat_bal2%d_t = pars%depth%zr_fix
+                    !where(pheno%is_real_crop)
+                    !    wat_bal2%d_t = max(0._dp, pheno%d_r - pars%depth%ze_fix)
+                    ! ###################################################################################################################
+
                     ! Soil water content inizialization [mm]
                     wat_bal1%h_soil = info_spat%theta(1)%old%mat*1000.*pars%depth%ze_fix
                     wat_bal2%h_soil = info_spat%theta(2)%old%mat*1000.*wat_bal2_old%d_t
@@ -364,10 +372,17 @@ subroutine simulation_manager(pars, pars_TDx, info_spat, wat_src_tbl, info_sourc
                 end where
 
                 ! Layer depths update as a function of d_r (phenological parameter - root depth)
-                wat_bal2%d_t = pars%depth%zr_fix
-                where(pheno%is_real_crop)
-                    wat_bal2%d_t = max(0._dp, pheno%d_r - pars%depth%ze_fix)
+                where(pheno%d_r > pars%depth%ze_fix)
+                    wat_bal2%d_t = pheno%d_r - pars%depth%ze_fix
+                else where
+                    wat_bal2%d_t = pars%depth%zr_fix
                 end where
+                ! ###################################### %PS%, todo: this is the correct way. #######################################
+                ! ## However, using this leads to a spike in early season irrigation events, rising total irrigation amount by 10% ##
+                !wat_bal2%d_t = pars%depth%zr_fix
+                !where(pheno%is_real_crop)
+                !    wat_bal2%d_t = max(0._dp, pheno%d_r - pars%depth%ze_fix)
+                ! ###################################################################################################################
 
                 ! Distance (mm) between rootzone and water table (influences capillary uptake)
                 wat_bal2%depth_under_rz = max(0._dp, info_spat%wat_tab%mat - wat_bal1%d_e - wat_bal2%d_t)
