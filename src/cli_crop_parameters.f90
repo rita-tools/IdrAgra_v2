@@ -336,6 +336,12 @@ subroutine read_crop_file(file_name, crop)
     end do
     close(unit)
 
+    if (crop%max_cuts < 1) then
+        print *, 'HarvNum_max must be at least 1 in ', trim(file_name), '.'
+        print *, 'Execution will be aborted...'
+        stop
+    end if
+
     call prepare_crop_definition_curves(crop)
 
 end subroutine read_crop_file

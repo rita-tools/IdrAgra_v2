@@ -7,14 +7,73 @@ use mod_grid, only: grid_i
 use mod_meteo, only: meteo_mat
 use mod_meteo, only: meteo_info
 use mod_parameters, only: simulation
-use mod_date, only: date, days_between_dates, days_in_year, month_lengths, calendar_date_from_doy
+use mod_date, only: date, days_between_dates, days_in_year, month_lengths, calendar_date_from_doy, advance_calendar_date, &
+                  & dates_are_equal
 
 implicit none
 private
 public :: advance_crops_daily, adjust_water_productivity, compute_canopy_resistance, prepare_crop_stage_boundaries, &
-        & compute_kcb_corrections
+        & compute_kcb_corrections, crop_weather_series, load_crop_weather
+
+type crop_weather_series
+    type(date) :: start
+    type(date) :: replay_start, replay_end
+    real(dp), allocatable :: tmax(:), tmin(:)
+end type crop_weather_series
 
 contains
+
+! Load into memory full station-level temperature series to be used in GDD calculations
+! todo: the resulting array is rather big. We should consider alternatives (e.g. loading smaller chunks at a time)
+subroutine load_crop_weather(weather, stations, path, replay_start, replay_end)
+    type(crop_weather_series), allocatable, intent(out) :: weather(:)
+    type(meteo_info), intent(in) :: stations(:)
+    character(len=*), intent(in) :: path
+    type(date), optional, intent(in) :: replay_start, replay_end
+
+    integer :: station, day, unit, ios, header_line, n_days, source_days, first_replay_row, last_replay_row
+    real(dp) :: unused_variables(5)
+    character(len=300) :: header
+
+    allocate(weather(size(stations)))
+    do station = 1, size(stations)
+        weather(station)%start = stations(station)%start
+        source_days = days_between_dates(stations(station)%start, stations(station)%finish) + 1
+        n_days = source_days
+        if (present(replay_end)) then
+            ! Warm-up runs once through the input year, then the simulation replays it from replay_start.
+            ! Project its surviving crops against that same repeated weather, followed by later input years.
+            first_replay_row = days_between_dates(stations(station)%start, replay_start) + 1
+            last_replay_row = days_between_dates(stations(station)%start, replay_end) + 1
+            n_days = last_replay_row + (source_days - first_replay_row + 1)
+            weather(station)%replay_start = replay_start
+            weather(station)%replay_end = replay_end
+        end if
+        allocate(weather(station)%tmax(n_days), weather(station)%tmin(n_days))
+        open(newunit=unit, file=trim(path)//trim(stations(station)%filename), status='old', action='read', iostat=ios)
+        if (ios /= 0) then
+            print *, 'Cannot reopen meteorological series for crop projection: ', trim(stations(station)%filename)
+            stop
+        end if
+        do header_line = 1, 4
+            read(unit, '(A)', iostat=ios) header
+            if (ios /= 0) exit
+        end do
+        do day = 1, source_days
+            if (ios /= 0) exit
+            read(unit, *, iostat=ios) weather(station)%tmax(day), weather(station)%tmin(day), unused_variables
+        end do
+        close(unit)
+        if (ios /= 0) then
+            print *, 'Incomplete meteorological series for crop projection: ', trim(stations(station)%filename)
+            stop
+        end if
+        if (present(replay_end)) then
+            weather(station)%tmax(last_replay_row+1:) = weather(station)%tmax(first_replay_row:source_days)
+            weather(station)%tmin(last_replay_row+1:) = weather(station)%tmin(first_replay_row:source_days)
+        end if
+    end do
+end subroutine load_crop_weather
 
 subroutine compute_kcb_corrections(kcb_corr_fact, crops, stations, sim)
     real(dp), allocatable :: kcb_corr_fact(:,:)
@@ -212,8 +271,8 @@ real(dp) function compute_canopy_resistance(co2) result(resistance)
     resistance = (1._dp/leaf_conductance)/(0.5_dp*24._dp*0.12_dp)
 end function compute_canopy_resistance
 
-subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, irandom, meteo, &
-                               & kcb_corr_fact, station_idx, current)
+subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, irandom, meteo, kcb_corr_fact, &
+                             & station_idx, station_weight, interpolate_temp, weather, current_date            )
     type(crop_pars_matrices), intent(inout) :: pheno
     type(crop_definition), intent(in) :: definitions(:)
     type(crop_rotation), intent(inout) :: rotations(:)
@@ -222,14 +281,17 @@ subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, 
     type(meteo_mat), intent(in) :: meteo
     real(dp), intent(in) :: kcb_corr_fact(:,:)
     integer, intent(in) :: station_idx(:,:,:)
-    type(date), intent(in) :: current
+    real(dp), intent(in) :: station_weight(:,:,:)
+    logical, intent(in) :: interpolate_temp
+    type(crop_weather_series), intent(in) :: weather(:)
+    type(date), intent(in) :: current_date
 
-    integer :: i, j, land_use, position, crop_id, first_day, last_day
-    real(dp) :: daily_gdd, daylength, temperature, cut_gdd
+    integer :: i, j, land_use, position, crop_id, first_day, last_day, n_points
+    real(dp) :: temperature, cut_gdd
     integer :: year, doy
 
-    year = current%year
-    doy = current%doy
+    year = current_date%year
+    doy = current_date%doy
 
     pheno%k_cb_old = pheno%k_cb
 
@@ -245,7 +307,7 @@ subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, 
                 pheno%harvest_pending(i,j) = .false.
                 pheno%crop_id(i,j) = 0
                 pheno%gdd(i,j) = 0._dp
-                pheno%vernalization_days(i,j) = 0._dp
+                pheno%vern_days(i,j) = 0._dp
                 pheno%cuts_completed(i,j) = 0
                 pheno%pheno_stage(i,j) = 0
 
@@ -317,19 +379,20 @@ subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, 
                 pheno%sowing_year(i,j) = year
                 pheno%sowing_doy(i,j) = doy
                 pheno%gdd(i,j) = 0._dp
-                pheno%vernalization_days(i,j) = 0._dp
+                pheno%vern_days(i,j) = 0._dp
                 pheno%cuts_completed(i,j) = 0
                 pheno%pheno_stage(i,j) = 0
                 pheno%is_real_crop(i,j) = maxval(definitions(crop_id)%gdd) > 0._dp
+                pheno%crop_age_days(i,j) = 0
+                n_points = size(definitions(crop_id)%gdd) * definitions(crop_id)%max_cuts
+                pheno%curve_day(i,j,1:n_points) = project_curve_days(definitions(crop_id), current_date, meteo%lat(i,j),  &
+                                                    & station_idx(i,j,:), station_weight(i,j,:), interpolate_temp, weather)
             end if
 
             ! Crop is in field: calculate GDD accumulation
-            call calculateDLH(doy, meteo%lat(i,j), daylength)
-            daily_gdd = calculate_daily_gdd(meteo%T_max(i,j), meteo%T_min(i,j), &
-                                           & definitions(crop_id)%base_temp, definitions(crop_id)%cutoff_temp)
-            daily_gdd = daily_gdd * min(vernalization_factor(definitions(crop_id), temperature, pheno%vernalization_days(i,j)), &
-                                      & photoperiod_factor(definitions(crop_id), daylength))
-            pheno%gdd(i,j) = pheno%gdd(i,j) + daily_gdd
+            call advance_crop_GDD(definitions(crop_id), meteo%T_max(i,j), meteo%T_min(i,j), &
+                                & doy, meteo%lat(i,j), pheno%gdd(i,j), pheno%vern_days(i,j) )
+            pheno%crop_age_days(i,j) = pheno%crop_age_days(i,j) + 1
 
             ! For multi-cut crops, increase the cut counter if the accumulated GDD has reached the next cut threshold
             cut_gdd = maxval(definitions(crop_id)%gdd)
@@ -344,7 +407,7 @@ subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, 
             call populate_crop_today(pheno, definitions(crop_id), kcb_corr_fact(crop_id,station_idx(i,j,1)), i, j)
 
             ! If harvest/cut GDD has been reached, or harvest date has passed, mark the cell; it will be set to baresoil tomorrow
-            if (pheno%gdd(i,j) >= real(max(1, definitions(crop_id)%max_cuts), dp) * cut_gdd .or.                    &
+            if (pheno%gdd(i,j) >= real(definitions(crop_id)%max_cuts, dp) * cut_gdd .or.                            &
                 & (doy >= definitions(crop_id)%harvest_doy_max .and.                                                &
                 & (year > pheno%sowing_year(i,j) .or. definitions(crop_id)%harvest_doy_max > pheno%sowing_doy(i,j)))) then
 
@@ -425,6 +488,30 @@ logical function should_sow_today(crop, doy, random_shift, temperature)
                        & (temperature > crop%sowing_temp .or. doy == last_day)
 end function should_sow_today
 
+subroutine advance_crop_GDD(crop, tmax, tmin, doy, latitude, accumulated_gdd, vern_days)
+    type(crop_definition), intent(in) :: crop
+    real(dp), intent(in) :: tmax, tmin, latitude
+    integer, intent(in) :: doy
+    real(dp), intent(inout) :: accumulated_gdd, vern_days
+
+    real(dp) :: daily_gdd, temperature, daylength, vern_factor, photo_factor
+
+    daily_gdd = calculate_daily_gdd(tmax, tmin, crop%base_temp, crop%cutoff_temp)
+    vern_factor = 1._dp
+    photo_factor = 1._dp
+
+    if (crop%requires_vernalization) then
+        temperature = (tmax + tmin)/2._dp
+        vern_factor = vernalization_factor(crop, temperature, vern_days)
+    end if
+    if (crop%photoperiod_response /= 0) then
+        call calculateDLH(doy, latitude, daylength)
+        photo_factor = photoperiod_factor(crop, daylength)
+    end if
+
+    accumulated_gdd = accumulated_gdd + daily_gdd * min(vern_factor, photo_factor)
+end subroutine advance_crop_GDD
+
 real(dp) function calculate_daily_gdd(tmax, tmin, base, cutoff) result(gdd)
     ! Single-day form of CropCoef's sine-wave calculateGDD() (Borghi, eq. i-85).
     real(dp), intent(in) :: tmax, tmin, base, cutoff
@@ -472,11 +559,9 @@ real(dp) function vernalization_factor(crop, temperature, accumulated_days) resu
 
     contribution = 0._dp
     if (crop%vern_curve_slope > 0._dp) then
-        if (temperature >= crop%vern_temp_min - crop%vern_curve_slope .and. &
-            temperature < crop%vern_temp_min) then
+        if (temperature >= crop%vern_temp_min - crop%vern_curve_slope .and. temperature < crop%vern_temp_min) then
             contribution = 1._dp - (crop%vern_temp_min - temperature)/crop%vern_curve_slope
-        else if (temperature >= crop%vern_temp_max .and. &
-                 temperature < crop%vern_temp_max + crop%vern_curve_slope) then
+        else if (temperature >= crop%vern_temp_max .and. temperature < crop%vern_temp_max + crop%vern_curve_slope) then
             contribution = 1._dp - (temperature - crop%vern_temp_max)/crop%vern_curve_slope
         end if
     end if
@@ -487,7 +572,7 @@ real(dp) function vernalization_factor(crop, temperature, accumulated_days) resu
     if (crop%vern_days_end <= crop%vern_days_start) return
 
     factor = crop%vern_fact_min + (1._dp - crop%vern_fact_min) * &
-             & (accumulated_days - crop%vern_days_start) / (crop%vern_days_end - crop%vern_days_start)
+           & (accumulated_days - crop%vern_days_start) / (crop%vern_days_end - crop%vern_days_start)
 end function vernalization_factor
 
 real(dp) function photoperiod_factor(crop, daylength) result(factor)
@@ -511,6 +596,121 @@ real(dp) function photoperiod_factor(crop, daylength) result(factor)
         end if
     end select
 end function photoperiod_factor
+
+! Looks ahead at future weather and takes note of predicted crop age at tabulated GDD thresholds
+! %PS%: this allow crop parameters to increase and decrease linearly in time, as in FAO56, without having to store the entire curves (the drawback is that we compute GDD accumulation twice for each crop)
+function project_curve_days(crop, sowing_date, latitude, stations, weights, interpolate_temp, weather) result(curve_days)
+    type(crop_definition), intent(in) :: crop
+    type(date), intent(in) :: sowing_date
+    real(dp), intent(in) :: latitude, weights(:)
+    integer, intent(in) :: stations(:)
+    logical, intent(in) :: interpolate_temp
+    type(crop_weather_series), intent(in) :: weather(:)
+    integer :: curve_days(size(crop%gdd)*crop%max_cuts)
+
+    type(date) :: projected_date, weather_date
+    integer :: first_row(size(stations)), day, stat, row, max_days, point, cut, n_points, n_cuts
+    real(dp) :: tmax, tmin, accumulated_gdd, vern_days, target, cut_gdd
+    logical :: replayed
+
+    curve_days = huge(0)
+    n_points = size(crop%gdd)
+    n_cuts = crop%max_cuts
+    cut_gdd = maxval(crop%gdd)
+    if (cut_gdd <= 0._dp) return
+
+    ! Make sure we're not projecting crop development beyond the end of the weather series
+    max_days = huge(0)
+    do stat = 1, merge(size(stations), 1, interpolate_temp)
+        first_row(stat) = days_between_dates(weather(stations(stat))%start, sowing_date) + 1
+        max_days = min(max_days, size(weather(stations(stat))%tmax) - first_row(stat) + 1)
+    end do
+
+    projected_date = sowing_date
+    weather_date = sowing_date
+    replayed = .false.
+    accumulated_gdd = 0._dp
+    vern_days = 0._dp
+    point = 1
+    cut = 0
+    do day = 1, max_days
+        tmax = 0._dp
+        tmin = 0._dp
+        if (interpolate_temp) then
+            do stat = 1, size(stations)
+                row = first_row(stat) + day - 1
+                tmax = tmax + weather(stations(stat))%tmax(row)*weights(stat)
+                tmin = tmin + weather(stations(stat))%tmin(row)*weights(stat)
+            end do
+        else
+            row = first_row(1) + day - 1
+            tmax = weather(stations(1))%tmax(row)
+            tmin = weather(stations(1))%tmin(row)
+        end if
+
+        call advance_crop_GDD(crop, tmax, tmin, weather_date%doy, latitude, accumulated_gdd, vern_days)
+
+        do
+            target = crop%gdd(point) + real(cut,dp)*cut_gdd
+            if (accumulated_gdd < target) exit
+            curve_days(cut*n_points + point) = day
+            point = point + 1
+            if (point > n_points) then
+                point = 1
+                cut = cut + 1
+                if (cut == n_cuts) return
+            end if
+        end do
+
+        call advance_calendar_date(projected_date)
+        if (.not. replayed .and. dates_are_equal(weather_date, weather(1)%replay_end)) then
+            weather_date = weather(1)%replay_start ! Replay the same year if in warmup
+            replayed = .true.
+        else
+            call advance_calendar_date(weather_date)
+        end if
+    end do
+end function project_curve_days
+
+subroutine curve_day_interval(days, age, left_point, right_point, fraction)
+    integer, intent(in) :: days(:), age
+    integer, intent(out) :: left_point, right_point
+    real(dp), intent(out) :: fraction
+
+    integer :: point
+
+    left_point = 1
+    right_point = 1
+    fraction = 0._dp
+    if (age <= days(1)) return
+
+    do point = 2, size(days)
+        if (age > days(point)) cycle
+        right_point = point
+        if (days(point) > days(point-1)) then
+            left_point = point - 1
+            fraction = real(age-days(point-1),dp)/real(days(point)-days(point-1),dp)
+        else
+            left_point = point
+        end if
+        return
+    end do
+
+    left_point = size(days)
+    right_point = left_point
+end subroutine curve_day_interval
+
+pure real(dp) function curve_value(values, left_point, right_point, fraction) result(value)
+    real(dp), intent(in) :: values(:)
+    real(dp), intent(in) :: fraction
+    integer, intent(in) :: left_point, right_point
+
+    if (left_point == right_point) then
+        value = values(left_point)
+    else
+        value = values(left_point) + (values(right_point)-values(left_point))*fraction
+    end if
+end function curve_value
 
 real(dp) function curve_at_gdd(gdd_points, values, accumulated_gdd) result(value)
     ! Interpolate today's parameter directly from accumulated thermal time.
@@ -542,21 +742,42 @@ subroutine populate_crop_today(pheno, crop, kcb_correction, i, j)
     type(crop_definition), intent(in) :: crop
     real(dp), intent(in) :: kcb_correction
     integer, intent(in) :: i, j
-    real(dp) :: current_gdd
+    real(dp) :: current_gdd, fraction
+    integer :: first_point, last_point, age, left_point, right_point
 
     ! Multi-cut crops reset their GDD curve for each cut, even though pheno%gdd continues to accumulate
     current_gdd = pheno%gdd(i,j) - real(pheno%cuts_completed(i,j), dp) * maxval(crop%gdd)
+    first_point = pheno%cuts_completed(i,j)*size(crop%gdd) + 1
+    last_point = first_point + size(crop%gdd) - 1
+    age = pheno%crop_age_days(i,j)
 
-    pheno%k_cb(i,j) = curve_at_gdd(crop%gdd, crop%k_cb, current_gdd)
+    ! Assign time-varying crop parameters
+    if (any(pheno%curve_day(i,j,first_point:last_point) == huge(0))) then
+        ! Fallback path: parameters vary linearly with accumulated GDD
+        pheno%k_cb(i,j)     = curve_at_gdd(crop%gdd, crop%k_cb,              current_gdd)
+        pheno%lai(i,j)      = curve_at_gdd(crop%gdd, crop%lai,               current_gdd)
+        pheno%h(i,j)        = curve_at_gdd(crop%gdd, crop%height,            current_gdd)
+        pheno%d_r(i,j)      = curve_at_gdd(crop%gdd, crop%root_depth,        current_gdd)
+        pheno%f_c(i,j)      = curve_at_gdd(crop%gdd, crop%cover_fraction,    current_gdd)
+        pheno%r_stress(i,j) = curve_at_gdd(crop%gdd, crop%stress_resistance, current_gdd)
+        pheno%cn_day(i,j)=nint(curve_at_gdd(crop%gdd,crop%cn_value,          current_gdd))
+    else
+        ! Normal path: parameters vary linearly in time (standard FAO56 shape)
+        call curve_day_interval(pheno%curve_day(i,j,first_point:last_point), age, left_point, right_point, fraction)
+        pheno%k_cb(i,j)     = curve_value(crop%k_cb,              left_point, right_point, fraction)
+        pheno%lai(i,j)      = curve_value(crop%lai,               left_point, right_point, fraction)
+        pheno%h(i,j)        = curve_value(crop%height,            left_point, right_point, fraction)
+        pheno%d_r(i,j)      = curve_value(crop%root_depth,        left_point, right_point, fraction)
+        pheno%f_c(i,j)      = curve_value(crop%cover_fraction,    left_point, right_point, fraction)
+        pheno%r_stress(i,j) = curve_value(crop%stress_resistance, left_point, right_point, fraction)
+        pheno%cn_day(i,j)=nint(curve_value(crop%cn_value,         left_point, right_point, fraction))
+    end if
+
     if (current_gdd >= crop%mid_start_gdd .and. pheno%k_cb(i,j) > 0.45_dp) then
         pheno%k_cb(i,j) = pheno%k_cb(i,j) + kcb_correction
     end if
-    pheno%lai(i,j) = curve_at_gdd(crop%gdd, crop%lai, current_gdd)
-    pheno%h(i,j) = curve_at_gdd(crop%gdd, crop%height, current_gdd)
-    pheno%d_r(i,j) = curve_at_gdd(crop%gdd, crop%root_depth, current_gdd)
-    pheno%f_c(i,j) = curve_at_gdd(crop%gdd, crop%cover_fraction, current_gdd)
-    pheno%r_stress(i,j) = curve_at_gdd(crop%gdd, crop%stress_resistance, current_gdd)
-    pheno%cn_day(i,j) = nint(curve_at_gdd(crop%gdd, crop%cn_value, current_gdd))
+
+    ! Assign static crop parameters (todo: could we avoid these, relying on the original crop definition values instead?)
     pheno%cn_class(i,j) = crop%cn_class
     pheno%irrigation_class(i,j) = merge(1, 0, crop%is_irrigated)
     pheno%p(i,j) = crop%raw_fraction

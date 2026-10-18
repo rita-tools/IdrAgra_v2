@@ -84,7 +84,7 @@ end type crop_rotation
 ! ---------------------------------------------------------------------------------
 
 type crop_pars_matrices
-    ! store the crop parameters for each calculation cells
+    ! store the crop parameters for each calculation cell
 
     integer, dimension(:,:), allocatable :: crop_id
     integer, dimension(:,:), allocatable :: sowing_year
@@ -95,8 +95,10 @@ type crop_pars_matrices
     integer, dimension(:,:), allocatable :: bare_soil_days_left
     logical, dimension(:,:), allocatable :: harvest_pending
     logical, dimension(:,:), allocatable :: is_real_crop        ! Used to distinguish between real crops and bare soil variations. Current discrimination: maxgdd>0
-    real(dp), dimension(:,:), allocatable :: gdd
-    real(dp), dimension(:,:), allocatable :: vernalization_days
+    real(dp), dimension(:,:), allocatable :: gdd                ! Accumulated growing degree days
+    real(dp), dimension(:,:), allocatable :: vern_days          ! Accumulated vernalization days
+    integer, dimension(:,:), allocatable :: crop_age_days       ! Days since sowing (sowing day is day 1)
+    integer, dimension(:,:,:), allocatable :: curve_day         ! Crop age [days] at which each GDD threshold is reached. Used to construct phenology curves
 
     real(dp), dimension(:,:), allocatable :: k_cb
     real(dp), dimension(:,:), allocatable :: h

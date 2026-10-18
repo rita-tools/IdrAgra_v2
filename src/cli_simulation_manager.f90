@@ -8,7 +8,7 @@ use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data, create_meteo_matric
 use mod_runoff
 use mod_crop_soil_water
 use mod_crop_phenology, only: crop_definition, crop_rotation, crop_pars_matrices
-use mod_cropcoef, only: advance_crops_daily
+use mod_cropcoef, only: advance_crops_daily, crop_weather_series, load_crop_weather
 use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva, nan_i, nan_r
 use mod_common, only: wat_matrix, soil2_rice, hourly
 use mod_irrigation
@@ -30,13 +30,14 @@ end interface
 
 contains
 
-subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_meteo,                        &
-                            & crop_definitions, crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, &
-                            & tab_CN2, tab_CN3, theta2_rice, simulation_end, boundaries, debug, summary      )
+subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_meteo, crop_definitions,      &
+                            & crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, tab_CN2, tab_CN3, &
+                            & theta2_rice, simulation_end, boundaries, debug, summary, is_warmup             )
 
     type(parameters),intent(inout)::pars
     real(dp),dimension(:,:,:),intent(in):: tab_CN2, tab_CN3
     type(date), intent(in) :: simulation_end
+    logical, intent(in) :: is_warmup
     type(bound),intent(in)::boundaries
     logical,intent(in)::debug,summary
     type(soil2_rice),intent(in)::theta2_rice
@@ -53,6 +54,7 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
     type(balance1_matrices)::wat_bal1,wat_bal1_old
     type(balance2_matrices)::wat_bal2,wat_bal2_old
     type(crop_pars_matrices)::pheno
+    type(crop_weather_series), allocatable :: crop_weather(:)
     type(meteo_mat)::meteo
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::out_cn_day
     type(output_CN),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::out_cn
@@ -117,11 +119,18 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
     irr_loss = 0.0D0
 
     ! Variables allocation
-    call allocate_all (stp_map, yr_map, deb_map, yr_deb_map, wat_bal1, wat_bal1_old, wat_bal2, wat_bal2_old, wat_bal_hour, meteo, wat, pheno, &
-        & info_spat%domain%header%imax,info_spat%domain%header%jmax, info_spat%domain%mat)
+    call allocate_all(stp_map, yr_map, deb_map, yr_deb_map, wat_bal1, wat_bal1_old, wat_bal2, wat_bal2_old, wat_bal_hour, meteo,    &
+                    & wat, pheno, info_spat%domain%header%imax, info_spat%domain%header%jmax, info_spat%domain%mat, crop_definitions)
 
     if (allocated(crop_state%crop_id)) pheno = crop_state
     call initialize_yield_accumulator(crop_yield_state, info_spat%domain%mat)
+
+    ! Load temperatures time series at the station level and save them in crop_weather (they're needed for phenology calculations)
+    if (is_warmup) then
+        call load_crop_weather(crop_weather, info_meteo, pars%sim%meteo_path, pars%sim%start, simulation_end)
+    else
+        call load_crop_weather(crop_weather, info_meteo, pars%sim%meteo_path)
+    end if
 
     ! Make sure that RF-related variables are nan outside the simulation domain
     pheno%d_t_max  = dble(info_spat%domain%header%nan)
@@ -285,8 +294,9 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
                                         & pars%sim%co2_concentration(year_idx), info_spat%domain)
 
             ! Advance each cell's crop phenology according to today's GDD accumulation
-            call advance_crops_daily(pheno, crop_definitions, crop_rotations, info_spat%domain, info_spat%soil_use_id, &
-                                   & info_spat%irandom%mat, meteo, kcb_corr_fact, dir_meteo, current                   )
+            call advance_crops_daily(pheno, crop_definitions, crop_rotations, info_spat%domain,                     &
+                                   & info_spat%soil_use_id, info_spat%irandom%mat, meteo, kcb_corr_fact, dir_meteo, &
+                                   & meteo_weight, pars%sim%interpolate_temp, crop_weather, current                 )
 
             call start_yield_for_new_crops(crop_yield_state, pheno, info_spat%domain)
 
@@ -1253,8 +1263,9 @@ subroutine write_outputs_by_step(doy, meteo, irrigation_sum, bil1, bil2, info_sp
 end subroutine write_outputs_by_step
 
 subroutine allocate_all (asc,yasc,deb_asc,deb_yasc,bil1,bil1_old,bil2,bil2_old,bil_hour,meteo,wat,pheno,&
-    & imax, jmax, domain)
+    & imax, jmax, domain, crop_definitions)
     integer,dimension(:,:),intent(in)::domain
+    type(crop_definition), intent(in) :: crop_definitions(:)
     type(step_map)::asc
     type(step_debug_map):: deb_asc
     type(annual_map)::yasc
@@ -1284,7 +1295,7 @@ subroutine allocate_all (asc,yasc,deb_asc,deb_yasc,bil1,bil1_old,bil2,bil2_old,b
     call init_wat_bal_hour(bil_hour,imax, jmax, allocazione)
     call init_meteo_matrices(meteo,imax, jmax, allocazione)
     call init_wat_matrices(wat,imax, jmax, allocazione)
-    call init_pheno_matrices(pheno,imax, jmax, allocazione)
+    call init_pheno_matrices(pheno,imax, jmax, allocazione, crop_definitions)
 end subroutine allocate_all
 
 subroutine destroy_all(asc,yasc,deb_asc,deb_yasc,bil1,bil1_old,bil2,bil2_old,bil_hour,meteo,wat,pheno,imax, jmax)
@@ -1802,13 +1813,14 @@ subroutine init_meteo_matrices(meteo,imax,jmax,f_allocate)
     end if
 end subroutine init_meteo_matrices
 
-subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
+subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate,definitions)
     ! init/destroy pheno
    type(crop_pars_matrices),intent(inout)::pheno
     integer,intent(in)::imax
     integer,intent(in)::jmax
     logical,intent(in)::f_allocate
-    integer::checkstat
+    type(crop_definition), optional, intent(in) :: definitions(:)
+    integer::checkstat, crop_id, max_curve_slots
     character (len=*),parameter:: errormessage = "pheno has been wrongly allocated"
 
     if(f_allocate)then
@@ -1822,7 +1834,14 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
         allocate(pheno%harvest_pending   (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%is_real_crop      (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%gdd               (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
-        allocate(pheno%vernalization_days(imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%vern_days         (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%crop_age_days     (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        max_curve_slots = 0
+        do crop_id = 1, size(definitions)
+            if (.not. allocated(definitions(crop_id)%gdd)) cycle
+            max_curve_slots = max(max_curve_slots, size(definitions(crop_id)%gdd)*definitions(crop_id)%max_cuts)
+        end do
+        allocate(pheno%curve_day(imax,jmax,max_curve_slots),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%k_cb_old          (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%k_cb              (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%h                 (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
@@ -1854,7 +1873,9 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
         pheno%harvest_pending = .false.
         pheno%is_real_crop = .false.
         pheno%gdd = 0._dp
-        pheno%vernalization_days = 0._dp
+        pheno%vern_days = 0._dp
+        pheno%crop_age_days = 0
+        pheno%curve_day = huge(0)
         pheno%k_cb_old = 0._dp
         pheno%k_cb = 0._dp
         pheno%h = 0._dp
@@ -1887,7 +1908,9 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate)
         deallocate(pheno%harvest_pending)
         deallocate(pheno%is_real_crop)
         deallocate(pheno%gdd)
-        deallocate(pheno%vernalization_days)
+        deallocate(pheno%vern_days)
+        deallocate(pheno%crop_age_days)
+        if (allocated(pheno%curve_day)) deallocate(pheno%curve_day)
         deallocate(pheno%k_cb_old        )
         deallocate(pheno%k_cb            )
         deallocate(pheno%h              )

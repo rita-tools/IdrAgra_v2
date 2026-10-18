@@ -163,7 +163,7 @@ subroutine accumulate_daily_yield(acc, pheno, definitions, meteo, wat_bal1, wat_
                 ! Accumulate thermal stress
                 ! The former heat window was 45-75% of planned crop duration.
                 ! GDD progress lets it follow a winter crop across December 31.
-                target_gdd = real(max(1, definitions(crop_id)%max_cuts), dp) * maxval(definitions(crop_id)%gdd)
+                target_gdd = real(definitions(crop_id)%max_cuts, dp) * maxval(definitions(crop_id)%gdd)
                 progress = pheno%gdd(i,j) / max(target_gdd, tiny(1._dp))
                 if (progress >= 0.45_dp .and. progress < 0.75_dp) then
                     acc%heat_days(i,j) = acc%heat_days(i,j) + 1

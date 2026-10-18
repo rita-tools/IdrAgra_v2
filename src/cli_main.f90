@@ -141,9 +141,9 @@ if(xml%sim%f_init_wc .eqv. .false.)then ! Generates soil initial condition
     end if
 
     ! Soil-crop water balance algorithm
-    call simulation_manager(xml, info_spat, watsour, info_sources, info_meteo,                             &
-                          & crop_definitions, crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, &
-                          & tab_CN2, tab_CN3, theta2_rice, warmup_end, boundaries, verbose, summary        )
+    call simulation_manager(xml, info_spat, watsour, info_sources, info_meteo, crop_definitions,           &
+                          & crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, tab_CN2, tab_CN3, &
+                          & theta2_rice, warmup_end, boundaries, verbose, summary, is_warmup=.true.        )
 
     where (crop_state%sowing_year > 0) crop_state%sowing_year = crop_state%sowing_year - 1
     where (crop_yield_state%sowing_year > 0) crop_yield_state%sowing_year = crop_yield_state%sowing_year - 1
@@ -201,9 +201,9 @@ end if
 
 ! Soil-crop water balance algorithm
 print*,"=== SIMULATION ==="
-call simulation_manager(xml, info_spat, watsour, info_sources, info_meteo,                             &
-                      & crop_definitions, crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, &
-                      & tab_CN2, tab_CN3, theta2_rice, xml%sim%end, boundaries, verbose, summary       )
+call simulation_manager(xml, info_spat, watsour, info_sources, info_meteo, crop_definitions,           &
+                      & crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, tab_CN2, tab_CN3, &
+                      & theta2_rice, xml%sim%end, boundaries, verbose, summary, is_warmup=.false.      )
 
 ! Closes input files
 if (xml%sim%mode == 1) call close_water_sources_dudy(info_sources,xml)        ! USE mode
