@@ -824,15 +824,15 @@ subroutine populate_crop_today(pheno, crop, kcb_correction, i, j)
         pheno%k_cb(i,j) = pheno%k_cb(i,j) + kcb_correction
     end if
 
-    ! Assign static crop parameters (todo: could we avoid these, relying on the original crop definition values instead?)
+    ! Cache static crop parameters in pheno matrices (easier to use for the rest of the code compared to accessing individual crop definitions)
     pheno%cn_class(i,j) = crop%cn_class
     pheno%irrigation_class(i,j) = merge(1, 0, crop%is_irrigated)
     pheno%p(i,j) = crop%raw_fraction
     pheno%a(i,j) = crop%interception_coef
     pheno%d_t_max(i,j) = maxval(crop%root_depth)
     pheno%RF_t_max(i,j) = crop%maximum_transpirative_root_fraction
-    pheno%T_crit(i,j) = crop%heat_stress_temp_crit
-    pheno%T_lim(i,j) = crop%heat_stress_temp_lim
+
+    ! Update growth stage
     pheno%pheno_stage(i,j) = crop_growth_stage(crop, current_gdd)
 end subroutine populate_crop_today
 
@@ -931,8 +931,6 @@ subroutine set_bare_soil_today(pheno, i, j)
     pheno%a(i,j) = 0._dp
     pheno%d_t_max(i,j) = 0._dp
     pheno%RF_t_max(i,j) = 0._dp
-    pheno%T_lim(i,j) = 0._dp
-    pheno%T_crit(i,j) = 0._dp
 end subroutine set_bare_soil_today
 
 end module mod_cropcoef

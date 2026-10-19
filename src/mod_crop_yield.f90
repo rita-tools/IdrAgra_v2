@@ -147,7 +147,7 @@ subroutine accumulate_daily_yield(acc, pheno, crops, meteo, wat_bal1, wat_bal2, 
     type(balance2_matrices), intent(in) :: wat_bal2
     type(grid_i), intent(in) :: domain
     integer :: i, j, stage, crop_id
-    real(dp) :: h_transp_act, h_transp_pot, progress, target_gdd
+    real(dp) :: h_transp_act, h_transp_pot, progress, target_gdd, temp_crit, temp_lim
 
     do j = 1, size(domain%mat, 2)
         do i = 1, size(domain%mat, 1)
@@ -161,17 +161,16 @@ subroutine accumulate_daily_yield(acc, pheno, crops, meteo, wat_bal1, wat_bal2, 
                 h_transp_pot = wat_bal1%h_transp_pot(i,j) + wat_bal2%h_transp_pot(i,j)
 
                 ! Accumulate thermal stress
-                ! The former heat window was 45-75% of planned crop duration.
-                ! GDD progress lets it follow a winter crop across December 31.
                 target_gdd = real(crops(crop_id)%max_cuts, dp) * maxval(crops(crop_id)%gdd)
                 progress = pheno%gdd(i,j) / max(target_gdd, tiny(1._dp))
                 if (progress >= 0.45_dp .and. progress < 0.75_dp) then
+                    temp_crit = crops(crop_id)%heat_stress_temp_crit
+                    temp_lim = crops(crop_id)%heat_stress_temp_lim
                     acc%heat_days(i,j) = acc%heat_days(i,j) + 1
-                    if (meteo%T_ave(i,j) < pheno%T_crit(i,j)) then
+                    if (meteo%T_ave(i,j) < temp_crit) then
                         acc%heat_sum(i,j) = acc%heat_sum(i,j) + 1._dp
-                    else if (meteo%T_ave(i,j) < pheno%T_lim(i,j) .and. pheno%T_lim(i,j) > pheno%T_crit(i,j)) then
-                        acc%heat_sum(i,j) = acc%heat_sum(i,j) + 1._dp - &
-                            & (meteo%T_ave(i,j) - pheno%T_crit(i,j))/(pheno%T_lim(i,j) - pheno%T_crit(i,j))
+                    else if (meteo%T_ave(i,j) < temp_lim .and. temp_lim > temp_crit) then
+                        acc%heat_sum(i,j) = acc%heat_sum(i,j) + 1._dp - (meteo%T_ave(i,j) - temp_crit)/(temp_lim - temp_crit)
                     end if
                 end if
 

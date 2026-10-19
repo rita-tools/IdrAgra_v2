@@ -114,8 +114,6 @@ type crop_pars_matrices
     real(dp), dimension(:,:), allocatable :: RF_t_max
     real(dp), dimension(:,:), allocatable :: RF_e
     real(dp), dimension(:,:), allocatable :: RF_t
-    real(dp), dimension(:,:), allocatable :: T_lim
-    real(dp), dimension(:,:), allocatable :: T_crit
     real(dp), dimension(:,:), allocatable :: p_day
     real(dp), dimension(:,:), allocatable :: k_cb_old           ! Previous day's Kcb value
     integer, dimension(:,:), allocatable :: pheno_stage         ! 0 = pre-emergence, 1 = stage, 2 = development, 3 = mid-season, 4 = late season. See FAO56

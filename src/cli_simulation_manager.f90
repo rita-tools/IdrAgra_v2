@@ -1856,8 +1856,6 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate,crops)
         allocate(pheno%RF_t_max          (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%RF_e              (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%RF_t              (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
-        allocate(pheno%T_lim             (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
-        allocate(pheno%T_crit            (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%p_day             (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%pheno_stage       (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%r_stress          (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
@@ -1890,8 +1888,6 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate,crops)
         pheno%RF_t_max = 0._dp
         pheno%RF_e = 0._dp
         pheno%RF_t = 0._dp
-        pheno%T_lim = 0._dp
-        pheno%T_crit = 0._dp
         pheno%p_day = 0._dp
         pheno%pheno_stage = 0
         pheno%r_stress = 0._dp
@@ -1925,8 +1921,6 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate,crops)
         deallocate(pheno%RF_t_max         )
         deallocate(pheno%RF_e            )
         deallocate(pheno%RF_t            )
-        deallocate(pheno%T_lim           )
-        deallocate(pheno%T_crit          )
         deallocate(pheno%p_day           )
         deallocate(pheno%pheno_stage   )
         deallocate(pheno%r_stress   )
