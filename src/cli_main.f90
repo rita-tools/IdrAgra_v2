@@ -18,10 +18,10 @@ type(parameters) :: xml                                     ! stores parameters 
 type(bound)::boundaries                                     ! stores domain extension (rectangle)
 type(spatial_info)::info_spat                               ! stores spatial inputs
 type(water_sources_table),dimension(:),allocatable::watsour ! stores parameters of "<watsources>.txt" file
-real(dp), dimension(10,3,4):: tab_CN2, tab_CN3               ! CN implementation
+real(dp), dimension(10,3,4):: tab_CN2, tab_CN3              ! CN implementation
 type(source_info)::info_sources                             ! stores water sources series
 type(meteo_info),dimension(:),allocatable::info_meteo       ! stores meteorological series data
-type(crop_definition), dimension(:), allocatable :: crop_definitions ! shared static crop parameters
+type(crop_definition), dimension(:), allocatable :: crops   ! shared static crop parameters
 type(crop_rotation), dimension(:), allocatable :: crop_rotations     ! crop IDs ordered by land use
 real(dp), allocatable :: kcb_corr_fact(:,:)                 ! Additive kcb correction factor, indexed by crop ID and weather station.
 type(crop_pars_matrices) :: crop_state                      ! per-cell state carried through warmup
@@ -87,7 +87,7 @@ call date_and_time(values=t_start)
 call read_all_parameters(filename, xml, verbose, reckless)
 
 ! Import crop .dat files and the list of landuses (rotations)
-call import_crop_definitions(xml%sim, crop_definitions, crop_rotations)
+call import_crop_definitions(xml%sim, crops, crop_rotations)
 
 if (showpreview .eqv. .true.) then
     print *, '=== PREVIEW ==='
@@ -124,7 +124,7 @@ if(xml%sim%f_init_wc .eqv. .false.)then ! Generates soil initial condition
     call read_meteo_parameters(xml%sim,info_meteo,verbose)
     print*, 'Variable "info_meteo" has been initialized'
 
-    call compute_kcb_corrections(kcb_corr_fact, crop_definitions, info_meteo, xml%sim)
+    call compute_kcb_corrections(kcb_corr_fact, crops, info_meteo, xml%sim)
 
     if (any(date_is_before(info_meteo(:)%finish, warmup_end))) then
         print *, 'A complete warmup requires meteorological data from '//date_to_string(xml%sim%start)// &
@@ -141,7 +141,7 @@ if(xml%sim%f_init_wc .eqv. .false.)then ! Generates soil initial condition
     end if
 
     ! Soil-crop water balance algorithm
-    call simulation_manager(xml, info_spat, watsour, info_sources, info_meteo, crop_definitions,           &
+    call simulation_manager(xml, info_spat, watsour, info_sources, info_meteo, crops,                      &
                           & crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, tab_CN2, tab_CN3, &
                           & theta2_rice, warmup_end, boundaries, verbose, summary, is_warmup=.true.        )
 
@@ -191,7 +191,7 @@ end where
 ! Initializes info_meteo matrices with meteorological data
 call read_meteo_parameters(xml%sim,info_meteo,verbose)
 print*, 'Variable "info_meteo" has been initialized'
-if (.not. allocated(kcb_corr_fact)) call compute_kcb_corrections(kcb_corr_fact, crop_definitions, info_meteo, xml%sim)
+if (.not. allocated(kcb_corr_fact)) call compute_kcb_corrections(kcb_corr_fact, crops, info_meteo, xml%sim)
 
 ! Initializes watsources and info_sources matrices
 if (xml%sim%mode == 1) then         ! %AB% USE mode
@@ -201,7 +201,7 @@ end if
 
 ! Soil-crop water balance algorithm
 print*,"=== SIMULATION ==="
-call simulation_manager(xml, info_spat, watsour, info_sources, info_meteo, crop_definitions,           &
+call simulation_manager(xml, info_spat, watsour, info_sources, info_meteo, crops,                      &
                       & crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, tab_CN2, tab_CN3, &
                       & theta2_rice, xml%sim%end, boundaries, verbose, summary, is_warmup=.false.      )
 

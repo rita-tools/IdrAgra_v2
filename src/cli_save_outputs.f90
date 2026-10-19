@@ -595,11 +595,11 @@ subroutine write_cell_info(info_spat, cell_info, mode, f_caprise, ze_fix, zr_fix
     end do
 end subroutine write_cell_info
 
-subroutine write_cell_prod(info_prod, definitions, rotations, co2, soil_use, irandom)
+subroutine write_cell_prod(info_prod, crops, rotations, co2, soil_use, irandom)
     ! Print parameters of the rotation defined for each sampled cell.
     ! Actual sowing and harvest dates are decided by daily phenology.
     type(cell_output), dimension(:), intent(in) :: info_prod
-    type(crop_definition), intent(in) :: definitions(:)
+    type(crop_definition), intent(in) :: crops(:)
     type(crop_rotation), intent(in) :: rotations(:)
     real(dp), intent(in) :: co2
     integer, intent(in) :: soil_use(:,:), irandom(:,:)
@@ -617,16 +617,16 @@ subroutine write_cell_prod(info_prod, definitions, rotations, co2, soil_use, ira
             crop_id = rotations(land_use)%crop_ids(slot)
             write(unit,*) 'CropId; ', slot, '; ', crop_id
             write(unit,*) 'WPadj; ', slot, '; ', adjust_water_productivity( &
-                & definitions(crop_id)%water_productivity, co2, definitions(crop_id)%sink_strength)
-            write(unit,*) 'HI; ', slot, '; ', definitions(crop_id)%harvest_index
-            write(unit,*) 'KyT; ', slot, '; ', definitions(crop_id)%yield_response_total
-            write(unit,*) 'Ky1-Ky4; ', slot, '; ', definitions(crop_id)%yield_response_stage
-            write(unit,*) 'Tcrit/Tlim; ', slot, '; ', definitions(crop_id)%heat_stress_temp_crit, &
-                & definitions(crop_id)%heat_stress_temp_lim
-            write(unit,*) 'Kcbmin/Kcbmax; ', slot, '; ', minval(definitions(crop_id)%k_cb), &
-                & maxval(definitions(crop_id)%k_cb)
-            write(unit,*) 'SowingDOYmin/Delay; ', slot, '; ', definitions(crop_id)%sowing_doy_min, &
-                & definitions(crop_id)%sowing_delay_max
+                & crops(crop_id)%water_productivity, co2, crops(crop_id)%sink_strength)
+            write(unit,*) 'HI; ', slot, '; ', crops(crop_id)%harvest_index
+            write(unit,*) 'KyT; ', slot, '; ', crops(crop_id)%yield_response_total
+            write(unit,*) 'Ky1-Ky4; ', slot, '; ', crops(crop_id)%yield_response_stage
+            write(unit,*) 'Tcrit/Tlim; ', slot, '; ', crops(crop_id)%heat_stress_temp_crit, &
+                & crops(crop_id)%heat_stress_temp_lim
+            write(unit,*) 'Kcbmin/Kcbmax; ', slot, '; ', minval(crops(crop_id)%k_cb), &
+                & maxval(crops(crop_id)%k_cb)
+            write(unit,*) 'SowingDOYmin/Delay; ', slot, '; ', crops(crop_id)%sowing_doy_min, &
+                & crops(crop_id)%sowing_delay_max
         end do
         write(unit,*) 'irandom; ', irandom(row,col)
     end do

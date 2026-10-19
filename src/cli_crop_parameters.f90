@@ -28,9 +28,9 @@ subroutine initialize_co2_parameters(sim)
         last_needed_year = max(last_needed_year, warmup_end%year)
     end if
     n_years = last_needed_year - sim%start_year + 1
-    allocate(sim%co2_concentration(n_years))
+    allocate(sim%co2_conc(n_years))
     allocate(sim%res_canopy(n_years))
-    sim%co2_concentration = -1._dp
+    sim%co2_conc = -1._dp
 
     open(newunit=unit, file=trim(filename), status='old', action='read', iostat=ios)
     if (ios /= 0) then
@@ -47,11 +47,11 @@ subroutine initialize_co2_parameters(sim)
         if (ios /= 0) cycle ! Header: Year CO2
         idx = year - sim%start_year + 1
         if (idx < 1 .or. idx > n_years) cycle
-        sim%co2_concentration(idx) = co2
+        sim%co2_conc(idx) = co2
     end do
     close(unit)
 
-    if (any(sim%co2_concentration <= 0._dp)) then
+    if (any(sim%co2_conc <= 0._dp)) then
         print *, 'CO2 series ', trim(filename), ' must include every calendar year from ', &
                  & sim%start_year, ' to ', last_needed_year, '.'
         print *, 'Execution will be aborted...'
@@ -59,14 +59,14 @@ subroutine initialize_co2_parameters(sim)
     end if
 
     do idx = 1, n_years
-        sim%res_canopy(idx) = compute_canopy_resistance(sim%co2_concentration(idx))
+        sim%res_canopy(idx) = compute_canopy_resistance(sim%co2_conc(idx))
     end do
 end subroutine initialize_co2_parameters
 
-! Read all of the crop .dat files and the crop rotation file, and store the information in crop_definitions and crop_rotations.
-subroutine import_crop_definitions(sim, crop_definitions, crop_rotations)
+! Read all of the crop .dat files and the crop rotation file, and store the information in crops and crop_rotations.
+subroutine import_crop_definitions(sim, crops, crop_rotations)
     type(simulation), intent(inout) :: sim
-    type(crop_definition), dimension(:), allocatable, intent(out) :: crop_definitions
+    type(crop_definition), dimension(:), allocatable, intent(out) :: crops
     type(crop_rotation), dimension(:), allocatable, intent(out) :: crop_rotations
 
     character(len=255), dimension(:), allocatable :: crop_files
@@ -151,13 +151,12 @@ subroutine import_crop_definitions(sim, crop_definitions, crop_rotations)
         crop_ids(file_idx) = maximum_crop_id
     end do
 
-    allocate(crop_definitions(maximum_crop_id))
+    allocate(crops(maximum_crop_id))
     do file_idx = 1, n_crop_files
         crop_idx = crop_ids(file_idx)
-        crop_definitions(crop_idx)%crop_id = crop_idx
-        crop_definitions(crop_idx)%parameter_file = trim(crop_files(file_idx))
-        call read_crop_file(join_path(sim%crop_parameters_path, crop_files(file_idx), delimiter), &
-                          & crop_definitions(crop_idx))
+        crops(crop_idx)%crop_id = crop_idx
+        crops(crop_idx)%parameter_file = trim(crop_files(file_idx))
+        call read_crop_file(join_path(sim%crop_parameters_path, crop_files(file_idx), delimiter), crops(crop_idx))
     end do
 
     do rotation_idx = 1, n_rotations

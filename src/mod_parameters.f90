@@ -107,7 +107,7 @@ type simulation
     integer :: n_irr_meth                       ! number of irrigation methods
     logical :: f_out_cells = .false.            ! if true, print outputs file for control points (aka cells)
     real(dp),dimension(:),allocatable :: res_canopy ! annual canopy resistance derived from CO2
-    real(dp),dimension(:),allocatable :: co2_concentration ! annual atmospheric CO2 [ppm]
+    real(dp),dimension(:),allocatable :: co2_conc ! annual atmospheric CO2 [ppm]
     real(dp), dimension(2,2) :: quantiles = reshape([0.575118, 0.472116, 8.026400, 7.706101], [2,2])
     real(dp) :: lambda_cn = 0.2                 ! lambda parameters for curve number [-]
     real(dp) :: h_prec_lim = 5.0                ! minimum meaningful precipitation [mm]

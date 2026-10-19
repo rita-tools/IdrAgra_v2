@@ -138,10 +138,10 @@ subroutine destroy_yield(yld)
     if (allocated(yld%completed_crops))     deallocate(yld%completed_crops)
 end subroutine destroy_yield
 
-subroutine accumulate_daily_yield(acc, pheno, definitions, meteo, wat_bal1, wat_bal2, domain)
+subroutine accumulate_daily_yield(acc, pheno, crops, meteo, wat_bal1, wat_bal2, domain)
     type(yield_accumulator), intent(inout) :: acc
     type(crop_pars_matrices), intent(in) :: pheno
-    type(crop_definition), intent(in) :: definitions(:)
+    type(crop_definition), intent(in) :: crops(:)
     type(meteo_mat), intent(in) :: meteo
     type(balance1_matrices), intent(in) :: wat_bal1
     type(balance2_matrices), intent(in) :: wat_bal2
@@ -163,7 +163,7 @@ subroutine accumulate_daily_yield(acc, pheno, definitions, meteo, wat_bal1, wat_
                 ! Accumulate thermal stress
                 ! The former heat window was 45-75% of planned crop duration.
                 ! GDD progress lets it follow a winter crop across December 31.
-                target_gdd = real(definitions(crop_id)%max_cuts, dp) * maxval(definitions(crop_id)%gdd)
+                target_gdd = real(crops(crop_id)%max_cuts, dp) * maxval(crops(crop_id)%gdd)
                 progress = pheno%gdd(i,j) / max(target_gdd, tiny(1._dp))
                 if (progress >= 0.45_dp .and. progress < 0.75_dp) then
                     acc%heat_days(i,j) = acc%heat_days(i,j) + 1
@@ -188,11 +188,11 @@ subroutine accumulate_daily_yield(acc, pheno, definitions, meteo, wat_bal1, wat_
     end do
 end subroutine accumulate_daily_yield
 
-subroutine finalize_harvested_yield(acc, yld, pheno, definitions, co2, domain)
+subroutine finalize_harvested_yield(acc, yld, pheno, crops, co2, domain)
     type(yield_accumulator), intent(inout) :: acc
     type(yield_t), intent(inout) :: yld
     type(crop_pars_matrices), intent(in) :: pheno
-    type(crop_definition), intent(in) :: definitions(:)
+    type(crop_definition), intent(in) :: crops(:)
     real(dp), intent(in) :: co2
     type(grid_i), intent(in) :: domain
     integer :: i, j, slot, stage, crop_id
@@ -215,10 +215,9 @@ subroutine finalize_harvested_yield(acc, yld, pheno, definitions, co2, domain)
             yld%T_pot_sum%mat(i,j,:,slot) = acc%transp_pot(i,j,:)
             yld%days_in_stage%mat(i,j,:,slot) = acc%stage_days(i,j,:)
             ! Calculate potential yield
-            wp_adj = adjust_water_productivity(definitions(crop_id)%water_productivity, co2, &
-                                               & definitions(crop_id)%sink_strength)
+            wp_adj = adjust_water_productivity(crops(crop_id)%water_productivity, co2, crops(crop_id)%sink_strength)
             yld%biomass_pot%mat(i,j,slot) = wp_adj * acc%transp_ratio(i,j)
-            yld%yield_pot%mat(i,j,slot) = yld%biomass_pot%mat(i,j,slot) * definitions(crop_id)%harvest_index
+            yld%yield_pot%mat(i,j,slot) = yld%biomass_pot%mat(i,j,slot) * crops(crop_id)%harvest_index
 
             yld%f_HS%mat(i,j,slot) = 1._dp
             if (acc%heat_days(i,j) > 0) yld%f_HS%mat(i,j,slot) = acc%heat_sum(i,j)/real(acc%heat_days(i,j), dp)
@@ -227,7 +226,7 @@ subroutine finalize_harvested_yield(acc, yld, pheno, definitions, co2, domain)
             yld%f_WS_tot%mat(i,j,slot) = 1._dp
             if (total_pot > 0._dp) then
                 yld%f_WS_tot%mat(i,j,slot) = max(0._dp, &
-                    & 1._dp - definitions(crop_id)%yield_response_total*(1._dp - sum(acc%transp_act(i,j,:))/total_pot))
+                    & 1._dp - crops(crop_id)%yield_response_total*(1._dp - sum(acc%transp_act(i,j,:))/total_pot))
             end if
 
             ! Stage-specific water stress
@@ -239,7 +238,7 @@ subroutine finalize_harvested_yield(acc, yld, pheno, definitions, co2, domain)
                     deficit = 1._dp - acc%transp_act(i,j,stage)/acc%transp_pot(i,j,stage)
                     duration_fraction = acc%stage_days(i,j,stage)/total_days
                     yld%f_WS_stage%mat(i,j,slot) = yld%f_WS_stage%mat(i,j,slot) * &
-                        & max(0._dp, 1._dp - definitions(crop_id)%yield_response_stage(stage)*deficit)**duration_fraction
+                        & max(0._dp, 1._dp - crops(crop_id)%yield_response_stage(stage)*deficit)**duration_fraction
                 end do
             end if
             ! Actual yield depends on both heat and water stress

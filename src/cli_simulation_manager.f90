@@ -30,7 +30,7 @@ end interface
 
 contains
 
-subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_meteo, crop_definitions,      &
+subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_meteo, crops,      &
                             & crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, tab_CN2, tab_CN3, &
                             & theta2_rice, simulation_end, boundaries, debug, summary, is_warmup             )
 
@@ -45,7 +45,7 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
     type(water_sources_table),dimension(:),intent(inout)::wat_src_tbl
     type(source_info),intent(inout)::info_sources
     type(meteo_info),dimension(:),intent(inout)::info_meteo
-    type(crop_definition), dimension(:), intent(in) :: crop_definitions
+    type(crop_definition), dimension(:), intent(in) :: crops
     type(crop_rotation), dimension(:), intent(inout) :: crop_rotations
     real(dp), dimension(:,:), intent(in) :: kcb_corr_fact
     type(crop_pars_matrices), intent(inout) :: crop_state
@@ -120,7 +120,7 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
 
     ! Variables allocation
     call allocate_all(stp_map, yr_map, deb_map, yr_deb_map, wat_bal1, wat_bal1_old, wat_bal2, wat_bal2_old, wat_bal_hour, meteo,    &
-                    & wat, pheno, info_spat%domain%header%imax, info_spat%domain%header%jmax, info_spat%domain%mat, crop_definitions)
+                    & wat, pheno, info_spat%domain%header%imax, info_spat%domain%header%jmax, info_spat%domain%mat, crops)
 
     if (allocated(crop_state%crop_id)) pheno = crop_state
     call initialize_yield_accumulator(crop_yield_state, info_spat%domain%mat)
@@ -290,13 +290,12 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
                                      & doy, pars%sim%res_canopy(year_idx), pars%sim                  )
 
             ! Finalize yesterday's mature crop before daily phenology clears it.
-            call finalize_harvested_yield(crop_yield_state, yield, pheno, crop_definitions,     &
-                                        & pars%sim%co2_concentration(year_idx), info_spat%domain)
+            call finalize_harvested_yield(crop_yield_state, yield, pheno, crops, pars%sim%co2_conc(year_idx), info_spat%domain)
 
             ! Advance each cell's crop phenology according to today's GDD accumulation
-            call advance_crops_daily(pheno, crop_definitions, crop_rotations, info_spat%domain, info_spat%soil_use_id, &
-                                   & info_spat%irandom%mat, meteo, kcb_corr_fact, dir_meteo, meteo_weight,             &
-                                   & pars%sim%interpolate_temp, crop_weather, current, pars%sim%aggressive_sowing      )
+            call advance_crops_daily(pheno, crops, crop_rotations, info_spat%domain, info_spat%soil_use_id,      &
+                                   & info_spat%irandom%mat, meteo, kcb_corr_fact, dir_meteo, meteo_weight,       &
+                                   & pars%sim%interpolate_temp, crop_weather, current, pars%sim%aggressive_sowing)
 
             call start_yield_for_new_crops(crop_yield_state, pheno, info_spat%domain)
 
@@ -309,9 +308,9 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
             ! Inizialization on first day of simulation
             first_day: if (dos == 1) then
 
-                if (pars%sim%f_out_cells) call write_cell_prod(out_tbl_list%prod_info, crop_definitions, crop_rotations, &
-                                                             & pars%sim%co2_concentration(year_idx),                     &
-                                                             & info_spat%soil_use_id%mat, info_spat%irandom%mat          )
+                if (pars%sim%f_out_cells) call write_cell_prod(out_tbl_list%prod_info, crops,                  &
+                                                             & crop_rotations, pars%sim%co2_conc(year_idx),    &
+                                                             & info_spat%soil_use_id%mat, info_spat%irandom%mat)
 
                 day_from_irr=-9999
                 esp_perc=1.
@@ -746,7 +745,7 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
             wat_bal1%h_pond = min(wat_bal_hour%esten%h_pond,info_spat%h_maxpond%mat)
             !wat_bal1%h_pond = wat_bal_hour%esten%h_pond
 
-            call accumulate_daily_yield(crop_yield_state, pheno, crop_definitions, meteo, wat_bal1, wat_bal2, info_spat%domain)
+            call accumulate_daily_yield(crop_yield_state, pheno, crops, meteo, wat_bal1, wat_bal2, info_spat%domain)
 
             call write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal1, wat_bal2, wat_bal2_old, info_spat, &
                                    & pars, wat, wat_bal_hour, fw_day, fw_old, esp_perc, out_cn, out_cn_day, h_bypass,       &
@@ -1263,9 +1262,9 @@ subroutine write_outputs_by_step(doy, meteo, irrigation_sum, bil1, bil2, info_sp
 end subroutine write_outputs_by_step
 
 subroutine allocate_all (asc,yasc,deb_asc,deb_yasc,bil1,bil1_old,bil2,bil2_old,bil_hour,meteo,wat,pheno,&
-    & imax, jmax, domain, crop_definitions)
+    & imax, jmax, domain, crops)
     integer,dimension(:,:),intent(in)::domain
-    type(crop_definition), intent(in) :: crop_definitions(:)
+    type(crop_definition), intent(in) :: crops(:)
     type(step_map)::asc
     type(step_debug_map):: deb_asc
     type(annual_map)::yasc
@@ -1295,7 +1294,7 @@ subroutine allocate_all (asc,yasc,deb_asc,deb_yasc,bil1,bil1_old,bil2,bil2_old,b
     call init_wat_bal_hour(bil_hour,imax, jmax, allocazione)
     call init_meteo_matrices(meteo,imax, jmax, allocazione)
     call init_wat_matrices(wat,imax, jmax, allocazione)
-    call init_pheno_matrices(pheno,imax, jmax, allocazione, crop_definitions)
+    call init_pheno_matrices(pheno,imax, jmax, allocazione, crops)
 end subroutine allocate_all
 
 subroutine destroy_all(asc,yasc,deb_asc,deb_yasc,bil1,bil1_old,bil2,bil2_old,bil_hour,meteo,wat,pheno,imax, jmax)
@@ -1813,13 +1812,13 @@ subroutine init_meteo_matrices(meteo,imax,jmax,f_allocate)
     end if
 end subroutine init_meteo_matrices
 
-subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate,definitions)
+subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate,crops)
     ! init/destroy pheno
    type(crop_pars_matrices),intent(inout)::pheno
     integer,intent(in)::imax
     integer,intent(in)::jmax
     logical,intent(in)::f_allocate
-    type(crop_definition), optional, intent(in) :: definitions(:)
+    type(crop_definition), optional, intent(in) :: crops(:)
     integer::checkstat, crop_id, max_curve_slots
     character (len=*),parameter:: errormessage = "pheno has been wrongly allocated"
 
@@ -1837,9 +1836,9 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate,definitions)
         allocate(pheno%vern_days         (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%crop_age_days     (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         max_curve_slots = 0
-        do crop_id = 1, size(definitions)
-            if (.not. allocated(definitions(crop_id)%gdd)) cycle
-            max_curve_slots = max(max_curve_slots, size(definitions(crop_id)%gdd)*definitions(crop_id)%max_cuts)
+        do crop_id = 1, size(crops)
+            if (.not. allocated(crops(crop_id)%gdd)) cycle
+            max_curve_slots = max(max_curve_slots, size(crops(crop_id)%gdd)*crops(crop_id)%max_cuts)
         end do
         allocate(pheno%curve_day(imax,jmax,max_curve_slots),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%k_cb_old          (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
