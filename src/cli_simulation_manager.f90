@@ -294,9 +294,9 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
                                         & pars%sim%co2_concentration(year_idx), info_spat%domain)
 
             ! Advance each cell's crop phenology according to today's GDD accumulation
-            call advance_crops_daily(pheno, crop_definitions, crop_rotations, info_spat%domain,                     &
-                                   & info_spat%soil_use_id, info_spat%irandom%mat, meteo, kcb_corr_fact, dir_meteo, &
-                                   & meteo_weight, pars%sim%interpolate_temp, crop_weather, current                 )
+            call advance_crops_daily(pheno, crop_definitions, crop_rotations, info_spat%domain, info_spat%soil_use_id, &
+                                   & info_spat%irandom%mat, meteo, kcb_corr_fact, dir_meteo, meteo_weight,             &
+                                   & pars%sim%interpolate_temp, crop_weather, current, pars%sim%aggressive_sowing      )
 
             call start_yield_for_new_crops(crop_yield_state, pheno, info_spat%domain)
 

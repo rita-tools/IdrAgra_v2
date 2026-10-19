@@ -271,8 +271,8 @@ real(dp) function compute_canopy_resistance(co2) result(resistance)
     resistance = (1._dp/leaf_conductance)/(0.5_dp*24._dp*0.12_dp)
 end function compute_canopy_resistance
 
-subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, irandom, meteo, kcb_corr_fact, &
-                             & station_idx, station_weight, interpolate_temp, weather, current_date            )
+subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, irandom, meteo, kcb_corr_fact,        &
+                             & station_idx, station_weight, interpolate_temp, weather, current_date, aggressive_sowing)
     type(crop_pars_matrices), intent(inout) :: pheno
     type(crop_definition), intent(in) :: definitions(:)
     type(crop_rotation), intent(inout) :: rotations(:)
@@ -283,12 +283,14 @@ subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, 
     integer, intent(in) :: station_idx(:,:,:)
     real(dp), intent(in) :: station_weight(:,:,:)
     logical, intent(in) :: interpolate_temp
+    logical, intent(in) :: aggressive_sowing
     type(crop_weather_series), intent(in) :: weather(:)
     type(date), intent(in) :: current_date
 
-    integer :: i, j, land_use, position, crop_id, first_day, last_day, n_points
+    integer :: i, j, land_use, position, next_position, crop_id, first_day, last_day, n_points
     real(dp) :: temperature, cut_gdd
     integer :: year, doy
+    logical :: landuse_has_changed
 
     year = current_date%year
     doy = current_date%doy
@@ -301,6 +303,7 @@ subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, 
 
             land_use = soil_use%mat(i,j)
             position = pheno%rotation_position(i,j)
+            landuse_has_changed = pheno%rotation_land_use(i,j) /= land_use
 
             ! Harvest the crop (becoming baresoil) if due
             if (pheno%harvest_pending(i,j)) then
@@ -312,11 +315,10 @@ subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, 
                 pheno%pheno_stage(i,j) = 0
 
                 ! Move to next crop in the rotation
-                if (pheno%rotation_land_use(i,j) /= land_use) then
-                    ! A land-use change occurred; find the closest sowing window in the new rotation
+                if (landuse_has_changed) then ! A land-use change occurred; find the closest sowing window in the new rotation
                     position = next_sowing_position(rotations(land_use), definitions, doy, irandom(i,j), year)
-                else
-                    ! Normal rotation advancement
+                    landuse_has_changed = .false.
+                else                          ! Normal rotation advancement
                     position = merge(1, position + 1, position == size(rotations(land_use)%crop_ids))
                 end if
                 pheno%rotation_position(i,j) = position
@@ -329,10 +331,11 @@ subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, 
 
             if (pheno%crop_id(i,j) == 0) then ! Soil is bare: wait crop_overlap_days before considering sowing
                 call set_bare_soil_today(pheno, i, j)
-                if (pheno%rotation_land_use(i,j) /= land_use) then
+                if (landuse_has_changed) then
                     position = next_sowing_position(rotations(land_use), definitions, doy, irandom(i,j), year)
                     pheno%rotation_position(i,j) = position
                     pheno%rotation_land_use(i,j) = land_use
+                    landuse_has_changed = .false.
                     crop_id = rotations(land_use)%crop_ids(position)
                     if (crop_id >= 1 .and. crop_id <= size(definitions)) then
                         pheno%bare_soil_days_left(i,j) = max(0, definitions(crop_id)%crop_overlap_days)
@@ -412,20 +415,62 @@ subroutine advance_crops_daily(pheno, definitions, rotations, domain, soil_use, 
                 & (year > pheno%sowing_year(i,j) .or. definitions(crop_id)%harvest_doy_max > pheno%sowing_doy(i,j)))) then
 
                 pheno%harvest_pending(i,j) = .true.
+                cycle
+            end if
+
+            if (aggressive_sowing) then
+                if (landuse_has_changed) then
+                    next_position = next_sowing_position(rotations(land_use), definitions, doy, irandom(i,j), year)
+                else
+                    next_position = merge(1, position + 1, position == size(rotations(land_use)%crop_ids))
+                end if
+                crop_id = rotations(land_use)%crop_ids(next_position)
+                if (crop_id >= 1 .and. crop_id <= size(definitions)) then
+                    pheno%harvest_pending(i,j) = should_clear_field(definitions(crop_id), current_date,                        &
+                                                                  & pheno%sowing_year(i,j), pheno%sowing_doy(i,j), irandom(i,j))
+                end if
             end if
         end do
     end do
 end subroutine advance_crops_daily
 
-! After a land-use change, choose the first sowing window still open or the nearest upcoming one
+! If harvested after today, can the next crop be sown once its bare-soil interval has passed?
+logical function should_clear_field(next_crop, current_date, sowing_year, sowing_doy, irandom) result(needs_field)
+    type(crop_definition), intent(in) :: next_crop
+    type(date), intent(in) :: current_date
+    integer, intent(in) :: sowing_year, sowing_doy, irandom
+    integer :: first_day, last_day, window_year, available_year, available_doy
+    needs_field = .false.
+
+    ! Calculate the sowing window for the next crop
+    call sowing_window(next_crop, irandom, first_day, last_day)
+
+    ! Earliest available day for sowing the next crop (tomorrow + crop_overlap_days)
+    available_year = current_date%year
+    available_doy = current_date%doy + next_crop%crop_overlap_days + 1
+    do while (available_doy > days_in_year(available_year))
+        available_doy = available_doy - days_in_year(available_year)
+        available_year = available_year + 1
+    end do
+
+    ! Doesn't clear the field if the next crop's sowing window is in a different year
+    window_year = current_date%year
+    if (window_year == sowing_year .and. first_day <= sowing_doy) window_year = window_year + 1
+    if (available_year /= window_year) return
+
+    needs_field = available_doy >= first_day .and. available_doy <= last_day
+end function should_clear_field
+
+! After a land-use change, prefer the earliest-opened sowing window; otherwise choose the nearest upcoming one.
 integer function next_sowing_position(rotation, definitions, doy, random_shift, year) result(position)
     type(crop_rotation), intent(in) :: rotation
     type(crop_definition), intent(in) :: definitions(:)
     integer, intent(in) :: doy, random_shift, year
-    integer :: candidate, crop_id, first_day, last_day, wait_days, shortest_wait
+    integer :: candidate, crop_id, first_day, last_day, wait_days, shortest_wait, earliest_start
 
     position = 1
     shortest_wait = huge(0)
+    earliest_start = huge(0)
     do candidate = 1, size(rotation%crop_ids)
         crop_id = rotation%crop_ids(candidate)
         if (crop_id < 1 .or. crop_id > size(definitions)) cycle
@@ -436,8 +481,10 @@ integer function next_sowing_position(rotation, definitions, doy, random_shift, 
         else
             wait_days = days_in_year(year) - doy + first_day
         end if
-        if (wait_days >= shortest_wait) cycle
+        if (wait_days > shortest_wait) cycle
+        if (wait_days == shortest_wait .and. first_day >= earliest_start) cycle
         shortest_wait = wait_days
+        earliest_start = first_day
         position = candidate
     end do
 end function next_sowing_position

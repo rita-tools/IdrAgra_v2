@@ -297,6 +297,7 @@ print *, 'output period = ', xml%sim%out_step_start, xml%sim%out_step_end, xml%s
 print *, 'InitialThetaFlag = ',  xml%sim%f_init_wc
 print *, 'FinalThetaFlag = ',  xml%sim%f_theta_out
 print *, 'RadnSowDaysWind = ',  xml%sim%sowing_range
+print *, 'AggressiveSowing = ', xml%sim%aggressive_sowing
 print *, 'CapillaryFlag = ', xml%sim%f_cap_rise
 print *, 'SoilUseVarFlag = ', xml%sim%f_soiluse
 print *, 'MeteoStatWeightNum = ', xml%sim%n_interpolation_stations

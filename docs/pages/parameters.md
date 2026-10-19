@@ -303,8 +303,16 @@ RandSowDaysSym: shape of the sowing-date randomization window.
 **Type:** Integer  ·  **Default:** `0`  ·  **Unit:** days
 :::
 
-RandSowDaysWind: half-width or extent, in days, of the sowing-date  
-randomization window.
+RandSowDaysWind: half-width or extent, in days, of the sowing-date randomization window.
+
+### `AggressiveSowing`
+
+:::{container} parameter-summary
+**Type:** Boolean · **Default:** `false`
+:::
+
+When `T`, a standing crop may be harvested early so the next crop in the rotation can be sown in its window, respecting a baresoil interval. If several sowing windows are open, the one that opened earliest is selected.
+When `F`, the standing crop is harvested at its normal GDD or maximum harvest-date limit; the next crop may miss its sowing window.
 
 ### `Repeatable`
 
