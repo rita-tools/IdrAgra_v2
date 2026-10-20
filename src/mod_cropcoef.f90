@@ -324,10 +324,9 @@ subroutine advance_crops_daily(pheno, crops, bare_soil, rotations, domain, soil_
                 ! Sow the next crop in the rotation if its sowing window is open and temperature requirements are met
                 crop_id = rotations(land_use)%crop_ids(position)
                 temperature = (meteo%T_max(i,j) + meteo%T_min(i,j))/2._dp
-                if (should_sow_today(crops(crop_id), current%doy, irandom(i,j), temperature)) then
-                    call sow_crop(pheno, crops(crop_id), crop_id, i, j, current, meteo%lat(i,j),      &
-                                & station_idx(i,j,:), station_weight(i,j,:), interpolate_temp, weather)
-                end if
+                if (.not. should_sow_today(crops(crop_id), current%doy, irandom(i,j), temperature)) cycle
+                call sow_crop(pheno, crops(crop_id), crop_id, i, j, current, meteo%lat(i,j),      &
+                            & station_idx(i,j,:), station_weight(i,j,:), interpolate_temp, weather)
             else ! Continue the crop already in field
                 crop_id = pheno%crop_id(i,j)
             end if
