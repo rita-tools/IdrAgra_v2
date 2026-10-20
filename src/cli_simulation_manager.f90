@@ -289,9 +289,6 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
             call create_meteo_matrices(info_meteo, dir_meteo, meteo_weight, meteo, info_spat%domain, &
                                      & doy, pars%sim%res_canopy(year_idx), pars%sim                  )
 
-            ! Finalize yesterday's mature crop before daily phenology clears it.
-            call finalize_harvested_yield(crop_yield_state, yield, pheno, crops, pars%sim%co2_conc(year_idx), info_spat%domain)
-
             ! Advance each cell's crop phenology according to today's GDD accumulation
             call advance_crops_daily(pheno, crops, crop_rotations, info_spat%domain, info_spat%soil_use_id,      &
                                    & info_spat%irandom%mat, meteo, kcb_corr_fact, dir_meteo, meteo_weight,       &
@@ -746,6 +743,7 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
             !wat_bal1%h_pond = wat_bal_hour%esten%h_pond
 
             call accumulate_daily_yield(crop_yield_state, pheno, crops, meteo, wat_bal1, wat_bal2, info_spat%domain)
+            call finalize_harvested_yield(crop_yield_state, yield, pheno, crops, pars%sim%co2_conc(year_idx), info_spat%domain)
 
             call write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal1, wat_bal2, wat_bal2_old, info_spat, &
                                    & pars, wat, wat_bal_hour, fw_day, fw_old, esp_perc, out_cn, out_cn_day, h_bypass,       &

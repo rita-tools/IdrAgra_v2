@@ -199,8 +199,11 @@ subroutine finalize_harvested_yield(acc, yld, pheno, crops, co2, domain)
 
     do j = 1, size(domain%mat, 2)
         do i = 1, size(domain%mat, 1)
+
+            ! Only consider active cells whose crop is ready for harvest
             if (domain%mat(i,j) == domain%header%nan) cycle
-            if (.not. pheno%harvest_pending(i,j) .or. acc%crop_id(i,j) == 0) cycle
+            if (.not. pheno%harvest_pending(i,j)) cycle
+
             crop_id = acc%crop_id(i,j)
             slot = yld%completed_crops(i,j) + 1
             if (slot > size(yld%yield_act%mat, 3)) then
