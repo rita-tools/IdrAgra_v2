@@ -335,6 +335,12 @@ subroutine read_crop_file(file_name, crop)
     end do
     close(unit)
 
+    if (size(crop%gdd) == 0) then
+        print *, 'Crop parameter file has no GDD curve rows: ', trim(file_name), '.'
+        print *, 'Execution will be aborted...'
+        stop
+    end if
+
     if (crop%max_cuts < 1) then
         print *, 'HarvNum_max must be at least 1 in ', trim(file_name), '.'
         print *, 'Execution will be aborted...'
@@ -365,8 +371,6 @@ subroutine prepare_crop_definition_curves(crop)
     ! module can consume complete parameter curves directly.
     type(crop_definition), intent(inout) :: crop
     integer :: idx
-
-    if (size(crop%gdd) == 0) return
 
     call fill_missing_curve(crop%k_cb, crop%gdd)
     call prepare_crop_stage_boundaries(crop)
