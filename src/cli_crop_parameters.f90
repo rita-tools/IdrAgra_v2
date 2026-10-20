@@ -64,10 +64,11 @@ subroutine initialize_co2_parameters(sim)
 end subroutine initialize_co2_parameters
 
 ! Read all of the crop .dat files and the crop rotation file, and store the information in crops and crop_rotations.
-subroutine import_crop_definitions(sim, crops, crop_rotations)
+subroutine import_crop_definitions(sim, crops, crop_rotations, bare_soil)
     type(simulation), intent(inout) :: sim
     type(crop_definition), dimension(:), allocatable, intent(out) :: crops
     type(crop_rotation), dimension(:), allocatable, intent(out) :: crop_rotations
+    type(crop_definition), intent(out) :: bare_soil
 
     character(len=255), dimension(:), allocatable :: crop_files
     character(len=255), dimension(:,:), allocatable :: rotation_files
@@ -82,6 +83,8 @@ subroutine import_crop_definitions(sim, crops, crop_rotations)
     rotations_file = join_path(sim%crop_inputs_path, sim%soil_uses_fn, delimiter)
     n_rotations = count_crop_rotations(rotations_file)
     sim%n_lus = n_rotations
+
+    call initialize_bare_soil(bare_soil)
 
     allocate(crop_rotations(n_rotations))
     allocate(rotation_files(n_rotations, 2))
@@ -135,8 +138,7 @@ subroutine import_crop_definitions(sim, crops, crop_rotations)
     end do
     close(unit)
 
-    ! Numeric filename prefixes are stable crop IDs. Unprefixed files receive
-    ! deterministic IDs after the largest explicit one.
+    ! Numeric filename prefixes are stable crop IDs. Unprefixed files receive deterministic IDs after the largest explicit one
     maximum_crop_id = 0
     do file_idx = 1, n_crop_files
         explicit_id = crop_id_from_filename(crop_files(file_idx))
@@ -157,6 +159,11 @@ subroutine import_crop_definitions(sim, crops, crop_rotations)
         crops(crop_idx)%crop_id = crop_idx
         crops(crop_idx)%parameter_file = trim(crop_files(file_idx))
         call read_crop_file(join_path(sim%crop_parameters_path, crop_files(file_idx), delimiter), crops(crop_idx))
+        if (is_bare_soil_file(crop_files(file_idx)) .and. len_trim(bare_soil%parameter_file) == 0) then
+            bare_soil = crops(crop_idx)
+            bare_soil%crop_id = 0
+            print *, 'Using ', trim(crop_files(file_idx)), ' parameters as bare soil.'
+        end if
     end do
 
     do rotation_idx = 1, n_rotations
@@ -169,6 +176,24 @@ subroutine import_crop_definitions(sim, crops, crop_rotations)
         end do
     end do
 end subroutine import_crop_definitions
+
+! Default values for bare soil. These are overwritten if a 0_*.dat crop file is present
+subroutine initialize_bare_soil(bare_soil)
+    type(crop_definition), intent(out) :: bare_soil
+
+    allocate(bare_soil%gdd(1), bare_soil%k_cb(1), bare_soil%height(1), bare_soil%root_depth(1),                  &
+           & bare_soil%lai(1), bare_soil%cn_value(1), bare_soil%cover_fraction(1), bare_soil%stress_resistance(1))
+    bare_soil%gdd = 0._dp
+    bare_soil%k_cb = 0._dp
+    bare_soil%height = 0._dp
+    bare_soil%root_depth = 0._dp
+    bare_soil%lai = 0._dp
+    bare_soil%cn_value = 0._dp
+    bare_soil%cover_fraction = 0._dp
+    bare_soil%stress_resistance = 0._dp
+    bare_soil%cn_class = 1
+    bare_soil%maximum_transpirative_root_fraction = 0._dp
+end subroutine initialize_bare_soil
 
 integer function count_crop_rotations(file_name)
     character(len=*), intent(in) :: file_name
@@ -227,6 +252,15 @@ integer function crop_id_from_filename(file_name)
     read(base_name(:underscore - 1), *, iostat=ios) crop_id_from_filename
     if (ios /= 0 .or. crop_id_from_filename <= 0) crop_id_from_filename = 0
 end function crop_id_from_filename
+
+!%PS%: note that the bare soil file can only be found if at least one landuse references it. Being in the landuses folder is not enough. Todo!
+logical function is_bare_soil_file(file_name)
+    character(len=*), intent(in) :: file_name
+    integer :: separator
+
+    separator = max(scan(trim(file_name), '/', back=.true.), scan(trim(file_name), achar(92), back=.true.))
+    is_bare_soil_file = index(file_name(separator + 1:), '0_') == 1
+end function is_bare_soil_file
 
 subroutine read_crop_file(file_name, crop)
     character(len=*), intent(in) :: file_name

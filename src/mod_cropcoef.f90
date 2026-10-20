@@ -271,10 +271,11 @@ real(dp) function compute_canopy_resistance(co2) result(resistance)
     resistance = (1._dp/leaf_conductance)/(0.5_dp*24._dp*0.12_dp)
 end function compute_canopy_resistance
 
-subroutine advance_crops_daily(pheno, crops, rotations, domain, soil_use, irandom, meteo, kcb_corr_fact,         &
-                             & station_idx, station_weight, interpolate_temp, weather, current, aggressive_sowing)
+subroutine advance_crops_daily(pheno, crops, bare_soil, rotations, domain, soil_use, irandom, meteo, kcb_corr_fact, &
+                             & station_idx, station_weight, interpolate_temp, weather, current, aggressive_sowing   )
     type(crop_pars_matrices), intent(inout) :: pheno
     type(crop_definition), intent(in) :: crops(:)
+    type(crop_definition), intent(in) :: bare_soil
     type(crop_rotation), intent(inout) :: rotations(:)
     type(grid_i), intent(in) :: domain, soil_use
     integer, intent(in) :: irandom(:,:)
@@ -301,7 +302,7 @@ subroutine advance_crops_daily(pheno, crops, rotations, domain, soil_use, irando
                                                             & land_use, i, j, current, irandom(i,j))
 
             if (pheno%crop_id(i,j) == 0) then ! Soil is bare: consider sowing
-                call set_bare_soil_today(pheno, i, j)
+                call set_bare_soil_today(pheno, bare_soil, i, j)
                 position = pheno%rotation_position(i,j)
 
                 ! First baresoil day after a landuse change: find the earliest sowable crop
@@ -922,26 +923,27 @@ integer function crop_growth_stage(crop, accumulated_gdd) result(stage)
     stage = 4
 end function crop_growth_stage
 
-subroutine set_bare_soil_today(pheno, i, j)
+subroutine set_bare_soil_today(pheno, bare_soil, i, j)
     type(crop_pars_matrices), intent(inout) :: pheno
+    type(crop_definition), intent(in) :: bare_soil
     integer, intent(in) :: i, j
 
     pheno%crop_id(i,j) = 0
     pheno%pheno_stage(i,j) = 0
     pheno%is_real_crop(i,j) = .false.
-    pheno%k_cb(i,j) = 0._dp
-    pheno%h(i,j) = 0._dp
-    pheno%d_r(i,j) = 0._dp
-    pheno%lai(i,j) = 0._dp
-    pheno%cn_day(i,j) = 0
-    pheno%f_c(i,j) = 0._dp
-    pheno%r_stress(i,j) = 0._dp
-    pheno%irrigation_class(i,j) = 0
-    pheno%cn_class(i,j) = 1
-    pheno%p(i,j) = 0._dp
-    pheno%a(i,j) = 0._dp
-    pheno%d_t_max(i,j) = 0._dp
-    pheno%RF_t_max(i,j) = 0._dp
+    pheno%k_cb(i,j) = bare_soil%k_cb(1)
+    pheno%h(i,j) = bare_soil%height(1)
+    pheno%d_r(i,j) = bare_soil%root_depth(1)
+    pheno%lai(i,j) = bare_soil%lai(1)
+    pheno%cn_day(i,j) = nint(bare_soil%cn_value(1))
+    pheno%f_c(i,j) = bare_soil%cover_fraction(1)
+    pheno%r_stress(i,j) = bare_soil%stress_resistance(1)
+    pheno%irrigation_class(i,j) = merge(1, 0, bare_soil%is_irrigated)
+    pheno%cn_class(i,j) = bare_soil%cn_class
+    pheno%p(i,j) = bare_soil%raw_fraction
+    pheno%a(i,j) = bare_soil%interception_coef
+    pheno%d_t_max(i,j) = maxval(bare_soil%root_depth)
+    pheno%RF_t_max(i,j) = bare_soil%maximum_transpirative_root_fraction
 end subroutine set_bare_soil_today
 
 end module mod_cropcoef

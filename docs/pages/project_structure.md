@@ -174,6 +174,8 @@ EndTable =
 
 IdrAgra reads the rotation table selected by {ref}`SoilUsesFilename <parameter-soilusesfilename>` from {ref}`CropInputsFolder <parameter-cropinputsfolder>`, and reads the referenced crop parameter files from {ref}`CropFolder <parameter-cropfolder>`. A positive integer prefix such as `13_maize.tab` supplies a stable crop ID; files without one receive deterministic generated IDs.
 
+If a referenced crop file starts with `0_`, IdrAgra also uses its first curve row and static parameters for days when a cell is bare. The rotation entry still receives a positive ID. Without a referenced `0_` file, IdrAgra uses its built-in bare-soil values.
+
 For crops with `Adj_flag = 1` (the default), IdrAgra calculates a Kcb correction from the nearest weather station's average climate. The crop file can specify an inclusive day/month interval for the weather average:
 
 ```text

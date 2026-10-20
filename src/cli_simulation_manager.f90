@@ -30,7 +30,7 @@ end interface
 
 contains
 
-subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_meteo, crops,      &
+subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_meteo, crops, bare_soil,      &
                             & crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, tab_CN2, tab_CN3, &
                             & theta2_rice, simulation_end, boundaries, debug, summary, is_warmup             )
 
@@ -46,6 +46,7 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
     type(source_info),intent(inout)::info_sources
     type(meteo_info),dimension(:),intent(inout)::info_meteo
     type(crop_definition), dimension(:), intent(in) :: crops
+    type(crop_definition), intent(in) :: bare_soil
     type(crop_rotation), dimension(:), intent(inout) :: crop_rotations
     real(dp), dimension(:,:), intent(in) :: kcb_corr_fact
     type(crop_pars_matrices), intent(inout) :: crop_state
@@ -290,9 +291,9 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
                                      & doy, pars%sim%res_canopy(year_idx), pars%sim                  )
 
             ! Advance each cell's crop phenology according to today's GDD accumulation
-            call advance_crops_daily(pheno, crops, crop_rotations, info_spat%domain, info_spat%soil_use_id,      &
-                                   & info_spat%irandom%mat, meteo, kcb_corr_fact, dir_meteo, meteo_weight,       &
-                                   & pars%sim%interpolate_temp, crop_weather, current, pars%sim%aggressive_sowing)
+            call advance_crops_daily(pheno, crops, bare_soil, crop_rotations, info_spat%domain, info_spat%soil_use_id, &
+                                   & info_spat%irandom%mat, meteo, kcb_corr_fact, dir_meteo, meteo_weight,             &
+                                   & pars%sim%interpolate_temp, crop_weather, current, pars%sim%aggressive_sowing      )
 
             call start_yield_for_new_crops(crop_yield_state, pheno, info_spat%domain)
 

@@ -22,6 +22,7 @@ real(dp), dimension(10,3,4):: tab_CN2, tab_CN3              ! CN implementation
 type(source_info)::info_sources                             ! stores water sources series
 type(meteo_info),dimension(:),allocatable::info_meteo       ! stores meteorological series data
 type(crop_definition), dimension(:), allocatable :: crops   ! shared static crop parameters
+type(crop_definition) :: bare_soil                          ! parameters used for bare soil. If present, a 0_*.dat crop file overwrites default values.
 type(crop_rotation), dimension(:), allocatable :: crop_rotations     ! crop IDs ordered by land use
 real(dp), allocatable :: kcb_corr_fact(:,:)                 ! Additive kcb correction factor, indexed by crop ID and weather station.
 type(crop_pars_matrices) :: crop_state                      ! per-cell state carried through warmup
@@ -87,7 +88,7 @@ call date_and_time(values=t_start)
 call read_all_parameters(filename, xml, verbose, reckless)
 
 ! Import crop .dat files and the list of landuses (rotations)
-call import_crop_definitions(xml%sim, crops, crop_rotations)
+call import_crop_definitions(xml%sim, crops, crop_rotations, bare_soil)
 
 if (showpreview .eqv. .true.) then
     print *, '=== PREVIEW ==='
@@ -141,7 +142,7 @@ if(xml%sim%f_init_wc .eqv. .false.)then ! Generates soil initial condition
     end if
 
     ! Soil-crop water balance algorithm
-    call simulation_manager(xml, info_spat, watsour, info_sources, info_meteo, crops,                      &
+    call simulation_manager(xml, info_spat, watsour, info_sources, info_meteo, crops, bare_soil,           &
                           & crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, tab_CN2, tab_CN3, &
                           & theta2_rice, warmup_end, boundaries, verbose, summary, is_warmup=.true.        )
 
@@ -201,7 +202,7 @@ end if
 
 ! Soil-crop water balance algorithm
 print*,"=== SIMULATION ==="
-call simulation_manager(xml, info_spat, watsour, info_sources, info_meteo, crops,                      &
+call simulation_manager(xml, info_spat, watsour, info_sources, info_meteo, crops, bare_soil,           &
                       & crop_rotations, kcb_corr_fact, crop_state, crop_yield_state, tab_CN2, tab_CN3, &
                       & theta2_rice, xml%sim%end, boundaries, verbose, summary, is_warmup=.false.      )
 
