@@ -314,6 +314,23 @@ RandSowDaysWind: half-width or extent, in days, of the sowing-date randomization
 When `T`, a standing crop may be harvested early so the next crop in the rotation can be sown in its window, respecting a baresoil interval. If several sowing windows are open, the one that opened earliest is selected.
 When `F`, the standing crop is harvested at its normal GDD or maximum harvest-date limit; the next crop may miss its sowing window.
 
+### `PhenologyEventsFileName`
+
+:::{container} parameter-summary
+**Type:** String · **Default:** `''`
+:::
+
+Optional file of observed cell-level sowing, cut, and harvest dates. The path is relative to the working directory.
+See {ref}`external-phenology-events` for its format and event timing.
+
+### `PhenoEventsFileName`
+
+:::{container} parameter-summary
+**Type:** String · **Default:** `''`
+:::
+
+Alias of `PhenologyEventsFileName`.
+
 ### `Repeatable`
 
 :::{container} parameter-summary

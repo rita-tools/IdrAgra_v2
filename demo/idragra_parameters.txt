@@ -126,6 +126,10 @@ RandSowDaysWind = 3
 # AggressiveSowing: harvest a standing crop early when necessary to sow the next crop in the rotation [T/F].
 AggressiveSowing = F
 
+# PhenologyEventsFileName: optional observed sowing, cut and harvest events.
+# The example file contains only commented rows, so enabling it does not alter the demo.
+# PhenologyEventsFileName = geodata\\phenology_events.example.txt
+
 # Repeatable: use a repeatable random sequence, allowing identical results
 # across equivalent runs [T/F].
 Repeatable = T

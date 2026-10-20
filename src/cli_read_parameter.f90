@@ -284,6 +284,8 @@ subroutine read_sim_parameters(file_xml, xml, reckless)
                         read(buffer, *, iostat=ios) xml%sim%sowing_range
                     case ('aggressivesowing')
                         read(buffer, *, iostat=ios) xml%sim%aggressive_sowing
+                    case ('phenologyeventsfilename', 'phenoeventsfilename')
+                        read(buffer, *, iostat=ios) xml%sim%phenology_events_fn
                     case ('repeatable') ! set simulation with random seeding repeatible
                         if ((trim(adjustl(buffer)) == 'true') .or. (trim(adjustl(buffer))== 't') .or. (trim(adjustl(buffer)) == '1'))  then
                             xml%sim%repeatable = .true.

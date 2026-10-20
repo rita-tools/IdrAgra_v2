@@ -9,6 +9,7 @@ use mod_runoff
 use mod_crop_soil_water
 use mod_crop_phenology, only: crop_definition, crop_rotation, crop_pars_matrices
 use mod_cropcoef, only: advance_crops_daily, crop_weather_series, load_crop_weather
+use mod_phenology_events, only: phenology_event_list, read_phenology_events
 use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva, nan_i, nan_r
 use mod_common, only: wat_matrix, soil2_rice, hourly
 use mod_irrigation
@@ -56,6 +57,7 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
     type(balance2_matrices)::wat_bal2,wat_bal2_old
     type(crop_pars_matrices)::pheno
     type(crop_weather_series), allocatable :: crop_weather(:)
+    type(phenology_event_list) :: phenology_events
     type(meteo_mat)::meteo
     real(dp),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::out_cn_day
     type(output_CN),dimension(info_spat%domain%header%imax,info_spat%domain%header%jmax)::out_cn
@@ -125,6 +127,9 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
 
     if (allocated(crop_state%crop_id)) pheno = crop_state
     call initialize_yield_accumulator(crop_yield_state, info_spat%domain%mat)
+
+    call read_phenology_events(pars%sim%phenology_events_fn, phenology_events, &
+                               size(info_spat%domain%mat,1), size(info_spat%domain%mat,2))
 
     ! Load temperatures time series at the station level and save them in crop_weather (they're needed for phenology calculations)
     if (is_warmup) then
@@ -293,7 +298,8 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
             ! Advance each cell's crop phenology according to today's GDD accumulation
             call advance_crops_daily(pheno, crops, bare_soil, crop_rotations, info_spat%domain, info_spat%soil_use_id, &
                                    & info_spat%irandom%mat, meteo, kcb_corr_fact, dir_meteo, meteo_weight,             &
-                                   & pars%sim%interpolate_temp, crop_weather, current, pars%sim%aggressive_sowing      )
+                                   & pars%sim%interpolate_temp, crop_weather, current, pars%sim%aggressive_sowing,     &
+                                   & phenology_events)
 
             call start_yield_for_new_crops(crop_yield_state, pheno, info_spat%domain)
 
@@ -1826,12 +1832,14 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate,crops)
         allocate(pheno%sowing_year       (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%sowing_doy        (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%cuts_completed    (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%scheduled_cuts     (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%rotation_position (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%rotation_land_use (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%bare_soil_days_left(imax,jmax),stat=checkstat);if(checkstat/=0)print*,errormessage
         allocate(pheno%harvest_pending   (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%is_real_crop      (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%gdd               (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
+        allocate(pheno%cut_gdd_offset    (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%vern_days         (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         allocate(pheno%crop_age_days     (imax,jmax),stat=checkstat); if(checkstat/=0)print*,errormessage
         max_curve_slots = 0
@@ -1863,12 +1871,14 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate,crops)
         pheno%sowing_year = nan_i
         pheno%sowing_doy = nan_i
         pheno%cuts_completed = 0
+        pheno%scheduled_cuts = 0
         pheno%rotation_position = 1
         pheno%rotation_land_use = 0
         pheno%bare_soil_days_left = 0
         pheno%harvest_pending = .false.
         pheno%is_real_crop = .false.
         pheno%gdd = 0._dp
+        pheno%cut_gdd_offset = 0._dp
         pheno%vern_days = 0._dp
         pheno%crop_age_days = 0
         pheno%curve_day = huge(0)
@@ -1896,12 +1906,14 @@ subroutine init_pheno_matrices(pheno,imax,jmax,f_allocate,crops)
         deallocate(pheno%sowing_year)
         deallocate(pheno%sowing_doy)
         deallocate(pheno%cuts_completed)
+        deallocate(pheno%scheduled_cuts)
         deallocate(pheno%rotation_position)
         deallocate(pheno%rotation_land_use)
         deallocate(pheno%bare_soil_days_left)
         deallocate(pheno%harvest_pending)
         deallocate(pheno%is_real_crop)
         deallocate(pheno%gdd)
+        deallocate(pheno%cut_gdd_offset)
         deallocate(pheno%vern_days)
         deallocate(pheno%crop_age_days)
         if (allocated(pheno%curve_day)) deallocate(pheno%curve_day)

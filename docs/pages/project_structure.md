@@ -196,6 +196,33 @@ Year CO2
 ```
 
 IdrAgra computes crop development, canopy resistance, and CO2-adjusted water productivity internally. Yield accumulates for the crop in each cell through warmup and across calendar years, then appears in the year of harvest. Output suffixes (`_1`, `_2`) count harvested crops in each cell for that year; a crop not harvested has no yield result.
+
+(external-phenology-events)=
+### Observed phenology events
+
+Set `PhenologyEventsFileName` to a text file with one event per line:
+
+```text
+# row col year doy event
+2 2 2021 120 sowing
+2 2 2021 180 cut
+2 2 2021 230 harvest
+```
+
+`row` and `col` are 1-based grid indices. The `event` value is `sowing`, `cut`, or `harvest`.
+The date uses a calendar year and day of year. Sowing uses the cell's next crop in its land-use rotation;
+cut and harvest apply to the crop currently in the field.
+
+An observed sowing replaces the ordinary sowing window and temperature check. An observed harvest keeps the crop in the
+field until that date; it contributes to that day's water balance and is removed the following day. An observed cut uses
+the standing crop on its event day, then starts the next cut curve on the following day using local weather. A cut must
+refer to a multi-cut crop with a remaining cut. A sowing event cannot overlap a standing crop.
+
+If a crop occurrence has any observed cuts, only those dates trigger cuts for that occurrence. Between them, the crop
+remains at the end of its current phenology curve. If no cuts are listed, cuts follow the crop's GDD thresholds.
+If cut and harvest are listed for the same cell and day, harvest takes precedence.
+
+Cells without events keep their normal phenology. An event file is optional; an empty file name disables this feature.
 (soil-moisture-inputs)=
 ## Initial and final soil moisture
 

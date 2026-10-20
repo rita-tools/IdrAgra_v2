@@ -1,0 +1,8 @@
+# Optional external phenology events. Set PhenologyEventsFileName to this file's path to enable it.
+# Columns: row col year doy event
+# Sowing uses the next crop in the rotation; cut and harvest use the standing crop.
+# Events are sowing, cut, or harvest. Dates are calendar year and day of year.
+#
+# 2 2 2021 120 sowing
+# 2 2 2021 180 cut
+# 2 2 2021 230 harvest

@@ -90,12 +90,14 @@ type crop_pars_matrices
     integer, dimension(:,:), allocatable :: sowing_year
     integer, dimension(:,:), allocatable :: sowing_doy          ! Sowing DOY for the current crop in this cell, affected by irandom and sowing requirements (minimum temperature, cropsoverlap)
     integer, dimension(:,:), allocatable :: cuts_completed
+    integer, dimension(:,:), allocatable :: scheduled_cuts    ! Zero selects GDD cuts; otherwise, observed cuts govern the occurrence
     integer, dimension(:,:), allocatable :: rotation_position   ! Position of the crop in the rotation (1 = first crop, 2 = second crop, etc.)
     integer, dimension(:,:), allocatable :: rotation_land_use   ! Land use ID to which rotation_position belongs (can differ from the current ID if a crop survived a land-use change)
     integer, dimension(:,:), allocatable :: bare_soil_days_left
     logical, dimension(:,:), allocatable :: harvest_pending
     logical, dimension(:,:), allocatable :: is_real_crop        ! Used to distinguish between real crops and bare soil variations. Current discrimination: maxgdd>0
     real(dp), dimension(:,:), allocatable :: gdd                ! Accumulated growing degree days
+    real(dp), dimension(:,:), allocatable :: cut_gdd_offset     ! Shift cut thresholds after an observed cut
     real(dp), dimension(:,:), allocatable :: vern_days          ! Accumulated vernalization days
     integer, dimension(:,:), allocatable :: crop_age_days       ! Days since sowing (sowing day is day 1)
     integer, dimension(:,:,:), allocatable :: curve_day         ! Crop age [days] at which each GDD threshold is reached. Used to construct phenology curves
