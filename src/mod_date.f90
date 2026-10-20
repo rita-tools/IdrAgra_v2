@@ -48,6 +48,26 @@ pure function get_doy(day, month, year) result(doy)
     doy = day + sum(days_in_month(:month-1))
 end function get_doy
 
+! Build a complete calendar date from its year and day of year.
+pure function calendar_date_from_doy(year, doy) result(calendar_date)
+    integer, intent(in) :: year, doy
+    type(date) :: calendar_date
+
+    integer :: remaining, month, days_in_month(12)
+
+    days_in_month = month_lengths(year)
+    remaining = max(1, doy)
+    do month = 1, 12
+        if (remaining <= days_in_month(month)) exit
+        remaining = remaining - days_in_month(month)
+    end do
+    calendar_date%year = year
+    calendar_date%month = month
+    calendar_date%day = remaining
+    calendar_date%doy = doy
+    calendar_date%weekday = day_of_week(remaining, month, year)
+end function calendar_date_from_doy
+
 ! Return the signed number of days from start_date to end_date.
 pure function days_between_dates(start_date, end_date) result(n_days)
     type(date), intent(in) :: start_date, end_date
@@ -180,6 +200,27 @@ subroutine split_date_range(input_string, start_string, end_string)
     index = scan(string, delimiter, .true.)
     end_string = string(index+1:)
 end subroutine split_date_range
+
+! Parse a day/month pair without a year, allowing 29 February for leap years.
+subroutine parse_day_month_date(value, day, month, ios)
+    character(len=*), intent(in) :: value
+    integer, intent(out) :: day, month, ios
+
+    integer :: separator, days_in_month(12)
+
+    ios = 1
+    separator = index(trim(value), '/')
+    if (separator < 2) return
+    read(value(:separator-1), *, iostat=ios) day
+    if (ios /= 0) return
+    read(value(separator+1:), *, iostat=ios) month
+    if (ios /= 0) return
+    ios = 1
+    if (month < 1 .or. month > 12) return
+    days_in_month = month_lengths(2000)
+    if (day < 1 .or. day > days_in_month(month)) return
+    ios = 0
+end subroutine parse_day_month_date
 
 ! Parse a date formatted as "dd/mm/yyyy" and populate its derived fields.
 subroutine parse_date(input_string, output_date)

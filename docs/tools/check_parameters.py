@@ -27,13 +27,11 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PARSER = REPOSITORY_ROOT / "src" / "cli_read_parameter.f90"
 DEFAULT_DECLARATIONS = (
     REPOSITORY_ROOT / "src" / "mod_parameters.f90",
-    REPOSITORY_ROOT / "src" / "mod_TDx_index.f90",
 )
 DEFAULT_DOCUMENTATION = REPOSITORY_ROOT / "docs" / "pages" / "parameters.md"
 
 ROOT_TYPES = {
     "xml": "parameters",
-    "xml_dtx": "tdx_index",
 }
 
 # These cases parse or transform the input instead of reading it directly into
@@ -49,7 +47,6 @@ PARAMETER_METADATA_OVERRIDES = {
     "monthlyflag": ("String", "monthly"),
     "weekday": ("String or Integer", "monday"),
     "randsowdayssym": ("String", "symmetric"),
-    "simulatedsoiluses": ("Integer array", "none"),
 }
 
 
@@ -239,7 +236,7 @@ def destination_from_block(name: str, block: Sequence[str]) -> str | None:
 
     read_pattern = re.compile(
         r"\bread\s*\(\s*buffer\b[^)]*\)\s*"
-        r"((?:xml|xml_dtx)(?:%[a-z_]\w*)+(?:\([^)]*\))?)",
+        r"(xml(?:%[a-z_]\w*)+(?:\([^)]*\))?)",
         re.I,
     )
     for line in block:
@@ -248,7 +245,7 @@ def destination_from_block(name: str, block: Sequence[str]) -> str | None:
             return match.group(1)
 
     assignment_pattern = re.compile(
-        r"\b((?:xml|xml_dtx)(?:%[a-z_]\w*)+(?:\([^)]*\))?)\s*=",
+        r"\b(xml(?:%[a-z_]\w*)+(?:\([^)]*\))?)\s*=",
         re.I,
     )
     destinations = [

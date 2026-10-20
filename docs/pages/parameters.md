@@ -20,7 +20,7 @@ When launching the IdrAgra exe, the model looks for `idragra_parameters.txt` in 
 
 - Blank lines are ignored by the model and skipped.
 - Anything that comes after "#" is a comment and is also ignored.
-- Most variables can appear in any order, but dependency-sensitive settings must precede the values that use them. In particular, place `SoilUsesNum` before `SimulatedSoilUses` and `DTxNumXs` before any `DTx_x` values. Group output switches such as `prt_all` also act where they occur, so a later group switch can replace earlier individual choices.
+- Variables can appear in any order, but note that group output switches such as `prt_all` act where they occur, so a later group switch can replace earlier individual choices.
 - The accepted structure is "VariableName = value".
 - Both the variable name and its value are NOT case-sensitive
 - Any number of spaces and tabs is accepted before and after the "=" symbol.
@@ -68,23 +68,41 @@ Folder containing meteorological station data.
 
 Root-level file listing the meteorological input files.
 
-(parameter-phenopath)=
-### `PhenoPath`
+(parameter-cropinputsfolder)=
+### `CropInputsFolder`
 
 :::{container} parameter-summary
-**Type:** String  ·  **Default:** `.\\crop_series\\`
+**Type:** String  ·  **Default:** `.\\landuses\\`
 :::
 
-Folder containing crop phenology parameter files.
+Folder containing the CropCoef land-use rotation database.
 
-(parameter-phenofileroot)=
-### `PhenoFileRoot`
+(parameter-soilusesfilename)=
+### `SoilUsesFilename`
 
 :::{container} parameter-summary
-**Type:** String  ·  **Default:** `pheno_`
+**Type:** String  ·  **Default:** `soil_uses.txt`
 :::
 
-Common prefix used by phenology files associated with meteorological stations.
+CropCoef rotation table within {ref}`CropInputsFolder <parameter-cropinputsfolder>`.
+
+(parameter-co2filename)=
+### `CO2Filename`
+
+:::{container} parameter-summary
+**Type:** String · **Default:** `CO2_conc.dat`
+:::
+
+Annual atmospheric CO2 concentrations file. It has a `Year CO2` header followed by one `year concentration` row for each meteorological calendar year. IdrAgra uses it to calculate canopy resistance and crop water productivity. Concentration is expressed in ppm.
+
+(parameter-cropfolder)=
+### `CropFolder`
+
+:::{container} parameter-summary
+**Type:** String  ·  **Default:** `.\\landuses\\crop_parameters\\`
+:::
+
+Folder containing CropCoef crop parameter files. A leading positive integer followed by an underscore in a filename is treated as the crop's stable ID. IdrAgra assigns deterministic IDs after the largest explicit ID to files without such a prefix.
 
 (parameter-irrmethpath)=
 ### `IrrMethPath`
@@ -184,7 +202,7 @@ If true, the final soil_moisture_condition is stored in the `FinalConditionPath\
 ### `StartSimulation`
 
 :::{container} parameter-summary
-**Type:** Date  ·  **Default:** `date(29, 2, 1600, 2305507, 0)`
+**Type:** Date  ·  **Default:** none
 :::
 
 First day of the simulation [dd/mm/yyyy].
@@ -192,7 +210,7 @@ First day of the simulation [dd/mm/yyyy].
 ### `EndSimulation`
 
 :::{container} parameter-summary
-**Type:** Date  ·  **Default:** `date(29, 2, 1600, 2305507, 0)`
+**Type:** Date  ·  **Default:** none
 :::
 
 Last day of the simulation [dd/mm/yyyy].
@@ -271,25 +289,6 @@ Whether simulation cells receive interpolated weather data (T, default&recommend
 **Type:** Boolean  ·  **Default:** `true`
 :::
 
-(parameter-soilusesnum)=
-### `SoilUsesNum`
-
-:::{container} parameter-summary
-**Type:** Integer  ·  **Default:** `1`
-:::
-
-SoilUsesNum: number of soil-use classes included in each phenological  
-series.
-
-(parameter-simulatedsoiluses)=
-### `SimulatedSoilUses`
-
-:::{container} parameter-summary parameter-summary--required
-**Type:** Integer array  ·  **Required:** no code default
-:::
-
-SimulatedSoilUses: IDs of the soil-use classes to simulate.
-
 ### `RandSowDaysSym`
 
 :::{container} parameter-summary
@@ -304,8 +303,16 @@ RandSowDaysSym: shape of the sowing-date randomization window.
 **Type:** Integer  ·  **Default:** `0`  ·  **Unit:** days
 :::
 
-RandSowDaysWind: half-width or extent, in days, of the sowing-date  
-randomization window.
+RandSowDaysWind: half-width or extent, in days, of the sowing-date randomization window.
+
+### `AggressiveSowing`
+
+:::{container} parameter-summary
+**Type:** Boolean · **Default:** `false`
+:::
+
+When `T`, a standing crop may be harvested early so the next crop in the rotation can be sown in its window, respecting a baresoil interval. If several sowing windows are open, the one that opened earliest is selected.
+When `F`, the standing crop is harvested at its normal GDD or maximum harvest-date limit; the next crop may miss its sowing window.
 
 ### `Repeatable`
 
@@ -933,61 +940,3 @@ potential evapotranspiration
 **Type:** String
 **Default:** `n`
 :::
-
-{.parameter-list-group .parameter-list-last}
-## DTx settings (deprecated)
-
-### `DTxMode`
-
-:::{container} parameter-summary
-**Type:** String  ·  **Default:** `none`
-:::
-
-DTx support is incomplete. Keep all values in this block even when the mode is "none", because the current code does not provide safe defaults for every internal DTx dimension.
-
-DTxMode: experimental DTx calculation mode [none/analysis/application].
-  none        = disable DTx calculations  
-  analysis    = accumulate samples and fit gamma-distribution parameters  
-  application = export current-run accumulated deficit maps; despite its  
-                name, it does NOT load or apply relationships from analysis
-
-### `DTxNumXs`
-
-:::{container} parameter-summary parameter-summary--required
-**Type:** Integer  ·  **Required:** no code default
-:::
-
-DTxNumXs: number of DTx integration periods listed in DTx_x.
-
-### `DTx_x`
-
-:::{container} parameter-summary parameter-summary--required
-**Type:** Integer array  ·  **Required:** no code default  ·  **Unit:** days
-:::
-
-DTx_x: integration periods in days. For example, DT10 represents the transpirative deficit accumulated over 10 days.
-
-### `DTxDeltaDate`
-
-:::{container} parameter-summary parameter-summary--required
-**Type:** Integer  ·  **Required:** no code default  ·  **Unit:** days
-:::
-
-DTxDeltaDate: interval, in days, between DTx calculations.
-
-### `DTxDelayDays`
-
-:::{container} parameter-summary parameter-summary--required
-**Type:** Integer  ·  **Required:** no code default  ·  **Unit:** days
-:::
-
-DTxDelayDays: delay, in days from the start of the year, before DTx  
-calculations begin.
-
-### `DTxMinCard`
-
-:::{container} parameter-summary
-**Type:** Integer  ·  **Default:** `0`
-:::
-
-DTxMinCard: minimum sample cardinality required for a valid estimate in analysis mode.

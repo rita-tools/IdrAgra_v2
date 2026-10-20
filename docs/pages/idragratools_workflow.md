@@ -65,7 +65,7 @@ The plugin's simulation menu separates export into several steps:
 6. **Run CropCoef** creates the station-specific crop/phenology files.
 7. **Run IdrAgra** executes the water-balance and irrigation simulation.
 
-The manual's **Run all** command chains these operations. Running the individual steps is useful while diagnosing input problems because the first failing export is easier to identify.
+The manual's **Run all** command chains these operations. The current IdrAgra executable reads crop definitions and the annual CO2 table directly, so its own run does not require step 6 or the generated `pheno/` folder. The plugin workflow described here may still invoke CropCoef; update its exported `idragra_parameters.txt` to include `CropInputsFolder`, `CropFolder`, and `CO2Filename` before using this executable.
 
 Whenever database inputs or simulation settings change, re-run every export/preprocessing step affected by that change before launching IdrAgra again.
 
@@ -77,7 +77,7 @@ The v4 manual uses this exported layout:
 |---|---|
 | `geodata/` | {ref}`InputPath <parameter-inputpath>` |
 | `meteodata/` | {ref}`MeteoPath <parameter-meteopath>` |
-| `pheno/` | {ref}`PhenoPath <parameter-phenopath>` |
+| `pheno/` | Legacy CropCoef output; current IdrAgra does not read it |
 | `irrmethods/` | {ref}`IrrMethPath <parameter-irrmethpath>` |
 | `wsources/` | {ref}`WatSourPath <parameter-watsourpath>` |
 | `simout/` | {ref}`OutputPath <parameter-outputpath>` |

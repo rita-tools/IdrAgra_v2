@@ -5,7 +5,6 @@ use mod_common
 use mod_grid
 use mod_irrigation, only: calc_perc_booster_pars
 use cli_watsources
-use mod_TDx_index
 use mod_system
 use mod_utility
 
@@ -14,10 +13,9 @@ implicit none
 
 contains
 
-subroutine read_all_parameters(file_xml, xml, xml_dtx, verbose, reckless)
+subroutine read_all_parameters(file_xml, xml, verbose, reckless)
    character(len=*), intent(in) :: file_xml
     logical, intent(in) :: verbose, reckless
-    type(TDx_index), intent(inout) :: xml_dtx
     type(parameters), intent(inout) :: xml
     ! Input related variables used in parsing loop
     integer :: ios          ! State variable (0 = ok)
@@ -27,7 +25,7 @@ subroutine read_all_parameters(file_xml, xml, xml_dtx, verbose, reckless)
     line = 0; tablestart = 0
     ios = 0
 
-    call read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
+    call read_sim_parameters(file_xml, xml, reckless)
 
     inquire(file="cells.txt", exist=xml%sim%f_out_cells) ! update "output_cells"
 
@@ -81,31 +79,18 @@ subroutine read_all_parameters(file_xml, xml, xml_dtx, verbose, reckless)
 end subroutine read_all_parameters
 
 
-subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
+subroutine read_sim_parameters(file_xml, xml, reckless)
     ! read settings for the simulation
     character(len=*), intent(in) :: file_xml
-    logical, intent(in) :: verbose, reckless
-    type(TDx_index), intent(inout) :: xml_dtx
+    logical, intent(in) :: reckless
     type(parameters), intent(inout) :: xml
-    integer :: unit_txt
-    ! Input related variables used in parsing loop
-    character(len=300) :: comment,buffer, label
-    integer :: p
-    integer :: ios          ! state variable (0 = ok)
-    integer :: line
+
+    integer :: unit_txt, p, ios, line
+    character(len=300) :: buffer, label, dir_ic, dir_fc
     logical :: dir_exists
-
-    integer :: i, j, k
-    integer :: actcroplen
-    integer,parameter :: nanvalue=-9999       ! general NaN value
-    integer,dimension(:),allocatable :: dummy
-    character(len=300) :: dir_ic, dir_fc
-
-    !character :: delimiter
 
     line = 0
     ios = 0
-    actcroplen = 0
     dir_ic = xml%sim%initial_condition
     dir_fc = xml%sim%final_condition
     open(newunit=unit_txt, file=trim(file_xml), status="old", action="read", iostat=ios)
@@ -119,14 +104,7 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
         read(unit_txt, '(A)', iostat=ios) buffer
         if (ios == 0) then
             line = line + 1
-            ! remove white spaces before and after string sequences
-            buffer = trim(buffer)
-            ! check if there are comment and get only left side of the row
-            p = scan(buffer, '#')
-            if (p /= 0) then
-                comment = buffer(p+1:)
-                buffer = buffer(1:p-1)
-            end if
+            buffer = clean_input_line(buffer)
             ! if buffer is different from blank string, parse it
             if (buffer /= '') then
                 call lower_case(buffer)
@@ -162,14 +140,16 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
                                             )
                     case ('meteofilename') ! name of the file with the list of weather station
                         read(buffer, *, iostat=ios) xml%sim%ws_list_fn
-                    case ('phenopath') ! path to the phenophase files
-                        read(buffer, *, iostat=ios) xml%sim%pheno_path
-                        xml%sim%pheno_path = replace_str( string = xml%sim%pheno_path &
-                                            , search = "\\" &
-                                            , substitute = delimiter &
-                                            )
-                    case ('phenofileroot') ! the sub string to use as root of phenophase subfolder
-                        read(buffer, *, iostat=ios) xml%sim%pheno_root
+                    case ('cropinputsfolder')
+                        read(buffer, *, iostat=ios) xml%sim%crop_inputs_path
+                        xml%sim%crop_inputs_path = replace_str(xml%sim%crop_inputs_path, "\\", delimiter)
+                    case ('soilusesfilename')
+                        read(buffer, *, iostat=ios) xml%sim%soil_uses_fn
+                    case ('co2filename')
+                        read(buffer, *, iostat=ios) xml%sim%co2_conc_fn
+                    case ('cropfolder')
+                        read(buffer, *, iostat=ios) xml%sim%crop_parameters_path
+                        xml%sim%crop_parameters_path = replace_str(xml%sim%crop_parameters_path, "\\", delimiter)
                     case ('irrmethpath') ! path to meteo files
                         read(buffer, *, iostat=ios) xml%sim%irr_met_path
                         xml%sim%irr_met_path = replace_str( string = xml%sim%irr_met_path &
@@ -289,16 +269,6 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
                         read(buffer, *, iostat=ios) xml%sim%out_step_end
                     case ('deltadate')
                         read(buffer, *, iostat=ios) xml%sim%out_step_days
-                    case ('soilusesnum') ! number of land uses to be processed
-                        read(buffer, *, iostat=ios)xml%sim%n_lus
-                    !!!! %AB% TODO: to be checked
-                    case ('simulatedsoiluses') ! list of simulated soil uses
-                        read (buffer, *, iostat=ios)
-                        allocate(dummy(xml%sim%n_lus))
-                        dummy = nanvalue
-                        dummy = string_to_integers(buffer(2:len_trim(buffer)), " ")
-                    ! case ('randsowdaysseed')
-                    !           read(buffer, *, iostat=ios) xml%sim%rand_seed
                     case ('randsowdayssym')
                         select case (trim(adjustl(buffer)))
                             case ('symmetric', 's', '1', 't', 'true')
@@ -312,6 +282,8 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
                         end select
                     case ('randsowdayswind') ! range of sowinf
                         read(buffer, *, iostat=ios) xml%sim%sowing_range
+                    case ('aggressivesowing')
+                        read(buffer, *, iostat=ios) xml%sim%aggressive_sowing
                     case ('repeatable') ! set simulation with random seeding repeatible
                         if ((trim(adjustl(buffer)) == 'true') .or. (trim(adjustl(buffer))== 't') .or. (trim(adjustl(buffer)) == '1'))  then
                             xml%sim%repeatable = .true.
@@ -341,20 +313,6 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
                         read(buffer, *, iostat=ios)xml%depth%zr_fix
                     case ('lambdacn') ! lambda_CN: coefficient for calculate the initial abstraction
                         read(buffer, *, iostat=ios)xml%sim%lambda_cn
-                    case ('dtxmode') ! DTx mode calculation
-                        read(buffer, *, iostat=ios)xml_dtx%mode
-                    case ('dtxnumxs') ! Number of indicators to calculate
-                        read(buffer, *, iostat=ios)xml_dtx%temp%n_ind
-                    case ('dtx_x') ! number of days to use to calculate the dtx indicators
-                        allocate(xml_dtx%temp%x(xml_dtx%temp%n_ind))
-                        read(buffer, *, iostat=ios) xml_dtx%temp%x
-                    case ('dtxdeltadate') ! validity of the report
-                        read(buffer, *, iostat=ios)xml_dtx%temp%td
-                    case ('dtxdelaydays') ! Shift di report delivering
-                        read(buffer, *, iostat=ios)xml_dtx%temp%delay
-                    case ('dtxmincard') ! Number of values to obtain meaningfull statistics
-                        read(buffer, *, iostat=ios)xml_dtx%n
-
                     ! add new case to edit input files for irrigation
                     case ('watsources_fn') ! list of water sources for each irrigation units
                         read(buffer, *, iostat=ios) xml%sim%watsources_fn
@@ -526,51 +484,6 @@ subroutine read_sim_parameters(file_xml, xml, xml_dtx, verbose, reckless)
     end if
 
     close(unit_txt)
-
-    if (allocated(dummy)) then
-        actcroplen = size(dummy)
-    else
-        actcroplen = xml%sim%n_lus
-        allocate(dummy(xml%sim%n_lus))
-        dummy(1:xml%sim%n_lus) = (/(i, i=1, xml%sim%n_lus, 1)/)
-    end if
-
-    allocate(xml%sim%lu_list(actcroplen))
-    k = 1
-    do j = 1, actcroplen
-        do i = k, xml%sim%n_lus
-            if (dummy(i) /= nanvalue) then
-                xml%sim%lu_list(j) = dummy(i)
-                k = i + 1
-                exit
-            end if
-        end do
-    end do
-    deallocate(dummy)
-
-    allocate(dummy(xml%sim%n_lus))
-    dummy(1:xml%sim%n_lus) = (/(i, i=1, xml%sim%n_lus, 1)/)
-    do i = 1, actcroplen
-        where (dummy == xml%sim%lu_list(i)) dummy = nanvalue
-    end do
-
-    allocate(xml%sim%no_lu_list(xml%sim%n_lus - actcroplen))
-    k = 1
-
-    do j = 1, size(xml%sim%no_lu_list)
-        do i = k, xml%sim%n_lus
-            if (dummy(i) /= nanvalue) then
-                xml%sim%no_lu_list(j) = dummy(i)
-                k = i + 1
-                exit
-            end if
-        end do
-    end do
-
-    if (verbose .eqv. .true.) then
-        print *, "Simulated land-use classes:", xml%sim%lu_list
-        print *, "Not simulated land-use classes:", xml%sim%no_lu_list
-    end if
 end subroutine read_sim_parameters
 
 ! TODO: %EAC% at the moment the id of the irrigation method define its order in the list
@@ -1044,7 +957,7 @@ subroutine check_grid(info_spat, sim)
     if(minval(info_spat%soil_use_id%mat,info_spat%soil_use_id%mat/=info_spat%soil_use_id%header%nan) < 1 &
             .or. maxval(info_spat%soil_use_id%mat) > sim%n_lus)then
         print *,"Soil use maps have soil uses not defined in crop database"
-        print *,"Verify the maximum allowed crop uses (SoilUsesNum) and soil maps"
+        print *, 'Verify the landuse list at ', trim(join_path(sim%crop_inputs_path, sim%soil_uses_fn, delimiter))
         print *, 'Execution will be aborted...'
         stop
     end if

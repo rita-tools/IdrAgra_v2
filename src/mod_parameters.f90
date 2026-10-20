@@ -12,8 +12,10 @@ type simulation
     character(len=200) :: path = '.\\sim_results\\'                     ! path of output
     character(len=200) :: meteo_path = '.\\meteo_data\\'                ! path of meteo tables
     character(len=200) :: ws_list_fn = 'weather_stations.dat'           ! filename (incl. path) of the weather station list
-    character(len=200) :: pheno_path = '.\\crop_series\\'               ! Path to the crop timeseries directory
-    character(len=200) :: pheno_root = 'pheno_'                         ! prefix shared by all folders in pheno_path
+    character(len=200) :: crop_inputs_path = '.\\landuses\\'            ! Path to CropCoef soil-use inputs
+    character(len=200) :: co2_conc_fn = 'CO2_conc.dat'                  ! filename (incl. path) of the CO2 concentration series
+    character(len=200) :: soil_uses_fn = 'soil_uses.txt'                ! Crop rotation table
+    character(len=200) :: crop_parameters_path = '.\\landuses\\crop_parameters\\' ! Path to crop definition files
     character(len=200) :: irr_met_path = '.\\irrmeth_data\\'            ! Path to irrigation methods folder
     character(len=200) :: irr_met_list_fn = 'irrmethods.txt'            ! Filename of the list of irrigation methods
     character(len=200) :: watsour_path = '.\\watsour_data\\'            ! Path to the water sources folder
@@ -81,6 +83,7 @@ type simulation
     integer :: rand_seed = -999                 ! seed to initialize the random number generator
     logical :: rand_symmetry = .true.           ! states if the randomization of emergence date is symmetric [-n,+n] or asymmetric [0, 2n]
     integer :: sowing_range = 0                 ! range of variability of the sowing day [days]
+    logical :: aggressive_sowing = .false.      ! end a standing crop early to make room for the next rotation crop
     logical :: repeatable = .true.              ! if true, al random generated are repeated over times
     integer :: imax = 1                         ! maximum number of rows in the raster map
     integer :: jmax = 1                         ! maximum number of columns in the raster map
@@ -88,10 +91,8 @@ type simulation
     real(dp) :: x0 = 1.0                        ! x coordinate of the reference corner
     real(dp) :: y0 = 1.0                        ! y coordinate of the reference corner
     integer :: n_weather_stations = 1           ! Total number of weather stations
-    integer :: n_lus = 1                        ! total number of land uses
+    integer :: n_lus = 0                        ! Number of land uses in the imported crop rotation table
     integer :: n_crops = 1                      ! max number of crops per year
-    integer,dimension(:),pointer :: lu_list     ! list of ids if the simulated land uses
-    integer,dimension(:),pointer :: no_lu_list  ! list of ids if the NOT simulated land uses
     logical :: f_cap_rise = .false.             ! if true, capillary rise is calculated
     logical :: f_shapearea = .false.            ! if true, use shapes area (for vectorialization)
     logical :: f_irandom                        ! if true, use user defined random values
@@ -105,7 +106,8 @@ type simulation
     integer :: end_irr_season = 304             ! end irrigation season [doy]
     integer :: n_irr_meth                       ! number of irrigation methods
     logical :: f_out_cells = .false.            ! if true, print outputs file for control points (aka cells)
-    real(dp),dimension(:),pointer :: res_canopy ! plant resistance
+    real(dp),dimension(:),allocatable :: res_canopy ! annual canopy resistance derived from CO2
+    real(dp),dimension(:),allocatable :: co2_conc ! annual atmospheric CO2 [ppm]
     real(dp), dimension(2,2) :: quantiles = reshape([0.575118, 0.472116, 8.026400, 7.706101], [2,2])
     real(dp) :: lambda_cn = 0.2                 ! lambda parameters for curve number [-]
     real(dp) :: h_prec_lim = 5.0                ! minimum meaningful precipitation [mm]

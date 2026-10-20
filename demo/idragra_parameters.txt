@@ -41,12 +41,17 @@ MeteoPath = meteodata\\
 # MeteoFileName: root-level file listing the meteorological input files.
 MeteoFileName = weather_stations.dat
 
-# PhenoPath: folder containing crop phenology parameter files.
-PhenoPath = pheno\\
+# CropInputsFolder: folder containing the CropCoef land-use rotation database.
+CropInputsFolder = landuses\\
 
-# PhenoFileRoot: common prefix used by phenology files associated with
-# meteorological stations.
-PhenoFileRoot = pheno_
+# SoilUsesFilename: crop-rotation table within CropInputsFolder.
+SoilUsesFilename = soil_uses.txt
+
+# CO2Filename: annual CO2 concentrations (path relative to the working folder).
+CO2Filename = CO2_conc.dat
+
+# CropFolder: folder containing the CropCoef crop parameter files.
+CropFolder = landuses\\crop_parameters\\
 
 # IrrMethPath: folder containing irrigation-method files.
 IrrMethPath = irrmethods\\
@@ -70,7 +75,7 @@ Mode = 3
 
 # InitialThetaFlag: read the initial soil-moisture state from an external
 # file [T/F]. When F, IdrAgra generates the initial condition internally.
-InitialThetaFlag = T
+InitialThetaFlag = F
 
 # FinalThetaFlag: save the final soil-moisture state for possible reuse as
 # an initial condition in a subsequent simulation [T/F].
@@ -111,19 +116,15 @@ InterpolateHumidity = T
 InterpolateWind = T
 InterpolateRadiation = T
 
-# SoilUsesNum: number of soil-use classes included in each phenological
-# series.
-SoilUsesNum = 7
-
-# SimulatedSoilUses: IDs of the soil-use classes to simulate.
-SimulatedSoilUses = 1 2 3 4 5 6 7
-
 # RandSowDaysSym: shape of the sowing-date randomization window.
 RandSowDaysSym = symmetric
 
 # RandSowDaysWind: half-width or extent, in days, of the sowing-date
 # randomization window.
 RandSowDaysWind = 3
+
+# AggressiveSowing: harvest a standing crop early when necessary to sow the next crop in the rotation [T/F].
+AggressiveSowing = F
 
 # Repeatable: use a repeatable random sequence, allowing identical results
 # across equivalent runs [T/F].
@@ -209,36 +210,3 @@ int_reuse_div_fn = int_reuse.txt
 cr_sources_list_fn = cr_sources.txt
 IrrDistr_list_fn = irr_districts.txt
 sched_irr_fn = scheduled_irrigation.txt
-
-
-### 7. DTx settings (experimental; inactive in this demo) ############
-
-# DTx support is incomplete. Keep all values in this block even when the mode
-# is "none", because the current code does not provide safe defaults for every
-# internal DTx dimension.
-#
-# DTxMode: experimental DTx calculation mode [none/analysis/application].
-#   none        = disable DTx calculations
-#   analysis    = accumulate samples and fit gamma-distribution parameters
-#   application = export current-run accumulated deficit maps; despite its
-#                 name, it does NOT load or apply relationships from analysis
-DTxMode = none
-
-# DTxNumXs: number of DTx integration periods listed in DTx_x.
-DTxNumXs = 3
-
-# DTx_x: integration periods in days. For example, DT10 represents the
-# transpirative deficit accumulated over 10 days.
-DTx_x = 10 20 30
-
-# DTxDeltaDate: interval, in days, between DTx calculations.
-DTxDeltaDate = 10
-
-# DTxDelayDays: delay, in days from the start of the year, before DTx
-# calculations begin.
-DTxDelayDays = 1
-
-# DTxMinCard: minimum sample cardinality required for a valid estimate in
-# analysis mode. This two-year demo cannot normally satisfy a value of 3;
-# the value is retained because DTx is disabled.
-DTxMinCard = 3
