@@ -31,14 +31,9 @@ subroutine read_all_parameters(file_xml, xml, verbose, reckless)
 
     ! fw - evaporation !%AB% used for not irrigated cells or without irrigation events
     xml%irr%f_w = cost_fwEva
-    ! allocate precipitation over the 24 hours
-    allocate(xml%f_eff_rain(24))
-    ! %AB% used only for evaluate effective precipitation
-    xml%f_eff_rain = cost_f_eff_rain
 
     ! allocate ET0 over the 24 hours
     allocate(xml%fet0(24))
-    xml%fet0 = cost_fet0
     xml%ms_i%f_exists=.false. ; xml%ms_i%f_allocate_timeserie=.false. ;
     xml%ms_ii%f_exists=.false. ; xml%ms_ii%f_allocate_timeserie=.false. ;
     xml%intreu%f_exists=.false. ; xml%intreu%f_allocate_timeserie=.false. ;

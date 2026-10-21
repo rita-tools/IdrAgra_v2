@@ -239,14 +239,6 @@ type uc_act_rule                                      ! activation rule for unmo
     real(dp), dimension(3) :: act_trsld               ! activation threshold
 end type uc_act_rule
 
-! TODO: NOT USED
-!type pond
-!    real(dp)::slope_min
-!    real(dp)::q_max
-!    real(dp)::slope_max
-!    real(dp)::q_min
-!end type pond
-
 type parameters
     type(simulation) :: sim
     integer :: n_bac
@@ -258,7 +250,6 @@ type parameters
     type(water_source) :: intreu
     type(water_source) :: cr
     type(uc_act_rule),dimension(:),pointer :: uc_act_rules
-    real(dp),dimension(:),pointer::f_eff_rain
     real(dp),dimension(:),pointer::fet0
 end type parameters
 

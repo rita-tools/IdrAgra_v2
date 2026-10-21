@@ -21,9 +21,6 @@ type balance1_matrices
     real(dp),dimension(:,:),pointer::h_perc           ! percolation from 1st to 2nd layer [mm]
     real(dp),dimension(:,:),pointer::h_pond           ! excessive surface ponding [m]
     real(dp),dimension(:,:),pointer::h_inf            ! infiltration [mm]
-    real(dp),dimension(:,:),pointer::k_s_dry          ! water scarcity stress coefficient [-]
-    real(dp),dimension(:,:),pointer::k_s_sat          ! water saturation stress coefficient [-]
-    real(dp),dimension(:,:),pointer::k_s              ! water stress coefficient [-]
     real(dp),dimension(:,:),pointer::h_runoff         ! runoff [mm]
     real(dp),dimension(:,:),pointer::h_eff_rain       ! effective rainfall [mm]
     real(dp),dimension(:,:),pointer::h_net_av_water   ! net available water = effective rainfall + sprinkle irrigation (over which runoff is calculated)
@@ -40,19 +37,10 @@ type balance2_matrices
     real(dp),dimension(:,:),pointer::h_transp_act   ! actual transpiration [mm]
     real(dp),dimension(:,:),pointer::h_transp_pot   ! potential transpiration [mm]
     real(dp),dimension(:,:),pointer::h_perc         ! percolation from 2nd layer out of the root zone [mm]
-    real(dp),dimension(:,:),pointer::h_raw_sup      ! difference between water content at field capacity
-                                                    ! and threshold water content
-                                                    ! for irrigation application [mm]
-    real(dp),dimension(:,:),pointer::h_raw          ! difference between water content at field capacity and
-                                                    ! water content at RAW [mm]
-    real(dp),dimension(:,:),pointer::h_raw_inf      ! difference between water content at field capacity and
-                                                    ! threshold water content
-                                                    ! for irrigation application when water availability is low [mm]
-                                                    ! it is used to evaluate the number of the days before next irrigation application
-                                                    ! from collective water sources - USE mode
+    real(dp),dimension(:,:),pointer::h_raw_sup      ! difference between water content at field capacity and threshold water content for irrigation application [mm]
+    real(dp),dimension(:,:),pointer::h_raw          ! difference between water content at field capacity and water content at RAW [mm]
+    real(dp),dimension(:,:),pointer::h_raw_inf      ! difference between water content at field capacity and threshold water content for irrigation application when water availability is low [mm] it is used to evaluate the number of the days before next irrigation application from collective water sources - USE mode
     real(dp),dimension(:,:),pointer::h_raw_priv     ! difference between water content at field capacity and threshold water content for irrigation application from private water sources - USE mode [mm]
-    real(dp),dimension(:,:),pointer::k_s_dry        ! water scarcity stress coefficient [-]
-    real(dp),dimension(:,:),pointer::k_s_sat        ! water saturation stress coefficient [-]
     real(dp),dimension(:,:),pointer::k_s            ! water stress coefficient [-]
     real(dp),dimension(:,:),pointer::depth_under_rz ! depth of water table from root zone [m]
     real(dp),dimension(:,:),pointer::h_caprise      ! capillary rise [mm]
@@ -106,7 +94,6 @@ end type hourly
 type unit_file_scratch
     integer,dimension(:),pointer::dxi
 end type unit_file_scratch
-
 
 type moisture               ! Moisture indicates in this case the relative water content [m^3/m^3]
     type(grid_r)::wp        ! Soil moisture at wilting point

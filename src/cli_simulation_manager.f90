@@ -290,7 +290,7 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
             call create_meteo_matrices(info_meteo, dir_meteo, meteo_weight, meteo, info_spat%domain, &
                                      & doy, pars%sim%res_canopy(year_idx), pars%sim                  )
 
-            ! Advance each cell's crop phenology according to today's GDD accumulation
+            ! Advance each cell's crop phenology according to today's GDD accumulation and sow/harvest rules
             call advance_crops_daily(pheno, crops, bare_soil, crop_rotations, info_spat%domain, info_spat%soil_use_id, &
                                    & info_spat%irandom%mat, meteo, kcb_corr_fact, dir_meteo, meteo_weight,             &
                                    & pars%sim%interpolate_temp, crop_weather, current, pars%sim%aggressive_sowing      )
@@ -591,12 +591,12 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
             end where
 
             hr_loop: do hour = 1,24
-                ! init the variables to zero (except for f_eff_rain, h_net_av_water)
+                ! init the hourly water-balance variables to zero
                 wat_bal_hour = 0.0D0
-                ! calculate the precipitation and infiltration hourly distribution
+                ! distribute precipitation and infiltration uniformly over the day
                 where (info_spat%domain%mat /= info_spat%domain%header%nan)
-                    wat_bal_hour%esten%h_eff_rain = wat_bal1%h_eff_rain*pars%f_eff_rain(hour)
-                    wat_bal_hour%esten%h_inf  = wat_bal1%h_net_av_water*pars%f_eff_rain(hour)
+                    wat_bal_hour%esten%h_eff_rain = wat_bal1%h_eff_rain / 24._dp
+                    wat_bal_hour%esten%h_inf = wat_bal1%h_net_av_water / 24._dp
                 end where
                 ! calculate parameters for evaporation that remain constant during the day
                 if(hour==1) then
@@ -1632,9 +1632,6 @@ subroutine init_wat_bal1_matrices(wat_bal1,imax,jmax,f_allocate)
         allocate(wat_bal1%h_gross_av_water(imax,jmax),stat=checkstat); if(checkstat/=0)print*,error_message
         allocate(wat_bal1%h_runoff(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message
         allocate(wat_bal1%h_pond(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%k_s_dry(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%k_s_sat(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%k_s(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message
 
     else
         deallocate(wat_bal1%d_e)
@@ -1652,9 +1649,6 @@ subroutine init_wat_bal1_matrices(wat_bal1,imax,jmax,f_allocate)
         deallocate(wat_bal1%h_gross_av_water)
         deallocate(wat_bal1%h_runoff)
         deallocate(wat_bal1%h_pond)
-        deallocate(wat_bal1%k_s_dry)
-        deallocate(wat_bal1%k_s_sat)
-        deallocate(wat_bal1%k_s)
     end if
 end subroutine init_wat_bal1_matrices
 
@@ -1679,8 +1673,6 @@ subroutine init_wat_bal2_matrices(wat_bal2,imax,jmax,f_allocate)
         allocate(wat_bal2%h_raw(imax,jmax),stat=checkstat)          ; if(checkstat/=0)print*,error_message
         allocate(wat_bal2%h_raw_inf(imax,jmax),stat=checkstat)       ; if(checkstat/=0)print*,error_message
         allocate(wat_bal2%h_raw_priv(imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal2%k_s_dry(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal2%k_s_sat(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message
         allocate(wat_bal2%k_s(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message
         allocate(wat_bal2%depth_under_rz(imax,jmax),stat=checkstat); if(checkstat/=0)print*,error_message
         allocate(wat_bal2%h_caprise(imax,jmax),stat=checkstat)      ; if(checkstat/=0)print*,error_message
@@ -1696,8 +1688,6 @@ subroutine init_wat_bal2_matrices(wat_bal2,imax,jmax,f_allocate)
         deallocate(wat_bal2%h_raw)
         deallocate(wat_bal2%h_raw_inf)
         deallocate(wat_bal2%h_raw_priv)
-        deallocate(wat_bal2%k_s_dry)
-        deallocate(wat_bal2%k_s_sat)
         deallocate(wat_bal2%k_s)
         deallocate(wat_bal2%depth_under_rz)
         deallocate(wat_bal2%h_caprise)
