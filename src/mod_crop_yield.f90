@@ -1,7 +1,7 @@
 module mod_crop_yield
 use mod_constants, only: dp
 use mod_grid, only: grid_i
-use mod_common, only: balance1_matrices, balance2_matrices
+use mod_common, only: balance_matrices
 use mod_meteo, only: meteo_mat
 use mod_crop_phenology, only: crop_pars_matrices, crop_definition
 use mod_cropcoef, only: adjust_water_productivity
@@ -138,13 +138,12 @@ subroutine destroy_yield(yld)
     if (allocated(yld%completed_crops))     deallocate(yld%completed_crops)
 end subroutine destroy_yield
 
-subroutine accumulate_daily_yield(acc, pheno, crops, meteo, wat_bal1, wat_bal2, domain)
+subroutine accumulate_daily_yield(acc, pheno, crops, meteo, balance, domain)
     type(yield_accumulator), intent(inout) :: acc
     type(crop_pars_matrices), intent(in) :: pheno
     type(crop_definition), intent(in) :: crops(:)
     type(meteo_mat), intent(in) :: meteo
-    type(balance1_matrices), intent(in) :: wat_bal1
-    type(balance2_matrices), intent(in) :: wat_bal2
+    type(balance_matrices), intent(in) :: balance
     type(grid_i), intent(in) :: domain
     integer :: i, j, stage, crop_id
     real(dp) :: h_transp_act, h_transp_pot, progress, target_gdd, temp_crit, temp_lim
@@ -157,8 +156,8 @@ subroutine accumulate_daily_yield(acc, pheno, crops, meteo, wat_bal1, wat_bal2, 
                 if (crop_id == 0 .or. crop_id /= pheno%crop_id(i,j)) cycle
 
                 stage = pheno%pheno_stage(i,j)
-                h_transp_act = wat_bal1%h_transp_act(i,j) + wat_bal2%h_transp_act(i,j)
-                h_transp_pot = wat_bal1%h_transp_pot(i,j) + wat_bal2%h_transp_pot(i,j)
+                h_transp_act = balance%lyr(1)%h_transp_act(i,j) + balance%lyr(2)%h_transp_act(i,j)
+                h_transp_pot = balance%lyr(1)%h_transp_pot(i,j) + balance%lyr(2)%h_transp_pot(i,j)
 
                 ! Accumulate thermal stress
                 target_gdd = real(crops(crop_id)%max_cuts, dp) * maxval(crops(crop_id)%gdd)

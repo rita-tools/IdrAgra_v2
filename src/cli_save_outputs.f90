@@ -241,7 +241,7 @@ subroutine init_cell_output_by_year(out_tbl_list,path,yr,id_ws_list, mode, f_cel
                 & 'trasp_act2_mm'//'; '//'ks'//'; '// &
                 & 'thickness_II_m'//'; '//'wat_table_depth_under_root_m'//'; '//'capflux_mm'//'; '// &
                 & 'perc2_mm'//'; '//'theta2_mm'//'; '//'theta_old_mm'//'; '//&
-                & 'rawbig'//'; '//'rawinf'//'; '// &
+                & 'rawbig'//'; '//'rawinf (legacy)'//'; '// &
                 & 'wat_table_depth_m'//'; '//&
                 & 'distr_irr_mm'//'; '//'priv_well_irr_mm'//'; '//&
                 & 'espperc1'//'; '//'espperc2'//'; '//'irr_loss_mm'//'; '//&

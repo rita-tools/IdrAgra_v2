@@ -2,12 +2,12 @@ module cli_simulation_manager
 use mod_date, only: date, month_lengths, days_in_year, days_between_dates, advance_calendar_date, day_of_week
 use mod_utility, only: dp, get_value_index, get_uniform_sample, itoa, join_path
 use mod_parameters
-use mod_grid, only: read_grid, write_grid, print_mat_as_grid, overlay_domain, bound, id_to_par, set_default_par
+use mod_grid, only: grid_i, read_grid, write_grid, print_mat_as_grid, overlay_domain, bound, id_to_par, set_default_par
 use mod_evapotranspiration, only: ET_reference, calculateDLH
 use mod_meteo, only: meteo_info, meteo_mat, read_meteo_data, create_meteo_matrices, skip_meteo_days
 use mod_runoff
 use mod_crop_soil_water
-use mod_crop_phenology, only: crop_definition, crop_rotation, crop_pars_matrices
+use mod_crop_phenology, only: crop_definition, crop_rotation, crop_pars_matrices, calculate_RF_t
 use mod_cropcoef, only: advance_crops_daily, crop_weather_series, load_crop_weather
 use mod_constants, only: tmax_time, tmin_time, pi, cost_fwEva, nan_i, nan_r
 use mod_common, only: wat_matrix, soil2_rice, hourly
@@ -19,13 +19,8 @@ use mod_crop_yield, only: yield_t, yield_accumulator, initialize_yield, destroy_
 use cli_read_parameter
 implicit none
 
-! Assignment statement overloading interface
-! Help to initialize and update derived types
 interface assignment(=) !eq_extensive
     module procedure eq_extensive
-end interface
-interface assignment(=) !eq_bil
-    module procedure eq_wat_bal1,eq_wat_bal2,init_wat_bal1,init_wat_bal2
 end interface
 
 contains
@@ -52,8 +47,7 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
     type(crop_pars_matrices), intent(inout) :: crop_state
     type(yield_accumulator), intent(inout) :: crop_yield_state
 
-    type(balance1_matrices)::wat_bal1,wat_bal1_old
-    type(balance2_matrices)::wat_bal2,wat_bal2_old
+    type(balance_matrices) :: bal, bal_old
     type(crop_pars_matrices)::pheno
     type(crop_weather_series), allocatable :: crop_weather(:)
     type(meteo_mat)::meteo
@@ -120,8 +114,8 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
     irr_loss = 0.0D0
 
     ! Variables allocation
-    call allocate_all(stp_map, yr_map, deb_map, yr_deb_map, wat_bal1, wat_bal1_old, wat_bal2, wat_bal2_old, wat_bal_hour, meteo,    &
-                    & wat, pheno, info_spat%domain%header%imax, info_spat%domain%header%jmax, info_spat%domain%mat, crops)
+    call allocate_all(stp_map, yr_map, deb_map, yr_deb_map, bal, bal_old, wat_bal_hour, meteo, wat, pheno,   &
+                    & info_spat%domain%header%imax, info_spat%domain%header%jmax, info_spat%domain%mat, crops)
 
     if (allocated(crop_state%crop_id)) pheno = crop_state
     call initialize_yield_accumulator(crop_yield_state, info_spat%domain%mat)
@@ -312,17 +306,15 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
 
                 day_from_irr=-9999
                 esp_perc=1.
-                wat_bal1 = 0.0D0; wat_bal1_old = 0.0D0
-                wat_bal2 = 0.0D0; wat_bal2_old = 0.0D0
-                wat_bal1%d_e = pars%depth%ze_fix
+                bal%lyr(1)%thickness = pars%depth%ze_fix
 
                 where(info_spat%domain%mat /= info_spat%domain%header%nan)
                     ! Layer depths inizialization - to calculate h_soil and t_soil
                     ! Comparing root zone to evaporative layer depth
                     where(pheno%d_r > pars%depth%ze_fix)
-                        wat_bal2%d_t = pheno%d_r - pars%depth%ze_fix
+                        bal%lyr(2)%thickness = pheno%d_r - pars%depth%ze_fix
                     else where
-                        wat_bal2%d_t = pars%depth%zr_fix
+                        bal%lyr(2)%thickness = pars%depth%zr_fix
                     end where
                     ! ###################################### %PS%, todo: this is the correct way. #######################################
                     ! ## However, using this leads to a spike in early season irrigation events, rising total irrigation amount by 10% ##
@@ -332,11 +324,11 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
                     ! ###################################################################################################################
 
                     ! Soil water content inizialization [mm]
-                    wat_bal1%h_soil = info_spat%theta(1)%old%mat*1000.*pars%depth%ze_fix
-                    wat_bal2%h_soil = info_spat%theta(2)%old%mat*1000.*wat_bal2_old%d_t
+                    bal%lyr(1)%h_soil = info_spat%theta(1)%old%mat*1000._dp*pars%depth%ze_fix
+                    bal%lyr(2)%h_soil = info_spat%theta(2)%old%mat*1000._dp*bal_old%lyr(2)%thickness
                     ! Soil water content inizialization [m3/m3]
-                    wat_bal1%t_soil = info_spat%theta(1)%old%mat
-                    wat_bal2%t_soil = info_spat%theta(2)%old%mat
+                    bal%lyr(1)%t_soil = info_spat%theta(1)%old%mat
+                    bal%lyr(2)%t_soil = info_spat%theta(2)%old%mat
                 end where
 
                 ! calculate average latitude !%PS%, todo: this should probably be calculated once per year because domain can change
@@ -345,8 +337,7 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
                 lat_mean = lat_sum / real(lat_num, dp)
             end if first_day
 
-            wat_bal1_old = wat_bal1
-            wat_bal2_old = wat_bal2
+            bal_old = bal
 
             where(info_spat%domain%mat /= info_spat%domain%header%nan)
 
@@ -357,9 +348,9 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
 
                 ! Layer depths update as a function of d_r (phenological parameter - root depth)
                 where(pheno%d_r > pars%depth%ze_fix)
-                    wat_bal2%d_t = pheno%d_r - pars%depth%ze_fix
+                    bal%lyr(2)%thickness = pheno%d_r - pars%depth%ze_fix
                 else where
-                    wat_bal2%d_t = pars%depth%zr_fix
+                    bal%lyr(2)%thickness = pars%depth%zr_fix
                 end where
                 ! ###################################### %PS%, todo: this is the correct way. #######################################
                 ! ## However, using this leads to a spike in early season irrigation events, rising total irrigation amount by 10% ##
@@ -369,52 +360,41 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
                 ! ###################################################################################################################
 
                 ! Distance (mm) between rootzone and water table (influences capillary uptake)
-                wat_bal2%depth_under_rz = max(0._dp, info_spat%wat_tab%mat - wat_bal1%d_e - wat_bal2%d_t)
+                bal%depth_under_rz = max(0._dp, info_spat%wat_tab%mat - bal%lyr(1)%thickness - bal%lyr(2)%thickness)
 
                 ! Soil water content update
-                where(wat_bal2%d_t == wat_bal2_old%d_t)
-                    wat_bal2_old%h_soil = wat_bal2_old%t_soil*1000*wat_bal2_old%d_t
-                else where(wat_bal2%d_t > wat_bal2_old%d_t)
+                where(bal%lyr(2)%thickness == bal_old%lyr(2)%thickness)
+                    bal_old%lyr(2)%h_soil = bal_old%lyr(2)%t_soil*1000*bal_old%lyr(2)%thickness
+                else where(bal%lyr(2)%thickness > bal_old%lyr(2)%thickness)
                     ! Paddy field correction
                     where(is_rice_paddy)
-                        wat_bal2_old%h_soil = wat_bal2_old%t_soil*1000*wat_bal2_old%d_t + &
-                                              theta2_rice%theta2_FC*1000*(wat_bal2%d_t-wat_bal2_old%d_t)
+                        bal_old%lyr(2)%h_soil = bal_old%lyr(2)%t_soil*1000*bal_old%lyr(2)%thickness +                    &
+                                                theta2_rice%theta2_FC*1000*(bal%lyr(2)%thickness-bal_old%lyr(2)%thickness)
                     else where
-                        wat_bal2_old%h_soil = wat_bal2_old%t_soil*1000*wat_bal2_old%d_t + &
-                                              info_spat%theta(2)%fc%mat*1000*(wat_bal2%d_t-wat_bal2_old%d_t)
+                        bal_old%lyr(2)%h_soil = bal_old%lyr(2)%t_soil*1000*bal_old%lyr(2)%thickness +                        &
+                                                info_spat%theta(2)%fc%mat*1000*(bal%lyr(2)%thickness-bal_old%lyr(2)%thickness)
                     end where
                 else where
-                    wat_bal2_old%h_soil = wat_bal2_old%t_soil*1000*wat_bal2_old%d_t - &
-                                          wat_bal2_old%t_soil*1000*(wat_bal2_old%d_t-wat_bal2%d_t)
+                    bal_old%lyr(2)%h_soil = bal_old%lyr(2)%t_soil*1000*bal_old%lyr(2)%thickness -                  &
+                                          bal_old%lyr(2)%t_soil*1000*(bal_old%lyr(2)%thickness-bal%lyr(2)%thickness)
                 end where
 
-                pheno%p_day = pheno%p + 0.04*(5.-(wat_bal1_old%h_eva_pot + wat_bal1_old%h_transp_pot + wat_bal2_old%h_transp_pot))
+                pheno%p_day = pheno%p + 0.04*(5.-(bal_old%h_eva_pot + bal_old%lyr(1)%h_transp_pot + bal_old%lyr(2)%h_transp_pot))
                 ! pheno%pday amendment if pday values are not in their allowed range [0.1 ; 0.8]
                 where (pheno%p_day <0.1) pheno%p_day=0.1
                 where (pheno%p_day >0.8) pheno%p_day=0.8 ! TODO: larger values will be permitted in order to consider stress irrigation
 
             end where
 
-            call calculate_RF_t(wat_bal2%d_t, pheno, info_spat%domain)
+            call calculate_RF_t(bal%lyr(2)%thickness, pheno, info_spat%domain)
 
             ! Soil water thresholds update (wat variable)
-            call update_soil_pars(info_spat%domain, info_spat%theta, wat_bal1%d_e, wat_bal2%d_t, wat, theta2_rice, is_rice_paddy)
+            call update_soil_pars(info_spat%domain, info_spat%theta, bal%lyr(1)%thickness, &
+                                & bal%lyr(2)%thickness, wat, theta2_rice, is_rice_paddy    )
 
             ! Irrigation application thresholds update
-            !%PS%, todo: rename and move out of wat_bal2 (these are average values for the entire profile, not layer2-specific)
-            where(info_spat%domain%mat /= info_spat%domain%header%nan)
-                wat_bal2%h_raw_sup  = (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*pheno%p_day*(alpha_ms_map+pheno%r_stress)) + &
-                                      (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*pheno%p_day*(alpha_ms_map+pheno%r_stress))
-
-                wat_bal2%h_raw      = (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*pheno%p_day) + &
-                                      (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*pheno%p_day)
-
-                wat_bal2%h_raw_inf  = (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*((pheno%p_day+1)/2)) + &
-                                      (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*((pheno%p_day+1)/2))
-
-                wat_bal2%h_raw_priv = (wat%layer(1)%h_fc - (wat%layer(1)%h_fc-wat%layer(1)%h_wp)*pheno%p_day*(alpha_unm_map+pheno%r_stress)) + &
-                                      (wat%layer(2)%h_fc - (wat%layer(2)%h_fc-wat%layer(2)%h_wp)*pheno%p_day*(alpha_unm_map+pheno%r_stress))
-            end where
+            call update_irrigation_thresholds(bal, wat, pheno%p_day, pheno%r_stress, alpha_ms_map, &
+                                            & alpha_unm_map, info_spat%domain, pars%sim%mode       )
 
             ! calculate day length
             call calculateDLH(doy, lat_mean, DLH)
@@ -422,8 +402,8 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
             pars%fet0 = pdf_normal(cost_hrs, 12.5D0, DLH/5)
 
             ! calculate the effective precipitation for the rice (only precipitation is considered)
-            wat_bal1%h_interc=calc_interception(meteo%p,pheno)
-            wat_bal1%h_eff_rain = net_precipitation(meteo%p,wat_bal1%h_interc)
+            bal%h_interc = calc_interception(meteo%p, pheno)
+            bal%h_eff_rain = net_precipitation(meteo%p, bal%h_interc)
 
             ! calculate the temperature stress factor
             tmax_d = tmax_time(current%month)
@@ -460,11 +440,11 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
                     if (doy==1) irr_units(:)%q_rem = 0
 
                     ! calculate the daily water duty for each irrigation unit, considering the water distribution efficiency
-                    call calc_daily_duty(doy, irr_units, info_sources, wat_src_tbl, info_spat%irr_unit_id,       &
-                                       & info_spat%domain, pars, pheno%irrigation_class,                         &
-                                       & info_spat%irr_meth_id%mat, (wat_bal1_old%h_soil + wat_bal2_old%h_soil), &
-                                       & (wat_bal1_old%h_transp_pot + wat_bal2_old%h_transp_pot),                &
-                                       & wat_bal2%h_raw, (wat%layer(1)%h_fc + wat%layer(2)%h_fc)                 )
+                    call calc_daily_duty(doy, irr_units, info_sources, wat_src_tbl, info_spat%irr_unit_id,           &
+                                       & info_spat%domain, pars, pheno%irrigation_class,                             &
+                                       & info_spat%irr_meth_id%mat, (bal_old%lyr(1)%h_soil + bal_old%lyr(2)%h_soil), &
+                                       & (bal_old%lyr(1)%h_transp_pot + bal_old%lyr(2)%h_transp_pot),                &
+                                       & bal%h_raw, (wat%layer(1)%h_fc + wat%layer(2)%h_fc)                          )
 
                     ! %EAC%: save irrigation units results
                     call save_irr_unit_debug_data(doy, out_tbl_list, irr_units)
@@ -473,17 +453,17 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
                     !      (whether irrigation can actually be supplied is decided in irrigation_use).
                     h_met_use = info_spat%h_meth%mat
                     where(is_rice_paddy)
-                        h_met_use = ((info_spat%h_meth%mat - wat_bal1_old%h_pond) +                                 &!<-- reach a pond level of h_meth
-                                     (info_spat%theta(1)%sat%mat*wat_bal1_old%d_e*1000.0D0 - wat_bal1_old%h_soil) + &!<-- replenish 1st layer up to saturation
-                                     (wat%layer(2)%h_sat - wat_bal2_old%h_soil) +                                   &!<-- replenish 2nd layer up to saturation
-                                     (wat_bal1_old%h_eva + wat_bal2_old%h_transp_pot)                               )!<-- add yesterday's evapotranspiration
+                        h_met_use = ((info_spat%h_meth%mat - bal_old%h_pond) +                                                &!<-- reach a pond level of h_meth
+                                     (info_spat%theta(1)%sat%mat*bal_old%lyr(1)%thickness*1000.0D0 - bal_old%lyr(1)%h_soil) + &!<-- replenish 1st layer up to saturation
+                                     (wat%layer(2)%h_sat - bal_old%lyr(2)%h_soil) +                                           &!<-- replenish 2nd layer up to saturation
+                                     (bal_old%h_eva + bal_old%lyr(2)%h_transp_pot))                                            !<-- add expected ET
                     end where
-                    call irrigate_rice(h_met_use, pheno, wat_bal1%h_eff_rain, theta2_rice%k_sat_2, is_rice_paddy)    !<-- add expected percolation and subtract rain
+                    call irrigate_rice(h_met_use, pheno, bal%h_eff_rain, theta2_rice%k_sat_2, is_rice_paddy) !<-- add expected percolation and subtract rain
 
                     call irrigation_use(info_spat%domain, info_spat%irr_unit_id, pheno%irrigation_class, info_spat%irr_meth_id, &
-                                      & irr_units, (wat_bal1_old%h_transp_pot+wat_bal2_old%h_transp_pot),                       &
-                                      & (wat_bal1_old%h_soil + wat_bal2_old%h_soil),                                            &
-                                      & wat_bal2%h_raw_sup, wat_bal2%h_raw_inf, wat_bal2%h_raw, wat_bal2%h_raw_priv,            &
+                                      & irr_units, (bal_old%lyr(1)%h_transp_pot+bal_old%lyr(2)%h_transp_pot),                   &
+                                      & (bal_old%lyr(1)%h_soil + bal_old%lyr(2)%h_soil),                                        &
+                                      & bal%h_irr_thresh, bal%h_raw, bal%h_priv_thresh,                                         &
                                       & h_irr, doy, priv_irr, coll_irr, pars%sim%f_shapearea, info_spat%cell_area%mat,          &
                                       & h_met_use, info_spat%irr_starts%mat, info_spat%irr_ends%mat, pheno%cn_class             )
 
@@ -502,8 +482,8 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
                     !if (doy==pars%sim%end_irr_season) irr_units(:)%q_surplus = 0
 
                 case (2) ! NEED mode with field capacity target
-                    call irrigation_need_fc(info_spat, h_irr, wat_bal2, wat_bal2_old, wat_bal1_old, pheno,            &
-                                          & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, is_rice_paddy, pars%sim%fc_ratio)
+                    call irrigation_need_fc(info_spat, h_irr, bal, bal_old, pheno, bal%h_eff_rain, &
+                                          & theta2_rice%k_sat_2, is_rice_paddy, pars%sim%fc_ratio  )
                     ! if outside the irrigation period, set irrigation height to zero
                     do z=1, pars%sim%n_irr_meth
                         where(doy<info_spat%irr_starts%mat .or. doy>info_spat%irr_ends%mat) h_irr(:,:,z) = 0.
@@ -511,8 +491,8 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
                     irr_loss = 0. ! not consider irrigation losses
 
                 case (3) ! NEED mode with fixed volume
-                    call irrigation_need_fixed(info_spat, h_irr, wat_bal2, wat_bal2_old, wat_bal1_old, pheno,             &
-                                             & wat_bal1%h_eff_rain, theta2_rice%k_sat_2, is_rice_paddy, wat%layer(2)%h_sat)
+                    call irrigation_need_fixed(info_spat, h_irr, bal, bal_old, pheno, bal%h_eff_rain, &
+                                             & theta2_rice%k_sat_2, is_rice_paddy, wat%layer(2)%h_sat )
                     ! update irrigation losses
                     call calc_irrigation_losses(a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min),irr_loss)
                     ! if outside the irrigation period, set irrigation height to zero
@@ -523,10 +503,9 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
                     end do
 
                 case (4)! SCHEDULED mode
-                    call irrigation_scheduled(info_spat, doy, y, irr_sch, pheno, &
-                        & h_irr, debug, wat_bal1_old, wat_bal2, wat_bal2_old, &
-                        & a_loss, b_loss, c_loss, meteo%Wind_vel, 0.5*(meteo%T_max+meteo%T_min),irr_loss,&
-                        wat_bal1%h_eff_rain, theta2_rice%k_sat_2, is_rice_paddy, wat%layer(2)%h_sat)
+                    call irrigation_scheduled(info_spat, doy, y, irr_sch, pheno, h_irr, debug, bal, bal_old, a_loss,      &
+                                            & b_loss, c_loss, meteo%Wind_vel, 0.5_dp*(meteo%T_max+meteo%T_min), irr_loss, &
+                                            & bal%h_eff_rain, theta2_rice%k_sat_2, is_rice_paddy, wat%layer(2)%h_sat      )
                     ! if outside the irrigation period, set irrigation height to zero
                     ! and calculate net irrigation
                     do z=1, pars%sim%n_irr_meth
@@ -554,33 +533,33 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
 
             ! calculate intercetion according to the Von Hoyningen-Huene and Braden model
             ! consider both precipitation and above canopy irrigation
-            wat_bal1%h_interc = calc_interception(meteo%p+h_irr_sum * f_interception, pheno)
-            wat_bal1%h_eff_rain = net_precipitation(meteo%p+h_irr_sum * f_interception, wat_bal1%h_interc)
+            bal%h_interc = calc_interception(meteo%p+h_irr_sum * f_interception, pheno)
+            bal%h_eff_rain = net_precipitation(meteo%p+h_irr_sum * f_interception, bal%h_interc)
 
             ! calculate the CN value
             call CN_table(tab_CN2, tab_CN3,info_spat%drainage,pheno%cn_class,pheno%cn_day, &
                 & out_cn_day,info_spat%domain,info_spat%hydr_gr, &
                 & info_spat%slope%mat, out_cn,info_spat%theta, &
-                & wat_bal1%t_soil,wat_bal2%t_soil)
+                & bal%lyr(1)%t_soil,bal%lyr(2)%t_soil)
 
             ! init water balance variables
-            call init_water_balance_variables(wat_bal1,wat_bal2)
+            call reset_water_balance_variables(bal)
 
             ! set soil water content of current day to the previous day
-            wat_bal_hour%inten%h_soil1 = wat_bal1_old%h_soil
-            wat_bal_hour%inten%h_soil2 = wat_bal2_old%h_soil
+            wat_bal_hour%inten%h_soil1 = bal_old%lyr(1)%h_soil
+            wat_bal_hour%inten%h_soil2 = bal_old%lyr(2)%h_soil
 
             ! the gross available water is the sum of precipitation and above canopy irrigation
-            wat_bal1%h_gross_av_water = meteo%p + h_irr_sum*f_interception
+            bal%h_gross_av_water = meteo%p + h_irr_sum*f_interception
 
             ! the net available precipitation is the net precipitation + ponding
-            wat_bal1%h_net_av_water = wat_bal1%h_eff_rain ! + wat_bal1_old%h_pond %CG% 2024-03-29 removed
+            bal%h_net_av_water = bal%h_eff_rain
             !wat_bal1%h_net_av_water = wat_bal1%h_eff_rain  + wat_bal1_old%h_pond
 
             ! calculate the runoff with the CN model
-            call CN_runoff(wat_bal1%h_gross_av_water, wat_bal1%h_net_av_water, &
+            call CN_runoff(bal%h_gross_av_water, bal%h_net_av_water, &
                 & h_irr_sum*(1-f_interception), info_spat%domain, is_rice_paddy, &
-                & wat_bal1%h_runoff, out_cn_day, pars%sim%lambda_cn)
+                & bal%h_runoff, out_cn_day, pars%sim%lambda_cn)
 
             ! HOURLY LOOP OF THE SIMULATION
             k_sat2_use = info_spat%k_sat(2)%mat
@@ -595,16 +574,16 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
                 wat_bal_hour = 0.0D0
                 ! distribute precipitation and infiltration uniformly over the day
                 where (info_spat%domain%mat /= info_spat%domain%header%nan)
-                    wat_bal_hour%esten%h_eff_rain = wat_bal1%h_eff_rain / 24._dp
-                    wat_bal_hour%esten%h_inf = wat_bal1%h_net_av_water / 24._dp
+                    wat_bal_hour%esten%h_eff_rain = bal%h_eff_rain / 24._dp
+                    wat_bal_hour%esten%h_inf = bal%h_net_av_water / 24._dp
                 end where
                 ! calculate parameters for evaporation that remain constant during the day
                 if(hour==1) then
                     call b1_no_iter_eva(pheno,meteo, pars%sim%h_prec_lim, wat, fw_day, fw_irr, pars%irr%f_w, fc, &
-                                        h_irr_sum, f_interception, info_spat%domain, wat_bal1_old, fw_old)
+                                        h_irr_sum, f_interception, info_spat%domain, bal_old, fw_old)
                     wat_bal_hour%inten%h_pond0 = 0.
                     !%CG% 2024-03-29 add total ponding to the first hour
-                    wat_bal_hour%esten%h_inf = wat_bal_hour%esten%h_inf + wat_bal1_old%h_pond
+                    wat_bal_hour%esten%h_inf = wat_bal_hour%esten%h_inf + bal_old%h_pond
                 end if
 
                 ! compute water balance for each cells
@@ -637,14 +616,14 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
                                 & wat_bal_hour%n_iter1(i,j), esp_perc(i,j,1), wat_bal_hour%n_max1(i,j), doy)
 
                             ! water balance for the transpirative layer
-                            if (wat_bal2%d_t(i,j) > 0.0D0) then
+                            if (bal%lyr(2)%thickness(i,j) > 0._dp) then
                                 call water_balance_transp_lay(wat_bal_hour%inten%h_soil2(i,j), wat_bal_hour%esten%h_transp_act2(i,j), &
                                     & wat_bal_hour%esten%h_transp_pot2(i,j), wat_bal_hour%esten%h_perc2(i,j), &
                                     & wat_bal_hour%esten%h_perc1(i,j), &
                                     & wat_bal_hour%inten%k_s_dry(i,j),wat_bal_hour%inten%k_s_sat(i,j), wat_bal_hour%inten%k_s(i,j), &
                                     & wat_bal_hour%esten%h_eva_pot(i,j), wat_bal_hour%esten%h_caprise(i,j), &
                                     & wat_bal_hour%esten%h_rise(i,j), &
-                                    & pheno%d_r(i,j), wat_bal2%d_t(i,j), pheno%RF_t(i,j), &
+                                    & pheno%d_r(i,j), bal%lyr(2)%thickness(i,j), pheno%RF_t(i,j), &
                                     & pheno%k_cb(i,j), pheno%p_day(i,j), &
                                     & meteo%et0(i,j)*pars%fet0(hour), wat%layer(2)%h_sat(i,j), &
                                     & wat%layer(2)%h_fc(i,j), wat%layer(2)%h_wp(i,j), wat%layer(2)%h_r(i,j), &
@@ -652,7 +631,7 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
                                     & info_spat%a3%mat(i,j), info_spat%a4%mat(i,j), &
                                     & info_spat%b1%mat(i,j), info_spat%b2%mat(i,j), &
                                     & info_spat%b3%mat(i,j), info_spat%b4%mat(i,j), &
-                                    & wat_bal2%depth_under_rz(i,j), wat_bal_hour%n_iter2(i,j), &
+                                    & bal%depth_under_rz(i,j), wat_bal_hour%n_iter2(i,j), &
                                     & esp_perc(i,j,2),pars%sim%f_cap_rise, wat_bal_hour%n_max2(i,j), doy)
                             else
                                 !%PS%: No 2nd layer is allowed if root is very shallow; drainage from layer 1 leaves the profile directly
@@ -680,27 +659,21 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
                         & wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
                 end where
 
-                ! wat_bal_hour%inten%h_soil1 = wat_bal_hour%inten%h_soil1 + wat_bal_hour%esten%h_rise
-                ! wat_bal_hour%esten%h_pond = merge (wat_bal_hour%inten%h_soil1 - wat%layer(1)%h_sat, &
-                !          & 0.0D0, wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
-                ! wat_bal_hour%inten%h_soil1 = merge (wat%layer(1)%h_sat, wat_bal_hour%inten%h_soil1, &
-                !          & wat_bal_hour%inten%h_soil1 > wat%layer(1)%h_sat)
-
                 ! update water balance variables
-                wat_bal1%h_soil = wat_bal_hour%inten%h_soil1
-                wat_bal1%h_inf = wat_bal1%h_inf + wat_bal_hour%esten%h_inf
-                wat_bal1%h_eva = wat_bal1%h_eva + wat_bal_hour%esten%h_eva
-                wat_bal1%h_eva_pot = wat_bal1%h_eva_pot + wat_bal_hour%esten%h_eva_pot
-                wat_bal1%h_transp_act = wat_bal1%h_transp_act + wat_bal_hour%esten%h_transp_act1
-                wat_bal1%h_transp_pot = wat_bal1%h_transp_pot + wat_bal_hour%esten%h_transp_pot1
-                wat_bal1%h_perc = wat_bal1%h_perc + wat_bal_hour%esten%h_perc1
-                wat_bal2%h_soil = wat_bal_hour%inten%h_soil2
-                wat_bal2%h_transp_act = wat_bal2%h_transp_act + wat_bal_hour%esten%h_transp_act2
-                wat_bal2%h_transp_pot = wat_bal2%h_transp_pot + wat_bal_hour%esten%h_transp_pot2
-                wat_bal2%h_perc = wat_bal2%h_perc + wat_bal_hour%esten%h_perc2
-                wat_bal2%k_s = wat_bal_hour%inten%k_s
-                wat_bal2%h_caprise = wat_bal2%h_caprise + wat_bal_hour%esten%h_caprise
-                wat_bal2%h_rise = wat_bal2%h_rise + wat_bal_hour%esten%h_rise
+                bal%lyr(1)%h_soil = wat_bal_hour%inten%h_soil1
+                bal%h_inf = bal%h_inf + wat_bal_hour%esten%h_inf
+                bal%h_eva = bal%h_eva + wat_bal_hour%esten%h_eva
+                bal%h_eva_pot = bal%h_eva_pot + wat_bal_hour%esten%h_eva_pot
+                bal%lyr(1)%h_transp_act = bal%lyr(1)%h_transp_act + wat_bal_hour%esten%h_transp_act1
+                bal%lyr(1)%h_transp_pot = bal%lyr(1)%h_transp_pot + wat_bal_hour%esten%h_transp_pot1
+                bal%lyr(1)%h_perc = bal%lyr(1)%h_perc + wat_bal_hour%esten%h_perc1
+                bal%lyr(2)%h_soil = wat_bal_hour%inten%h_soil2
+                bal%lyr(2)%h_transp_act = bal%lyr(2)%h_transp_act + wat_bal_hour%esten%h_transp_act2
+                bal%lyr(2)%h_transp_pot = bal%lyr(2)%h_transp_pot + wat_bal_hour%esten%h_transp_pot2
+                bal%lyr(2)%h_perc = bal%lyr(2)%h_perc + wat_bal_hour%esten%h_perc2
+                bal%k_s = wat_bal_hour%inten%k_s
+                bal%h_caprise = bal%h_caprise + wat_bal_hour%esten%h_caprise
+                bal%h_rise = bal%h_rise + wat_bal_hour%esten%h_rise
                 wat_bal_hour%inten%h_pond0 = wat_bal_hour%esten%h_pond
 
 
@@ -724,40 +697,40 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
 
             ! update volumetric water content
             where(info_spat%domain%mat /= info_spat%domain%header%nan)
-                wat_bal1%t_soil = wat_bal1%h_soil / (1000._dp * wat_bal1%d_e)
-                where (wat_bal2%d_t > 0._dp)
-                    wat_bal2%t_soil = wat_bal2%h_soil / (1000._dp * wat_bal2%d_t)
+                bal%lyr(1)%t_soil = bal%lyr(1)%h_soil / (1000._dp * bal%lyr(1)%thickness)
+                where (bal%lyr(2)%thickness > 0._dp)
+                    bal%lyr(2)%t_soil = bal%lyr(2)%h_soil / (1000._dp * bal%lyr(2)%thickness)
                 elsewhere !%PS%: assume layer 2 is at field capacity if unexplored
-                    wat_bal2%t_soil = info_spat%theta(2)%fc%mat
+                    bal%lyr(2)%t_soil = info_spat%theta(2)%fc%mat
                 end where
             end where
             if (doy == last_simulated_doy) then
                 where(info_spat%domain%mat /= info_spat%domain%header%nan)
-                    info_spat%theta(1)%old%mat = wat_bal1%t_soil
-                    info_spat%theta(2)%old%mat = wat_bal2%t_soil
+                    info_spat%theta(1)%old%mat = bal%lyr(1)%t_soil
+                    info_spat%theta(2)%old%mat = bal%lyr(2)%t_soil
                 end where
             end if
 
             ! update the ponding variable for each day
-            wat_bal1%h_runoff = wat_bal1%h_runoff+ max(wat_bal_hour%esten%h_pond-info_spat%h_maxpond%mat,0.0D0)
-            wat_bal1%h_pond = min(wat_bal_hour%esten%h_pond,info_spat%h_maxpond%mat)
+            bal%h_runoff = bal%h_runoff + max(wat_bal_hour%esten%h_pond-info_spat%h_maxpond%mat,0.0D0)
+            bal%h_pond = min(wat_bal_hour%esten%h_pond,info_spat%h_maxpond%mat)
             !wat_bal1%h_pond = wat_bal_hour%esten%h_pond
 
-            call accumulate_daily_yield(crop_yield_state, pheno, crops, meteo, wat_bal1, wat_bal2, info_spat%domain)
+            call accumulate_daily_yield(crop_yield_state, pheno, crops, meteo, bal, info_spat%domain)
             call finalize_harvested_yield(crop_yield_state, yield, pheno, crops, pars%sim%co2_conc(year_idx), info_spat%domain)
 
-            call write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal1, wat_bal2, wat_bal2_old, info_spat, &
-                                   & pars, wat, wat_bal_hour, fw_day, fw_old, esp_perc, out_cn, out_cn_day, h_bypass,       &
-                                   & coll_irr, priv_irr, out_tbl_list, pars%sim%mode, pars%sim%f_out_cells, pars%sim        )
+            call write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, bal, bal_old, info_spat,               &
+                                   & pars, wat, wat_bal_hour, fw_day, fw_old, esp_perc, out_cn, out_cn_day, h_bypass, &
+                                   & coll_irr, priv_irr, out_tbl_list, pars%sim%mode, pars%sim%f_out_cells, pars%sim  )
 
             ! save output files by step
-            call write_outputs_by_step(doy, meteo, h_irr_sum, wat_bal1, wat_bal2, info_spat, coll_irr, priv_irr, stp_map, &
+            call write_outputs_by_step(doy, meteo, h_irr_sum, bal, info_spat, coll_irr, priv_irr, stp_map,                &
                                      & deb_map, h_bypass, out_steps, days_before_1st_interval, last_simulated_doy, summary)
 
             ! save to file the output bu year
             yr_map%rain%mat = yr_map%rain%mat + meteo%p
-            yr_map%runoff%mat = yr_map%runoff%mat + wat_bal1%h_runoff
-            yr_map%net_flux_gw%mat = yr_map%net_flux_gw%mat + wat_bal2%h_perc - wat_bal2%h_caprise
+            yr_map%runoff%mat = yr_map%runoff%mat + bal%h_runoff
+            yr_map%net_flux_gw%mat = yr_map%net_flux_gw%mat + bal%lyr(2)%h_perc - bal%h_caprise
 
             ! VERY IMPORTANT EDIT
             ! %EAC%: water release for irrigation should be already controlled by the presence of crop in field
@@ -767,13 +740,13 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
 
             where(pheno%k_cb/=0)
                 yr_map%rain_crop_season%mat = yr_map%rain_crop_season%mat + meteo%p
-                yr_map%eva_pot_crop_season%mat = yr_map%eva_pot_crop_season%mat + wat_bal1%h_eva_pot
-                yr_map%eva_act_crop_season%mat = yr_map%eva_act_crop_season%mat + wat_bal1%h_eva
-                yr_map%transp_act%mat = yr_map%transp_act%mat + wat_bal1%h_transp_act + wat_bal2%h_transp_act
-                yr_map%transp_pot%mat = yr_map%transp_pot%mat + wat_bal1%h_transp_pot + wat_bal2%h_transp_pot
+                yr_map%eva_pot_crop_season%mat = yr_map%eva_pot_crop_season%mat + bal%h_eva_pot
+                yr_map%eva_act_crop_season%mat = yr_map%eva_act_crop_season%mat + bal%h_eva
+                yr_map%transp_act%mat = yr_map%transp_act%mat + bal%lyr(1)%h_transp_act + bal%lyr(2)%h_transp_act
+                yr_map%transp_pot%mat = yr_map%transp_pot%mat + bal%lyr(1)%h_transp_pot + bal%lyr(2)%h_transp_pot
             end where
 
-            yr_deb_map%eva_act_tot%mat = yr_deb_map%eva_act_tot%mat + wat_bal1%h_eva
+            yr_deb_map%eva_act_tot%mat = yr_deb_map%eva_act_tot%mat + bal%h_eva
             yr_deb_map%iter1%mat = merge(yr_deb_map%iter1%mat,dble(iter1),iter1<yr_deb_map%iter1%mat)
             yr_deb_map%iter2%mat = merge(yr_deb_map%iter2%mat,dble(iter2),iter2<yr_deb_map%iter2%mat)
 
@@ -820,16 +793,16 @@ subroutine simulation_manager(pars, info_spat, wat_src_tbl, info_sources, info_m
     end do year_cycle
 
     ! Save output for the following year
-    info_spat%theta(1)%old%mat = wat_bal1%h_soil/(1000.*wat_bal1%d_e)
-    info_spat%theta(2)%old%mat = wat_bal2%h_soil/(1000.*wat_bal2%d_t)
+    info_spat%theta(1)%old%mat = bal%lyr(1)%h_soil/(1000._dp*bal%lyr(1)%thickness)
+    info_spat%theta(2)%old%mat = bal%lyr(2)%h_soil/(1000._dp*bal%lyr(2)%thickness)
     if (pars%sim%f_theta_out .eqv. .true.) then
         call write_grid(trim(pars%sim%final_condition)//trim(pars%sim%thetaI_end_fn)//'.asc',info_spat%theta(1)%old)
         call write_grid(trim(pars%sim%final_condition)//trim(pars%sim%thetaII_end_fn)//'.asc',info_spat%theta(2)%old)
     end if
 
     crop_state = pheno
-    call destroy_all(stp_map,yr_map,deb_map,yr_deb_map,wat_bal1,wat_bal1_old,wat_bal2,wat_bal2_old,wat_bal_hour,meteo,wat,pheno, &
-        & pars%sim%imax,pars%sim%jmax)
+    call destroy_all(stp_map, yr_map, deb_map, yr_deb_map, bal, bal_old,          &
+                   & wat_bal_hour, meteo, wat, pheno, pars%sim%imax, pars%sim%jmax)
 
 end subroutine simulation_manager
 
@@ -1059,17 +1032,16 @@ subroutine update_water_table(pars, info_spat, boundaries, year, doy)
     end where
 end subroutine update_water_table
 
-subroutine write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal1, wat_bal2, wat_bal2_old, &
-    & info_spat, pars, wat, wat_bal_hour, fw, fw_old, esp_perc, out_cn, out_cn_day, h_bypass, coll_irr, &
-    & priv_irr, out_tbl, mode,cells,sim)
+subroutine write_daily_output(doy, meteo, info_meteo, pheno, h_irr_sum, balance, balance_old,    &
+                            & info_spat, pars, wat, wat_bal_hour, fw, fw_old, esp_perc, out_cn,  &
+                            & out_cn_day, h_bypass, coll_irr, priv_irr, out_tbl, mode, cells, sim)
     ! write daily output for each control cells
    integer, intent(in):: doy
     type(meteo_mat), intent(in):: meteo
     type(meteo_info), dimension(:), intent(in):: info_meteo
     type(crop_pars_matrices), intent(in):: pheno
     real(dp), dimension(:,:), intent(in):: h_irr_sum
-    type(balance1_matrices), intent(in):: wat_bal1
-    type(balance2_matrices), intent(in):: wat_bal2, wat_bal2_old
+    type(balance_matrices), intent(in):: balance, balance_old
     type(spatial_info), intent(in):: info_spat
     type(parameters), intent(in)::pars
     real(dp), dimension(:,:), intent(in)::fw, fw_old ! %RR% test
@@ -1099,16 +1071,17 @@ subroutine write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal
                         & ';', meteo%T_min(xx,yy), ';', meteo%et0(xx,yy), &
                         & ';', pheno%k_cb(xx,yy), ';',pheno%lai(xx,yy), ';',pheno%p_day(xx,yy), &
                         & ';', h_irr_sum(xx,yy),&
-                        & ';', wat_bal1%h_eff_rain(xx,yy), ';', wat_bal1%h_gross_av_water(xx,yy), ';',wat_bal1%h_net_av_water(xx,yy), &
-                        & ';', wat_bal1%h_interc(xx,yy), ';',wat_bal1%h_runoff(xx,yy), ';',wat_bal1%h_inf(xx,yy), &
-                        & ';', wat_bal1%h_eva_pot(xx,yy), ';',wat_bal1%h_eva(xx,yy), &
-                        & ';', wat_bal1%h_transp_pot(xx,yy), ';',wat_bal1%h_transp_act(xx,yy), &
-                        & ';', wat_bal1%h_perc(xx,yy), ';',wat_bal1%h_soil(xx,yy), &
-                        & ';', wat_bal1%h_pond(xx,yy), ';', wat_bal2%h_rise(xx,yy), &
-                        & ';', wat_bal2%h_transp_pot(xx,yy), ';',wat_bal2%h_transp_act(xx,yy), ';',wat_bal2%k_s(xx,yy), &
-                        & ';', wat_bal2%d_t(xx,yy), ';',wat_bal2%depth_under_rz(xx,yy), ';',wat_bal2%h_caprise(xx,yy), &
-                        & ';', wat_bal2%h_perc(xx,yy), ';',wat_bal2%h_soil(xx,yy),';',wat_bal2_old%h_soil(xx,yy), &
-                        & ';', wat_bal2%h_raw_sup(xx,yy), ';',wat_bal2%h_raw_inf(xx,yy), &
+                        & ';', balance%h_eff_rain(xx,yy), ';', balance%h_gross_av_water(xx,yy), ';',balance%h_net_av_water(xx,yy), &
+                        & ';', balance%h_interc(xx,yy), ';',balance%h_runoff(xx,yy), ';',balance%h_inf(xx,yy), &
+                        & ';', balance%h_eva_pot(xx,yy), ';',balance%h_eva(xx,yy), &
+                        & ';', balance%lyr(1)%h_transp_pot(xx,yy), ';',balance%lyr(1)%h_transp_act(xx,yy), &
+                        & ';', balance%lyr(1)%h_perc(xx,yy), ';',balance%lyr(1)%h_soil(xx,yy), &
+                        & ';', balance%h_pond(xx,yy), ';', balance%h_rise(xx,yy), &
+                        & ';', balance%lyr(2)%h_transp_pot(xx,yy), ';',balance%lyr(2)%h_transp_act(xx,yy), ';',balance%k_s(xx,yy), &
+                        & ';', balance%lyr(2)%thickness(xx,yy), ';',balance%depth_under_rz(xx,yy), ';',balance%h_caprise(xx,yy), &
+                        & ';', balance%lyr(2)%h_perc(xx,yy), ';',balance%lyr(2)%h_soil(xx,yy),';',balance_old%lyr(2)%h_soil(xx,yy), &
+                        & ';', balance%h_irr_thresh(xx,yy), &
+                        & ';', 0._dp, & !%PS%: rawinf is no longer calculated, replaced with "0". Remove this column when refactoring this output file
                         & ';', info_spat%wat_tab%mat(xx,yy), &
                         & ';', 0,';',0, & ! add dummy variables to maintain file structure
                         & ';', esp_perc(xx,yy,1),';',esp_perc(xx,yy,2),';',h_bypass(xx,yy), &
@@ -1123,16 +1096,17 @@ subroutine write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal
                         & ';', meteo%T_min(xx,yy), ';', meteo%et0(xx,yy), &
                         & ';', pheno%k_cb(xx,yy), ';',pheno%lai(xx,yy), ';',pheno%p_day(xx,yy), &
                         & ';', h_irr_sum(xx,yy),&
-                        & ';', wat_bal1%h_eff_rain(xx,yy), ';', wat_bal1%h_gross_av_water(xx,yy), ';',wat_bal1%h_net_av_water(xx,yy), &
-                        & ';', wat_bal1%h_interc(xx,yy), ';',wat_bal1%h_runoff(xx,yy), ';',wat_bal1%h_inf(xx,yy), &
-                        & ';', wat_bal1%h_eva_pot(xx,yy), ';',wat_bal1%h_eva(xx,yy), &
-                        & ';', wat_bal1%h_transp_pot(xx,yy), ';',wat_bal1%h_transp_act(xx,yy), &
-                        & ';', wat_bal1%h_perc(xx,yy), ';',wat_bal1%h_soil(xx,yy), &
-                        & ';', wat_bal1%h_pond(xx,yy), ';', wat_bal2%h_rise(xx,yy), &
-                        & ';', wat_bal2%h_transp_pot(xx,yy), ';',wat_bal2%h_transp_act(xx,yy), ';',wat_bal2%k_s(xx,yy), &
-                        & ';', wat_bal2%d_t(xx,yy), ';',wat_bal2%depth_under_rz(xx,yy), ';',wat_bal2%h_caprise(xx,yy), &
-                        & ';', wat_bal2%h_perc(xx,yy), ';',wat_bal2%h_soil(xx,yy),';',wat_bal2_old%h_soil(xx,yy), &
-                        & ';', wat_bal2%h_raw_sup(xx,yy), ';',wat_bal2%h_raw_inf(xx,yy), &
+                        & ';', balance%h_eff_rain(xx,yy), ';', balance%h_gross_av_water(xx,yy), ';',balance%h_net_av_water(xx,yy), &
+                        & ';', balance%h_interc(xx,yy), ';',balance%h_runoff(xx,yy), ';',balance%h_inf(xx,yy), &
+                        & ';', balance%h_eva_pot(xx,yy), ';',balance%h_eva(xx,yy), &
+                        & ';', balance%lyr(1)%h_transp_pot(xx,yy), ';',balance%lyr(1)%h_transp_act(xx,yy), &
+                        & ';', balance%lyr(1)%h_perc(xx,yy), ';',balance%lyr(1)%h_soil(xx,yy), &
+                        & ';', balance%h_pond(xx,yy), ';', balance%h_rise(xx,yy), &
+                        & ';', balance%lyr(2)%h_transp_pot(xx,yy), ';',balance%lyr(2)%h_transp_act(xx,yy), ';',balance%k_s(xx,yy), &
+                        & ';', balance%lyr(2)%thickness(xx,yy), ';',balance%depth_under_rz(xx,yy), ';',balance%h_caprise(xx,yy), &
+                        & ';', balance%lyr(2)%h_perc(xx,yy), ';',balance%lyr(2)%h_soil(xx,yy),';',balance_old%lyr(2)%h_soil(xx,yy), &
+                        & ';', balance%h_irr_thresh(xx,yy), &
+                        & ';', 0._dp, & ! Legacy rawinf column retained for downstream positional consumers
                         & ';', info_spat%wat_tab%mat(xx,yy), &
                         & ';', coll_irr(xx,yy),';',priv_irr(xx,yy),';',esp_perc(xx,yy,1),&
                         & ';', esp_perc(xx,yy,2),';',h_bypass(xx,yy),&
@@ -1164,7 +1138,7 @@ subroutine write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal
                         & ';', wat%kc_max(xx,yy), &
                         & ';', wat%wat1_rew(xx,yy), ';', wat%layer(1)%h_wp(xx,yy), ';', wat_bal_hour%inten%h_soil1(xx,yy), &
                         & ';', wat_bal_hour%esten%k_e(xx,yy), &
-                        & ';', wat_bal1%h_eva_pot(xx,yy), ';', wat_bal1%h_eva(xx,yy), ';', wat_bal_hour%esten%k_r(xx,yy), ';', fw_old(xx,yy) ! RR test
+                        & ';', balance%h_eva_pot(xx,yy), ';', balance%h_eva(xx,yy), ';', wat_bal_hour%esten%k_r(xx,yy), ';', fw_old(xx,yy) ! RR test
                 else
                      write(out_tbl%cell_eva(i)%file%unit,*)doy, &
                         & ';', meteo%Wind_vel(xx,yy), ';', meteo%RH_min(xx,yy), &
@@ -1175,7 +1149,7 @@ subroutine write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal
                         & ';', wat%kc_max(xx,yy), &
                         & ';', wat%wat1_rew(xx,yy), ';', wat%layer(1)%h_wp(xx,yy), ';', wat_bal_hour%inten%h_soil1(xx,yy), &
                         & ';', wat_bal_hour%esten%k_e(xx,yy), &
-                        & ';', wat_bal1%h_eva_pot(xx,yy), ';', wat_bal1%h_eva(xx,yy), ';', wat_bal_hour%esten%k_r(xx,yy), ';', fw_old(xx,yy) !%RR% test
+                        & ';', balance%h_eva_pot(xx,yy), ';', balance%h_eva(xx,yy), ';', wat_bal_hour%esten%k_r(xx,yy), ';', fw_old(xx,yy) !%RR% test
                 end if
             end do
         end if
@@ -1193,7 +1167,7 @@ subroutine write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal
                     & ';', info_spat%theta(1)%wp%mat(xx,yy)+info_spat%theta(2)%wp%mat(xx,yy)+ &
                     & (2.0/3.0)*(info_spat%theta(1)%fc%mat(xx,yy)+info_spat%theta(2)%fc%mat(xx,yy)- &
                     & info_spat%theta(1)%wp%mat(xx,yy)-info_spat%theta(2)%wp%mat(xx,yy)), &
-                    & ';', wat_bal1%t_soil(xx,yy)+wat_bal2%t_soil(xx,yy), &
+                    & ';', balance%lyr(1)%t_soil(xx,yy)+balance%lyr(2)%t_soil(xx,yy), &
                     & ';', out_cn(xx,yy)%tab_cn2, ';', out_cn(xx,yy)%tab_cn3, &
                     & ';', info_spat%slope%mat(xx,yy), &
                     & ';', pheno%cn_class(xx,yy),';', pheno%cn_day(xx,yy), &
@@ -1203,24 +1177,23 @@ subroutine write_daily_output (doy, meteo, info_meteo, pheno, h_irr_sum, wat_bal
                     & ';', pars%sim%lambda_cn, &
                     & ';', 25.4*((1000./out_cn_day(xx,yy))-10.), &
                     & ';', pars%sim%lambda_cn*25.4*((1000./out_cn_day(xx,yy))-10.), &
-                    & ';', wat_bal1%h_gross_av_water(xx,yy), ';', wat_bal1%h_net_av_water(xx,yy), &
-                    & ';', ((wat_bal1%h_gross_av_water(xx,yy)-pars%sim%lambda_cn*25.4*((1000./out_cn_day(xx,yy))-10.))**2.)/ &
-                    & (wat_bal1%h_gross_av_water(xx,yy)+0.8*25.4*((1000./out_cn_day(xx,yy))-10.)), &
-                    & ';', wat_bal1%h_runoff(xx,yy)
+                    & ';', balance%h_gross_av_water(xx,yy), ';', balance%h_net_av_water(xx,yy), &
+                    & ';', ((balance%h_gross_av_water(xx,yy)-pars%sim%lambda_cn*25.4*((1000./out_cn_day(xx,yy))-10.))**2.)/ &
+                    & (balance%h_gross_av_water(xx,yy)+0.8*25.4*((1000./out_cn_day(xx,yy))-10.)), &
+                    & ';', balance%h_runoff(xx,yy)
             end do
         end if
     end if
 end subroutine write_daily_output
 
-subroutine write_outputs_by_step(doy, meteo, irrigation_sum, bil1, bil2, info_spat, coll_irr, priv_irr, asc,           &
-                               & deb_asc, hbypass, interval_days, days_before_1st_interval, last_simulated_doy, summary)
+subroutine write_outputs_by_step(doy, meteo, irrigation_sum, balance, info_spat, coll_irr, priv_irr, asc, deb_asc, &
+                               & hbypass, interval_days, days_before_1st_interval, last_simulated_doy, summary     )
     ! writes periodic (monthly/weekly/custom) output in *.asc files
     integer, intent(in) :: doy
     type(meteo_mat), intent(in):: meteo
     real(dp), dimension(:,:), intent(in):: irrigation_sum
     real(dp), dimension(:,:), intent(in):: hbypass
-    type(balance1_matrices), intent(in):: bil1
-    type(balance2_matrices), intent(in):: bil2
+    type(balance_matrices), intent(in) :: balance
     type(spatial_info), intent(in):: info_spat
     real(dp), dimension(:,:), intent(in):: coll_irr, priv_irr
     type(step_map), intent(inout):: asc
@@ -1230,25 +1203,25 @@ subroutine write_outputs_by_step(doy, meteo, irrigation_sum, bil1, bil2, info_sp
     integer, intent(in) :: last_simulated_doy
     logical, intent(in)::summary
 
-    asc%runoff%mat = asc%runoff%mat + bil1%h_runoff
+    asc%runoff%mat = asc%runoff%mat + balance%h_runoff
     asc%rain%mat = asc%rain%mat + meteo%p
-    asc%transp_act%mat = asc%transp_act%mat + bil1%h_transp_act + bil2%h_transp_act
-    asc%transp_pot%mat = asc%transp_pot%mat + bil1%h_transp_pot + bil2%h_transp_pot
+    asc%transp_act%mat = asc%transp_act%mat + balance%lyr(1)%h_transp_act + balance%lyr(2)%h_transp_act
+    asc%transp_pot%mat = asc%transp_pot%mat + balance%lyr(1)%h_transp_pot + balance%lyr(2)%h_transp_pot
     asc%irr%mat = asc%irr%mat + irrigation_sum + hbypass
     asc%irr_loss%mat = asc%irr_loss%mat + hbypass
-    asc%cap_rise%mat = asc%cap_rise%mat + bil2%h_caprise
+    asc%cap_rise%mat = asc%cap_rise%mat + balance%h_caprise
     asc%irr_nm_priv%mat = asc%irr_nm_priv%mat + priv_irr
     asc%irr_nm_col%mat = asc%irr_nm_col%mat + coll_irr
-    asc%deep_perc%mat = asc%deep_perc%mat + bil2%h_perc - bil2%h_caprise
-    asc%et_pot%mat = asc%et_pot%mat + bil1%h_eva_pot + bil1%h_transp_pot + bil2%h_transp_pot
-    asc%et_act%mat = asc%et_act%mat + bil1%h_eva + bil1%h_transp_act + bil2%h_transp_act
+    asc%deep_perc%mat = asc%deep_perc%mat + balance%lyr(2)%h_perc - balance%h_caprise
+    asc%et_pot%mat = asc%et_pot%mat + balance%h_eva_pot + balance%lyr(1)%h_transp_pot + balance%lyr(2)%h_transp_pot
+    asc%et_act%mat = asc%et_act%mat + balance%h_eva + balance%lyr(1)%h_transp_act + balance%lyr(2)%h_transp_act
 
-    deb_asc%eva_act%mat = deb_asc%eva_act%mat + bil1%h_eva
-    deb_asc%eff_rain%mat = deb_asc%eff_rain%mat + bil1%h_eff_rain
-    deb_asc%perc1%mat = deb_asc%perc1%mat + bil1%h_perc
-    deb_asc%perc2%mat = deb_asc%perc2%mat + bil2%h_perc
-    deb_asc%h_soil1%mat = bil1%h_soil
-    deb_asc%h_soil2%mat = bil2%h_soil
+    deb_asc%eva_act%mat = deb_asc%eva_act%mat + balance%h_eva
+    deb_asc%eff_rain%mat = deb_asc%eff_rain%mat + balance%h_eff_rain
+    deb_asc%perc1%mat = deb_asc%perc1%mat + balance%lyr(1)%h_perc
+    deb_asc%perc2%mat = deb_asc%perc2%mat + balance%lyr(2)%h_perc
+    deb_asc%h_soil1%mat = balance%lyr(1)%h_soil
+    deb_asc%h_soil2%mat = balance%lyr(2)%h_soil
 
     if (summary .eqv. .false.) then
         call save_step_data(asc, doy, info_spat%domain, interval_days, days_before_1st_interval, last_simulated_doy)
@@ -1260,16 +1233,14 @@ subroutine write_outputs_by_step(doy, meteo, irrigation_sum, bil1, bil2, info_sp
 
 end subroutine write_outputs_by_step
 
-subroutine allocate_all (asc,yasc,deb_asc,deb_yasc,bil1,bil1_old,bil2,bil2_old,bil_hour,meteo,wat,pheno,&
-    & imax, jmax, domain, crops)
+subroutine allocate_all(asc, yasc, deb_asc, deb_yasc, balance, balance_old, bil_hour, meteo, wat, pheno, imax, jmax,domain,crops)
     integer,dimension(:,:),intent(in)::domain
     type(crop_definition), intent(in) :: crops(:)
     type(step_map)::asc
     type(step_debug_map):: deb_asc
     type(annual_map)::yasc
     type(annual_debug_map):: deb_yasc
-    type(balance1_matrices)::bil1, bil1_old
-    type(balance2_matrices)::bil2, bil2_old
+    type(balance_matrices) :: balance, balance_old
     type(hourly)::bil_hour
     type(meteo_mat)::meteo
     type(wat_matrix)::wat
@@ -1286,23 +1257,20 @@ subroutine allocate_all (asc,yasc,deb_asc,deb_yasc,bil1,bil1_old,bil2,bil2_old,b
     call init_yearly_debug_output(deb_yasc,domain)
 
     !alloca/dealloca le matrici in base al flag TRUE/FALSE
-    call init_wat_bal1_matrices(bil1,imax, jmax, allocazione)
-    call init_wat_bal1_matrices(bil1_old,imax, jmax, allocazione)
-    call init_wat_bal2_matrices(bil2,imax, jmax, allocazione)
-    call init_wat_bal2_matrices(bil2_old,imax, jmax, allocazione)
+    call init_balance_matrices(balance,imax,jmax,allocazione)
+    call init_balance_matrices(balance_old,imax,jmax,allocazione)
     call init_wat_bal_hour(bil_hour,imax, jmax, allocazione)
     call init_meteo_matrices(meteo,imax, jmax, allocazione)
     call init_wat_matrices(wat,imax, jmax, allocazione)
     call init_pheno_matrices(pheno,imax, jmax, allocazione, crops)
 end subroutine allocate_all
 
-subroutine destroy_all(asc,yasc,deb_asc,deb_yasc,bil1,bil1_old,bil2,bil2_old,bil_hour,meteo,wat,pheno,imax, jmax)
+subroutine destroy_all(asc, yasc, deb_asc, deb_yasc, balance, balance_old, bil_hour, meteo, wat, pheno, imax, jmax)
    type(step_map)::asc
     type(step_debug_map),optional::deb_asc
     type(annual_map)::yasc
     type(annual_debug_map),optional::deb_yasc
-    type(balance1_matrices)::bil1, bil1_old
-    type(balance2_matrices)::bil2, bil2_old
+    type(balance_matrices) :: balance, balance_old
     type(hourly)::bil_hour
     type(meteo_mat)::meteo
     type(wat_matrix)::wat
@@ -1318,98 +1286,13 @@ subroutine destroy_all(asc,yasc,deb_asc,deb_yasc,bil1,bil1_old,bil2,bil2_old,bil
     call destroy_step_debug_output(deb_asc)
     call destroy_annual_debug_output(deb_yasc)
     ! allocate/destrot the matrix base on f_allocate flag (true/false)
-    call init_wat_bal1_matrices(bil1,imax, jmax, f_allocate)
-    call init_wat_bal1_matrices(bil1_old,imax, jmax, f_allocate)
-    call init_wat_bal2_matrices(bil2,imax, jmax, f_allocate)
-    call init_wat_bal2_matrices(bil2_old,imax, jmax, f_allocate)
+    call init_balance_matrices(balance,imax,jmax,f_allocate)
+    call init_balance_matrices(balance_old,imax,jmax,f_allocate)
     call init_wat_bal_hour(bil_hour,imax, jmax, f_allocate)
     call init_meteo_matrices(meteo,imax, jmax, f_allocate)
     call init_wat_matrices(wat,imax, jmax, f_allocate)
     call init_pheno_matrices(pheno,imax, jmax, f_allocate)
 end subroutine destroy_all
-
-subroutine init_wat_bal1(bil,a)
-    ! overloading of the assignment operator "="
-   real(dp),intent(in)::a
-    type(balance1_matrices),intent(out)::bil
-
-    bil%d_e = a
-    bil%h_eva = a
-    bil%h_eva_pot = a
-    bil%h_transp_act = a
-    bil%h_transp_pot = a
-    bil%h_soil = a
-    bil%t_soil = a
-    bil%h_interc = a
-    bil%h_perc = a
-    bil%h_inf = a
-    bil%h_eff_rain = a
-    bil%h_net_av_water = a
-    bil%h_runoff = a
-    bil%h_pond = a
-end subroutine init_wat_bal1
-
-subroutine init_wat_bal2(bil,a)
-    ! overloading of the assignment operator "="
-   real(dp),intent(in)::a
-    type(balance2_matrices),intent(out)::bil
-
-    bil%d_t = a
-    bil%h_soil = a
-    bil%t_soil = a
-    bil%h_transp_act = a
-    bil%h_transp_pot = a
-    bil%h_perc = a
-    bil%h_raw_sup = a
-    bil%h_raw = a
-    bil%h_raw_inf = a
-    bil%h_raw_priv = a
-    bil%k_s = a
-    bil%depth_under_rz = a
-    bil%h_caprise = a
-    bil%h_rise = a
-end subroutine init_wat_bal2
-
-subroutine eq_wat_bal1(bil_out,bil_in)
-    ! overloading of the assignment operator "="
-   type(balance1_matrices),intent(in)::bil_in
-    type(balance1_matrices),intent(out)::bil_out
-    bil_out%d_e = bil_in%d_e
-    bil_out%h_eva = bil_in%h_eva
-    bil_out%h_eva_pot = bil_in%h_eva_pot
-    bil_out%h_transp_act = bil_in%h_transp_act
-    bil_out%h_transp_pot = bil_in%h_transp_pot
-    bil_out%h_soil = bil_in%h_soil
-    bil_out%h_interc = bil_in%h_interc
-    bil_out%t_soil = bil_in%t_soil
-    bil_out%h_perc = bil_in%h_perc
-    bil_out%h_inf = bil_in%h_inf
-    bil_out%h_eff_rain = bil_in%h_eff_rain
-    bil_out%h_net_av_water = bil_in%h_net_av_water
-    bil_out%h_runoff = bil_in%h_runoff
-    bil_out%h_pond=bil_in%h_pond
-end subroutine eq_wat_bal1
-
-subroutine eq_wat_bal2(bil_out,bil_in)
-   ! overloading of the assignment operator "="
-    type(balance2_matrices),intent(in)::bil_in
-    type(balance2_matrices),intent(out)::bil_out
-
-    bil_out%d_t = bil_in%d_t
-    bil_out%h_soil = bil_in%h_soil
-    bil_out%t_soil = bil_in%t_soil
-    bil_out%h_transp_act = bil_in%h_transp_act
-    bil_out%h_transp_pot = bil_in%h_transp_pot
-    bil_out%h_perc = bil_in%h_perc
-    bil_out%h_raw_sup = bil_in%h_raw_sup
-    bil_out%h_raw = bil_in%h_raw
-    bil_out%h_raw_inf = bil_in%h_raw_inf
-    bil_out%h_raw_priv = bil_in%h_raw_priv
-    bil_out%k_s = bil_in%k_s
-    bil_out%depth_under_rz = bil_in%depth_under_rz
-    bil_out%h_caprise = bil_in%h_caprise
-    bil_out%h_rise = bil_in%h_rise
-end subroutine eq_wat_bal2
 
 function calc_interception(p,pheno)
     ! Calculate the interception according to Von Hoyningen-Hune (1983) and Braden (1985)
@@ -1468,12 +1351,11 @@ subroutine eq_extensive(a,b)
     a%n_max2 = 1
 end subroutine eq_extensive
 
-
 subroutine b1_no_iter_eva(pheno, meteo, h_rain_lim, wat, fw_day, fw_irr, fw_rain, fc, &
                         & h_irr_sum, f_interception, domain, balance1_mat, fw_old) ! %RR% add fw_old for testing
     ! calculate the elements of the evaporative model that change daily
    type(grid_i),intent(in)::domain
-    type(balance1_matrices),intent(in):: balance1_mat
+    type(balance_matrices),intent(in):: balance1_mat
     type(crop_pars_matrices),intent(inout)::pheno
     type(meteo_mat),intent(in)::meteo
     type(wat_matrix),intent(inout)::wat
@@ -1503,7 +1385,7 @@ subroutine b1_no_iter_eva(pheno, meteo, h_rain_lim, wat, fw_day, fw_irr, fw_rain
         h_irr_net = h_irr_sum - calc_interception(h_irr_sum*f_interception, pheno)
         h_rain_net = meteo%P - calc_interception(meteo%p, pheno)
 
-        V_eva = max(zero_mat, (balance1_mat%h_soil - wat%layer(1)%h_wp ))
+        V_eva = max(zero_mat, (balance1_mat%lyr(1)%h_soil - wat%layer(1)%h_wp))
         TEW = wat%layer(1)%h_sat - wat%layer(1)%h_wp
 
         where(h_irr_sum/=0 .and. meteo%P>= h_rain_lim)
@@ -1555,28 +1437,22 @@ subroutine b1_no_iter_eva(pheno, meteo, h_rain_lim, wat, fw_day, fw_irr, fw_rain
 
 end subroutine b1_no_iter_eva
 
-subroutine init_water_balance_variables(wat_bal1,wat_bal2)
-   type(balance1_matrices),intent(out)::wat_bal1
-    type(balance2_matrices),intent(out)::wat_bal2
+! Make sure variables that are accumulated hourly are zeroed before the hourly loop
+subroutine reset_water_balance_variables(balance)
+    type(balance_matrices),intent(inout)::balance
 
-    wat_bal1%h_soil = 0.
-    wat_bal1%h_inf = 0.
-    wat_bal1%h_eva = 0.
-    wat_bal1%h_eva_pot = 0.
-    wat_bal1%h_transp_act = 0.
-    wat_bal1%h_transp_pot = 0.
-    wat_bal1%h_perc = 0.
-    wat_bal1%h_runoff = 0.
-
-    wat_bal2%h_soil = 0.
-    wat_bal2%h_transp_act = 0.
-    wat_bal2%h_transp_pot = 0.
-    wat_bal2%h_perc = 0.
-    wat_bal2%k_s = 0.
-    wat_bal2%h_caprise = 0.
-    wat_bal2%h_rise = 0.
-
-end subroutine init_water_balance_variables
+    balance%h_inf = 0.
+    balance%h_eva = 0.
+    balance%h_eva_pot = 0.
+    balance%lyr(1)%h_transp_act = 0.
+    balance%lyr(1)%h_transp_pot = 0.
+    balance%lyr(1)%h_perc = 0.
+    balance%lyr(2)%h_transp_act = 0.
+    balance%lyr(2)%h_transp_pot = 0.
+    balance%lyr(2)%h_perc = 0.
+    balance%h_caprise = 0.
+    balance%h_rise = 0.
+end subroutine reset_water_balance_variables
 
 subroutine update_soil_pars(domain, theta, d_e, d_t, wat, theta2_rice, is_rice_paddy)
     ! update water matrix that change with only the thikness of the soil layer
@@ -1607,93 +1483,58 @@ subroutine update_soil_pars(domain, theta, d_e, d_t, wat, theta2_rice, is_rice_p
     end where
 end subroutine update_soil_pars
 
-subroutine init_wat_bal1_matrices(wat_bal1,imax,jmax,f_allocate)
-    ! init/destroy water balance variable
-   type(balance1_matrices),intent(inout)::wat_bal1
-    integer,intent(in)::imax
-    integer,intent(in)::jmax
-    logical,intent(in)::f_allocate
-    integer::checkstat
-    character (len=*),parameter:: error_message = "wat_ball has been wrongly allocated"
+subroutine update_irrigation_thresholds(bal, wat, p_day, r_stress, alpha_ms, alpha_unm, domain, mode)
+    type(balance_matrices), intent(inout) :: bal
+    type(wat_matrix), intent(in) :: wat
+    real(dp), dimension(:,:), intent(in) :: p_day, r_stress, alpha_ms, alpha_unm
+    type(grid_i), intent(in) :: domain
+    integer, intent(in) :: mode
+    real(dp), dimension(size(p_day, 1), size(p_day, 2)) :: h_fc, taw
 
-    if(f_allocate)then
-        allocate(wat_bal1%d_e(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%h_eva(imax,jmax),stat=checkstat)          ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%h_eva_pot(imax,jmax),stat=checkstat)      ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%h_transp_act(imax,jmax),stat=checkstat)    ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%h_transp_pot(imax,jmax),stat=checkstat)    ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%h_soil(imax,jmax),stat=checkstat)          ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%t_soil(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%h_interc(imax,jmax),stat=checkstat)       ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%h_perc(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%h_inf(imax,jmax),stat=checkstat)          ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%h_eff_rain(imax,jmax),stat=checkstat)     ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%h_net_av_water(imax,jmax),stat=checkstat)  ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%h_gross_av_water(imax,jmax),stat=checkstat); if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%h_runoff(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal1%h_pond(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message
+    if (mode == 0) return
 
-    else
-        deallocate(wat_bal1%d_e)
-        deallocate(wat_bal1%h_eva)
-        deallocate(wat_bal1%h_eva_pot)
-        deallocate(wat_bal1%h_transp_act)
-        deallocate(wat_bal1%h_transp_pot)
-        deallocate(wat_bal1%h_soil)
-        deallocate(wat_bal1%t_soil)
-        deallocate(wat_bal1%h_interc)
-        deallocate(wat_bal1%h_perc)
-        deallocate(wat_bal1%h_inf)
-        deallocate(wat_bal1%h_eff_rain)
-        deallocate(wat_bal1%h_net_av_water)
-        deallocate(wat_bal1%h_gross_av_water)
-        deallocate(wat_bal1%h_runoff)
-        deallocate(wat_bal1%h_pond)
+    h_fc = wat%layer(1)%h_fc + wat%layer(2)%h_fc
+    taw = (wat%layer(1)%h_fc - wat%layer(1)%h_wp) + (wat%layer(2)%h_fc - wat%layer(2)%h_wp) ! Total available water
+
+    where(domain%mat /= domain%header%nan)
+        bal%h_irr_thresh = h_fc - taw * p_day * (alpha_ms + r_stress)
+    end where
+
+    if (mode == 1) then
+        where(domain%mat /= domain%header%nan)
+            bal%h_raw = h_fc - taw * p_day !%PS%: the "raw" naming here is a bit confusing. Read it as "profile water storage when RAW is fully depleted".
+            bal%h_priv_thresh = h_fc - taw * p_day * (alpha_unm + r_stress)
+        end where
     end if
-end subroutine init_wat_bal1_matrices
+end subroutine update_irrigation_thresholds
 
-subroutine init_wat_bal2_matrices(wat_bal2,imax,jmax,f_allocate)
-    ! init/destroy water balance variable
-   type(balance2_matrices),intent(inout)::wat_bal2
-    integer,intent(in)::imax
-    integer,intent(in)::jmax
-    logical,intent(in)::f_allocate
+subroutine init_balance_matrices(bal, imax, jmax, f_allocate)
+    type(balance_matrices), intent(inout) :: bal
+    integer, intent(in) :: imax, jmax
+    logical, intent(in) :: f_allocate
+    integer :: layer_idx
 
-    integer::checkstat
-    character (len=*),parameter:: error_message = "wat_bal2 has been wrongly allocated"
-
-    if(f_allocate)then
-        allocate(wat_bal2%d_t(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal2%h_soil(imax,jmax),stat=checkstat)          ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal2%t_soil(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal2%h_transp_act(imax,jmax),stat=checkstat)    ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal2%h_transp_pot(imax,jmax),stat=checkstat)    ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal2%h_perc(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal2%h_raw_sup(imax,jmax),stat=checkstat)       ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal2%h_raw(imax,jmax),stat=checkstat)          ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal2%h_raw_inf(imax,jmax),stat=checkstat)       ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal2%h_raw_priv(imax,jmax),stat=checkstat)        ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal2%k_s(imax,jmax),stat=checkstat)           ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal2%depth_under_rz(imax,jmax),stat=checkstat); if(checkstat/=0)print*,error_message
-        allocate(wat_bal2%h_caprise(imax,jmax),stat=checkstat)      ; if(checkstat/=0)print*,error_message
-        allocate(wat_bal2%h_rise(imax,jmax),stat=checkstat)         ; if(checkstat/=0)print*,error_message
+    if (f_allocate) then
+        do layer_idx=1,2
+            allocate(bal%lyr(layer_idx)%thickness(imax,jmax), bal%lyr(layer_idx)%h_soil(imax,jmax),                &
+                   & bal%lyr(layer_idx)%t_soil(imax,jmax), bal%lyr(layer_idx)%h_transp_act(imax,jmax),             &
+                   & bal%lyr(layer_idx)%h_transp_pot(imax,jmax), bal%lyr(layer_idx)%h_perc(imax,jmax), source=0._dp)
+        end do
+        allocate(bal%h_eva(imax,jmax), bal%h_eva_pot(imax,jmax), bal%h_interc(imax,jmax), bal%h_pond(imax,jmax),          &
+               & bal%h_inf(imax,jmax), bal%h_runoff(imax,jmax), bal%h_eff_rain(imax,jmax), bal%h_net_av_water(imax,jmax), &
+               & bal%h_gross_av_water(imax,jmax), bal%k_s(imax,jmax), bal%depth_under_rz(imax,jmax),                      &
+               & bal%h_caprise(imax,jmax), bal%h_rise(imax,jmax), bal%h_raw(imax,jmax),                                   &
+               & bal%h_irr_thresh(imax,jmax), bal%h_priv_thresh(imax,jmax), source=0._dp                                  )
     else
-        deallocate(wat_bal2%d_t)
-        deallocate(wat_bal2%h_soil)
-        deallocate(wat_bal2%t_soil)
-        deallocate(wat_bal2%h_transp_act)
-        deallocate(wat_bal2%h_transp_pot)
-        deallocate(wat_bal2%h_perc)
-        deallocate(wat_bal2%h_raw_sup)
-        deallocate(wat_bal2%h_raw)
-        deallocate(wat_bal2%h_raw_inf)
-        deallocate(wat_bal2%h_raw_priv)
-        deallocate(wat_bal2%k_s)
-        deallocate(wat_bal2%depth_under_rz)
-        deallocate(wat_bal2%h_caprise)
-        deallocate(wat_bal2%h_rise)
+        do layer_idx=1,2
+            deallocate(bal%lyr(layer_idx)%thickness, bal%lyr(layer_idx)%h_soil, bal%lyr(layer_idx)%t_soil,        &
+                     & bal%lyr(layer_idx)%h_transp_act, bal%lyr(layer_idx)%h_transp_pot, bal%lyr(layer_idx)%h_perc)
+        end do
+        deallocate(bal%h_eva, bal%h_eva_pot, bal%h_interc, bal%h_pond, bal%h_inf, bal%h_runoff,           &
+                 & bal%h_eff_rain, bal%h_net_av_water, bal%h_gross_av_water, bal%k_s, bal%depth_under_rz, &
+                 & bal%h_caprise, bal%h_rise, bal%h_raw, bal%h_irr_thresh, bal%h_priv_thresh              )
     end if
-end subroutine init_wat_bal2_matrices
+end subroutine init_balance_matrices
 
 subroutine init_wat_bal_hour(wat_bal1_hour,imax,jmax,f_allocate)
     ! init/destroy wat_bal_hourly
