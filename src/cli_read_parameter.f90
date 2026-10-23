@@ -753,6 +753,10 @@ subroutine read_grid_files(info_spat, extent, sim)
     if(sim%f_init_wc .eqv. .true.)then  ! from external files
         call read_grid(trim(dir_ic)//trim(sim%thetaI_0_fn)//'.asc',info_spat%theta(1)%old,sim,extent)
         call read_grid(trim(dir_ic)//trim(sim%thetaII_0_fn)//'.asc',info_spat%theta(2)%old,sim,extent)
+        print *, "Warning: since the removal of cropcoef (IdrAgra 3.0.0 onwards), it is recommended to set InitialThetaFlag = T."
+        print *, "Because you have set it to 'F' instead, note that crop state in the first simulation year might not be &
+                & representative of actual field conditions (crops can't be sown before the simulation starts)"
+        print *, "press <enter> to continue "; read *
     else ! Warmup starts at FC moisture; first actual year overwrites this using warmup_theta later 
         call read_grid(trim(dir)//trim(sim%thetaI_FC_fn)//'.asc',info_spat%theta(1)%old,sim,extent)
         call read_grid(trim(dir)//trim(sim%thetaII_FC_fn)//'.asc',info_spat%theta(2)%old,sim,extent)
