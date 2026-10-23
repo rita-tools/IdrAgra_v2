@@ -353,10 +353,10 @@ recursive subroutine water_balance_transp_lay(h_soil2, h_transp_act, h_transp_po
         if (h_soil_new >= h_sat) then
             h_rise = h_soil_new - h_sat   ! excess water moves upward
             h_soil_new = h_sat
-        else if (h_soil_new <= h_wp)then
-            ! limit percolation in order to not go under wilting point
-            h_perc2 = h_perc2 + (h_soil_new-h_wp)
-            h_soil_new = h_wp
+        else if (h_soil_new <= h_r) then
+            ! limit percolation in order to not go under wilting point %PS%: changed to residual
+            h_perc2 = h_perc2 + (h_soil_new - h_r)
+            h_soil_new = h_r
         end if
 
         ! convergence of the solution
